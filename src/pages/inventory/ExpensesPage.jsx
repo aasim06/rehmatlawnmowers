@@ -236,7 +236,7 @@ export default function ExpensesPage() {
     <Stack spacing={3}>
       {/* 1. TOP 4 MANTIS KPI STATS CARDS */}
       <Grid container spacing={2.5}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
             title="TODAY'S EXPENSES"
             count={`PKR ${stats.todayTotal.toLocaleString()}`}
@@ -245,7 +245,7 @@ export default function ExpensesPage() {
             accentColor="#ef4444"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
             title="THIS MONTH'S EXPENSES"
             count={`PKR ${stats.monthTotal.toLocaleString()}`}
@@ -254,7 +254,7 @@ export default function ExpensesPage() {
             accentColor="#1677ff"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
             title="TOP EXPENSE CATEGORY"
             count={stats.topCat}
@@ -263,7 +263,7 @@ export default function ExpensesPage() {
             accentColor="#faad14"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
             title="ALL-TIME TOTAL EXPENSES"
             count={`PKR ${stats.allTimeTotal.toLocaleString()}`}
@@ -283,9 +283,9 @@ export default function ExpensesPage() {
         }}
       >
         <form onSubmit={handleAddExpense}>
-          <Grid container spacing={2.5}>
-            {/* ROW 1 */}
-            <Grid item xs={12} md={6}>
+          <Grid container spacing={2.5} alignItems="center">
+            {/* ROW 1: Expense Title (50%), Category (25%), Amount (25%) */}
+            <Grid size={{ xs: 12, md: 6 }}>
               <Autocomplete
                 freeSolo
                 options={QUICK_EXPENSE_SUGGESTIONS}
@@ -314,7 +314,7 @@ export default function ExpensesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <TextField
                 select
                 fullWidth
@@ -336,7 +336,7 @@ export default function ExpensesPage() {
               </TextField>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <TextField
                 fullWidth
                 label="AMOUNT (PKR) *"
@@ -357,8 +357,8 @@ export default function ExpensesPage() {
               />
             </Grid>
 
-            {/* ROW 2 */}
-            <Grid item xs={12} sm={6} md={3.5}>
+            {/* ROW 2: Paid To (30%), Payment Method (20%), Expense Date (20%), Notes (30%) */}
+            <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
               <TextField
                 fullWidth
                 label="PAID TO / PERSON / VENDOR"
@@ -374,7 +374,7 @@ export default function ExpensesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6} md={2.5}>
+            <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
               <TextField
                 select
                 fullWidth
@@ -396,7 +396,7 @@ export default function ExpensesPage() {
               </TextField>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={2.5}>
+            <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
               <TextField
                 fullWidth
                 label="EXPENSE DATE"
@@ -413,7 +413,7 @@ export default function ExpensesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3.5}>
+            <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
               <TextField
                 fullWidth
                 label="NOTES / RECEIPT REF #"
@@ -430,8 +430,8 @@ export default function ExpensesPage() {
             </Grid>
 
             {/* ROW 3: Action Buttons */}
-            <Grid item xs={12}>
-              <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+            <Grid size={12}>
+              <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ pt: 1 }}>
                 <Button
                   variant="outlined"
                   color="secondary"
