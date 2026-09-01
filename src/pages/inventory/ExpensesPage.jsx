@@ -586,9 +586,9 @@ export default function ExpensesPage() {
         {/* Expenses Data Table */}
         <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
           <Table size="small">
-            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100') }}>
+            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50') }}>
               <TableRow>
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                   <Checkbox
                     color="primary"
                     indeterminate={selected.length > 0 && selected.length < filteredExpenses.length}
@@ -596,16 +596,16 @@ export default function ExpensesPage() {
                     onChange={handleSelectAllClick}
                   />
                 </TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary', width: 50 }}>SR</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary', width: 110 }}>DATE</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>EXPENSE TITLE / DESCRIPTION</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary', width: 160 }}>CATEGORY</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary', width: 130 }}>PAID TO</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.secondary', width: 110 }}>PAYMENT MODE</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.secondary', width: 130 }}>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 50, borderBottom: '1px solid', borderColor: 'divider' }}>SR</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 110, borderBottom: '1px solid', borderColor: 'divider' }}>DATE</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', borderBottom: '1px solid', borderColor: 'divider' }}>EXPENSE TITLE / DESCRIPTION</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 160, borderBottom: '1px solid', borderColor: 'divider' }}>CATEGORY</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 130, borderBottom: '1px solid', borderColor: 'divider' }}>PAID TO</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 120, borderBottom: '1px solid', borderColor: 'divider' }}>PAYMENT MODE</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', width: 130, borderBottom: '1px solid', borderColor: 'divider' }}>
                   AMOUNT (PKR)
                 </TableCell>
-                <TableCell align="center" sx={{ fontWeight: 700, color: 'text.secondary', width: 90 }}>
+                <TableCell align="center" sx={{ fontWeight: 700, color: 'text.primary', width: 90, borderBottom: '1px solid', borderColor: 'divider' }}>
                   ACTION
                 </TableCell>
               </TableRow>
@@ -650,26 +650,56 @@ export default function ExpensesPage() {
                         <Chip
                           label={exp.category || 'General'}
                           size="small"
-                          variant="light"
-                          color={
-                            exp.category === 'Tea & Refreshment'
-                              ? 'warning'
-                              : exp.category === 'Fuel & Transport'
-                              ? 'error'
-                              : exp.category === 'Utilities & Bills'
-                              ? 'primary'
-                              : exp.category === 'Staff Wages & Labor'
-                              ? 'info'
-                              : 'default'
-                          }
-                          sx={{ fontWeight: 600 }}
+                          sx={{
+                            fontWeight: 600,
+                            bgcolor: (theme) =>
+                              theme.palette.mode === 'dark'
+                                ? exp.category === 'Tea & Refreshment'
+                                  ? 'rgba(245, 158, 11, 0.2)'
+                                  : exp.category === 'Fuel & Transport'
+                                  ? 'rgba(239, 68, 68, 0.2)'
+                                  : exp.category === 'Utilities & Bills'
+                                  ? 'rgba(59, 130, 246, 0.2)'
+                                  : exp.category === 'Staff Wages & Labor'
+                                  ? 'rgba(99, 102, 241, 0.2)'
+                                  : 'rgba(255, 255, 255, 0.1)'
+                                : exp.category === 'Tea & Refreshment'
+                                ? '#fef3c7'
+                                : exp.category === 'Fuel & Transport'
+                                ? '#fee2e2'
+                                : exp.category === 'Utilities & Bills'
+                                ? '#dbeafe'
+                                : exp.category === 'Staff Wages & Labor'
+                                ? '#e0e7ff'
+                                : '#f1f5f9',
+                            color: (theme) =>
+                              theme.palette.mode === 'dark'
+                                ? exp.category === 'Tea & Refreshment'
+                                  ? '#fbbf24'
+                                  : exp.category === 'Fuel & Transport'
+                                  ? '#f87171'
+                                  : exp.category === 'Utilities & Bills'
+                                  ? '#60a5fa'
+                                  : exp.category === 'Staff Wages & Labor'
+                                  ? '#818cf8'
+                                  : '#e2e8f0'
+                                : exp.category === 'Tea & Refreshment'
+                                ? '#b45309'
+                                : exp.category === 'Fuel & Transport'
+                                ? '#b91c1c'
+                                : exp.category === 'Utilities & Bills'
+                                ? '#1d4ed8'
+                                : exp.category === 'Staff Wages & Labor'
+                                ? '#4338ca'
+                                : '#475569'
+                          }}
                         />
                       </TableCell>
                       <TableCell sx={{ color: 'text.primary' }}>{exp.paidTo || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip label={exp.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
                       </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, color: 'error.main', fontSize: '0.95rem' }}>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: (theme) => (theme.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '0.95rem' }}>
                         PKR {parseFloat(exp.amount || 0).toLocaleString()}
                       </TableCell>
                       <TableCell align="center">
@@ -703,7 +733,7 @@ export default function ExpensesPage() {
               {filteredExpenses.length > 0 && (
                 <TableRow
                   sx={{
-                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100'),
+                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'grey.50'),
                     borderTop: '2px solid',
                     borderColor: 'divider'
                   }}
@@ -711,7 +741,7 @@ export default function ExpensesPage() {
                   <TableCell colSpan={7} align="right" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem' }}>
                     Total Amount:
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 900, color: 'error.main', fontSize: '1.05rem' }}>
+                  <TableCell align="right" sx={{ fontWeight: 900, color: (theme) => (theme.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '1.05rem' }}>
                     PKR {filteredTotal.toLocaleString()}
                   </TableCell>
                   <TableCell />
