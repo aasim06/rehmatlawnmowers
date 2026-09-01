@@ -83,7 +83,8 @@ export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('factory_store_user');
+      // Use sessionStorage so every fresh app start demands sign-in
+      const saved = sessionStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
         return {
@@ -105,11 +106,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem('rehmat_store_staff_users', JSON.stringify(staffUsers));
   }, [staffUsers]);
 
-  // Sync user to localStorage
+  // Clean stale storage and sync active user to sessionStorage
   useEffect(() => {
+    localStorage.removeItem('factory_store_user');
     if (user) {
-      localStorage.setItem('factory_store_user', JSON.stringify(user));
+      sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(user));
     } else {
+      sessionStorage.removeItem('rehmat_erp_active_user');
       localStorage.removeItem('factory_store_user');
     }
   }, [user]);
