@@ -1,37 +1,30 @@
-import { lazy } from 'react';
+// direct imports for instantaneous 0ms page switching
+import DashboardDefault from 'pages/dashboard/default';
+import ItemsPage from 'pages/inventory/ItemsPage';
+import AddItemNamePage from 'pages/inventory/AddItemNamePage';
+import StockInPage from 'pages/inventory/StockInPage';
+import StockOutPage from 'pages/inventory/StockOutPage';
+import VendorsPage from 'pages/inventory/VendorsPage';
+import MachineSalesPage from 'pages/inventory/MachineSalesPage';
+import MachineRepairsPage from 'pages/inventory/MachineRepairsPage';
+import CategoriesPage from 'pages/inventory/CategoriesPage';
+import UsageLogPage from 'pages/inventory/UsageLogPage';
+import ReportsPage from 'pages/inventory/ReportsPage';
+import MachineBOMPage from 'pages/inventory/MachineBOMPage';
+import CustomerLedgerPage from 'pages/inventory/CustomerLedgerPage';
+import VendorLedgerPage from 'pages/inventory/VendorLedgerPage';
+import BackupRestorePage from 'pages/inventory/BackupRestorePage';
+import UserManagementPage from 'pages/admin/UserManagementPage';
+import Color from 'pages/component-overview/color';
+import Typography from 'pages/component-overview/typography';
+import Shadow from 'pages/component-overview/shadows';
+import SamplePage from 'pages/extra-pages/sample-page';
 
-// project imports
-import Loadable from 'components/Loadable';
+// layout & auth
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from 'components/ProtectedRoute';
 
-// render - Dashboard
-const DashboardDefault = Loadable(lazy(() => import('pages/dashboard/default')));
-
-// render - Inventory Store Pages
-const ItemsPage = Loadable(lazy(() => import('pages/inventory/ItemsPage')));
-const AddItemNamePage = Loadable(lazy(() => import('pages/inventory/AddItemNamePage')));
-const StockInPage = Loadable(lazy(() => import('pages/inventory/StockInPage')));
-const StockOutPage = Loadable(lazy(() => import('pages/inventory/StockOutPage')));
-const VendorsPage = Loadable(lazy(() => import('pages/inventory/VendorsPage')));
-const MachineSalesPage = Loadable(lazy(() => import('pages/inventory/MachineSalesPage')));
-const MachineRepairsPage = Loadable(lazy(() => import('pages/inventory/MachineRepairsPage')));
-const CategoriesPage = Loadable(lazy(() => import('pages/inventory/CategoriesPage')));
-const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
-const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
-const MachineBOMPage = Loadable(lazy(() => import('pages/inventory/MachineBOMPage')));
-const CustomerLedgerPage = Loadable(lazy(() => import('pages/inventory/CustomerLedgerPage')));
-const VendorLedgerPage = Loadable(lazy(() => import('pages/inventory/VendorLedgerPage')));
-const BackupRestorePage = Loadable(lazy(() => import('pages/inventory/BackupRestorePage')));
-const UserManagementPage = Loadable(lazy(() => import('pages/admin/UserManagementPage')));
-
-// render - Overview Utilities
-const Color = Loadable(lazy(() => import('pages/component-overview/color')));
-const Typography = Loadable(lazy(() => import('pages/component-overview/typography')));
-const Shadow = Loadable(lazy(() => import('pages/component-overview/shadows')));
-const SamplePage = Loadable(lazy(() => import('pages/extra-pages/sample-page')));
-
-// ==============================|| MAIN ROUTING ||============================== //
+// ==============================|| MAIN ROUTING (ZERO-LATENCY INSTANT NAVIGATION) ||============================== //
 
 const MainRoutes = {
   path: '/',

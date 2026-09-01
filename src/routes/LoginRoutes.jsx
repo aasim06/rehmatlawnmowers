@@ -1,13 +1,7 @@
-import { lazy } from 'react';
+import LoginPage from 'pages/auth/Login';
+import RegisterPage from 'pages/auth/Register';
 
-// project imports
-import Loadable from 'components/Loadable';
-
-// jwt auth
-const LoginPage = Loadable(lazy(() => import('pages/auth/Login')));
-const RegisterPage = Loadable(lazy(() => import('pages/auth/Register')));
-
-// ==============================|| AUTH ROUTING ||============================== //
+// ==============================|| AUTH ROUTING (INSTANT) ||============================== //
 
 const LoginRoutes = {
   path: '/',
