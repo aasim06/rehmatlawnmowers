@@ -12,6 +12,8 @@
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "tauri": "tauri",
+    "build:exe": "tauri build",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
     "prettier": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\""
@@ -68,6 +70,7 @@
     "@eslint/compat": "2.1.0",
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
+    "@tauri-apps/cli": "^2.11.4",
     "eslint": "10.3.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-jsx-a11y": "6.10.2",
