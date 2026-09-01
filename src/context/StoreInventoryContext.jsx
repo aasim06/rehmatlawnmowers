@@ -116,7 +116,14 @@ export function StoreInventoryProvider({ children }) {
   // 13. Machine Repairs & Job Cards State (Clean Zero Start)
   const [machineRepairs, setMachineRepairs] = useState(() => safeParseJSON('rehmat_store_machine_repairs_v1', []));
 
-  // 14. Audit Logs State
+  // 14. Expenses State
+  const [expenses, setExpenses] = useState(() => safeParseJSON('rehmat_store_expenses_v1', []));
+
+  useEffect(() => {
+    localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(expenses));
+  }, [expenses]);
+
+  // 15. Audit Logs State
   const initialAuditLogs = [
     {
       id: 'LOG-1',
@@ -278,7 +285,8 @@ export function StoreInventoryProvider({ children }) {
         vndPayRes,
         catRes,
         repairsRes,
-        masterItemsRes
+        masterItemsRes,
+        expensesRes
       ] = await Promise.allSettled([
         sql`SELECT * FROM store_items ORDER BY name ASC;`,
         sql`SELECT * FROM usage_logs ORDER BY created_at DESC LIMIT 500;`,
@@ -288,7 +296,8 @@ export function StoreInventoryProvider({ children }) {
         sql`SELECT * FROM vendor_payments ORDER BY created_at DESC;`,
         sql`SELECT * FROM categories ORDER BY name ASC;`,
         sql`SELECT * FROM machine_repairs ORDER BY created_at DESC LIMIT 500;`,
-        sql`SELECT * FROM master_item_names ORDER BY name ASC;`
+        sql`SELECT * FROM master_item_names ORDER BY name ASC;`,
+        sql`SELECT * FROM expenses ORDER BY expense_date DESC, created_at DESC;`
       ]);
 
       if (itemsRes.status === 'fulfilled' && itemsRes.value && itemsRes.value.length > 0) {
@@ -421,6 +430,20 @@ export function StoreInventoryProvider({ children }) {
 
       if (masterItemsRes.status === 'fulfilled' && masterItemsRes.value && masterItemsRes.value.length > 0) {
         setMasterItemNames(masterItemsRes.value);
+      }
+
+      if (expensesRes.status === 'fulfilled' && expensesRes.value && expensesRes.value.length > 0) {
+        setExpenses(expensesRes.value.map(e => ({
+          id: e.id,
+          title: e.title,
+          category: e.category || 'General',
+          amount: parseFloat(e.amount) || 0,
+          paymentMethod: e.payment_method || 'Cash',
+          paidTo: e.paid_to || 'N/A',
+          expenseDate: e.expense_date,
+          notes: e.notes || '',
+          createdAt: e.created_at
+        })));
       }
     } catch (err) {
       console.log('Neon Database Sync Notice:', err.message);
@@ -1660,6 +1683,58 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
+  const addExpense = async (expenseData) => {
+    const newId = expenseData.id || `exp-${Date.now()}`;
+    const newExpense = {
+      id: newId,
+      title: expenseData.title,
+      category: expenseData.category || 'General',
+      amount: parseFloat(expenseData.amount) || 0,
+      paymentMethod: expenseData.paymentMethod || expenseData.payment_method || 'Cash',
+      paidTo: expenseData.paidTo || expenseData.paid_to || 'N/A',
+      expenseDate: expenseData.expenseDate || expenseData.expense_date || new Date().toISOString().split('T')[0],
+      notes: expenseData.notes || '',
+      createdAt: new Date().toISOString()
+    };
+
+    setExpenses((prev) => [newExpense, ...prev]);
+    logActivity('Expense Added', `Added expense: PKR ${newExpense.amount} for ${newExpense.title}`);
+
+    try {
+      await sql`
+        INSERT INTO expenses (
+          id, title, category, amount, payment_method,
+          paid_to, expense_date, notes, created_at
+        ) VALUES (
+          ${newExpense.id}, ${newExpense.title}, ${newExpense.category},
+          ${newExpense.amount}, ${newExpense.paymentMethod},
+          ${newExpense.paidTo}, ${newExpense.expenseDate}, ${newExpense.notes}, NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          category = EXCLUDED.category,
+          amount = EXCLUDED.amount,
+          payment_method = EXCLUDED.payment_method,
+          paid_to = EXCLUDED.paid_to,
+          expense_date = EXCLUDED.expense_date,
+          notes = EXCLUDED.notes;
+      `;
+    } catch (e) {
+      console.error('Neon addExpense error:', e);
+    }
+    return newExpense;
+  };
+
+  const deleteExpense = async (expenseId) => {
+    setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
+    logActivity('Expense Deleted', `Deleted expense ID ${expenseId}`);
+    try {
+      await sql`DELETE FROM expenses WHERE id = ${expenseId};`;
+    } catch (e) {
+      console.error('Neon deleteExpense error:', e);
+    }
+  };
+
   const resetAllDataToZero = async () => {
     try {
       // 1. Wipe store_items, usage_logs, and all operational tables from Supabase Database
@@ -1807,7 +1882,10 @@ export function StoreInventoryProvider({ children }) {
       addNotification,
       markNotificationRead,
       markAllNotificationsRead,
-      clearNotifications
+      clearNotifications,
+      expenses,
+      addExpense,
+      deleteExpense
     }),
     [
       items,
@@ -1820,6 +1898,7 @@ export function StoreInventoryProvider({ children }) {
       machineRecipes,
       customerPayments,
       vendorPayments,
+      expenses,
       totalInventoryCount,
       totalValuation,
       todayStockInQty,

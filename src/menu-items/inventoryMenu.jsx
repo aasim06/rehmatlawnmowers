@@ -18,7 +18,8 @@ import {
   BookOutlined,
   PayCircleOutlined,
   ShopOutlined,
-  CloudSyncOutlined
+  CloudSyncOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
 
 const icons = {
@@ -40,7 +41,8 @@ const icons = {
   BookOutlined,
   PayCircleOutlined,
   ShopOutlined,
-  CloudSyncOutlined
+  CloudSyncOutlined,
+  WalletOutlined
 };
 
 // ==============================|| MENU ITEMS - FACTORY STORE INVENTORY ||============================== //
@@ -135,6 +137,13 @@ const inventoryMenu = {
       type: 'item',
       url: '/inventory/reports',
       icon: icons.BarChartOutlined
+    },
+    {
+      id: 'expenses',
+      title: 'Daily Expenses',
+      type: 'item',
+      url: '/inventory/expenses',
+      icon: icons.WalletOutlined
     },
     {
       id: 'backup-restore',

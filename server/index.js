@@ -12,6 +12,7 @@ import vendorsRoutes from './routes/vendors.js';
 import customersRoutes from './routes/customers.js';
 import reportsRoutes from './routes/reports.js';
 import backupRoutes from './routes/backup.js';
+import expensesRoutes from './routes/expenses.js';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/repairs', repairsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/vendors', vendorsRoutes);
 app.use('/api/customers', customersRoutes);
+app.use('/api/expenses', expensesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/backup', backupRoutes);
 

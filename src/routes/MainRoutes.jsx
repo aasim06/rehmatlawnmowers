@@ -14,6 +14,7 @@ import MachineBOMPage from 'pages/inventory/MachineBOMPage';
 import CustomerLedgerPage from 'pages/inventory/CustomerLedgerPage';
 import VendorLedgerPage from 'pages/inventory/VendorLedgerPage';
 import BackupRestorePage from 'pages/inventory/BackupRestorePage';
+import ExpensesPage from 'pages/inventory/ExpensesPage';
 import UserManagementPage from 'pages/admin/UserManagementPage';
 import Color from 'pages/component-overview/color';
 import Typography from 'pages/component-overview/typography';
@@ -101,6 +102,10 @@ const MainRoutes = {
         {
           path: 'reports',
           element: <ReportsPage />
+        },
+        {
+          path: 'expenses',
+          element: <ExpensesPage />
         },
         {
           path: 'backup-restore',
