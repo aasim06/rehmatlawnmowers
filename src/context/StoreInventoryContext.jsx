@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
+import { sql } from 'api/neon';
 
 const StoreInventoryContext = createContext();
 
@@ -265,7 +266,7 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Parallel Data Fetching via Promise.allSettled for zero-latency initial load
+  // Parallel Data Fetching via Neon PostgreSQL for zero-latency initial load
   const fetchSupabaseData = async () => {
     try {
       const [
@@ -276,70 +277,73 @@ export function StoreInventoryProvider({ children }) {
         custPayRes,
         vndPayRes,
         catRes,
-        repairsRes
+        repairsRes,
+        masterItemsRes
       ] = await Promise.allSettled([
-        supabase.from('store_items').select('*'),
-        supabase.from('usage_logs').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('vendors').select('*'),
-        supabase.from('machine_sales').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('customer_payments').select('*'),
-        supabase.from('vendor_payments').select('*'),
-        supabase.from('categories').select('*'),
-        supabase.from('machine_repairs').select('*').order('created_at', { ascending: false }).limit(500)
+        sql`SELECT * FROM store_items ORDER BY name ASC;`,
+        sql`SELECT * FROM usage_logs ORDER BY created_at DESC LIMIT 500;`,
+        sql`SELECT * FROM vendors ORDER BY name ASC;`,
+        sql`SELECT * FROM machine_sales ORDER BY created_at DESC LIMIT 500;`,
+        sql`SELECT * FROM customer_payments ORDER BY created_at DESC;`,
+        sql`SELECT * FROM vendor_payments ORDER BY created_at DESC;`,
+        sql`SELECT * FROM categories ORDER BY name ASC;`,
+        sql`SELECT * FROM machine_repairs ORDER BY created_at DESC LIMIT 500;`,
+        sql`SELECT * FROM master_item_names ORDER BY name ASC;`
       ]);
 
-      if (itemsRes.status === 'fulfilled' && !itemsRes.value.error && itemsRes.value.data) {
-        const mappedItems = itemsRes.value.data.map((i) => ({
+      if (itemsRes.status === 'fulfilled' && itemsRes.value && itemsRes.value.length > 0) {
+        const mappedItems = itemsRes.value.map((i) => ({
           id: i.id,
           name: i.name,
-          itemCode: i.item_code || i.id,
+          itemCode: i.sku_code || i.item_code || i.id,
           category: i.category || 'General',
           unit: i.unit || 'PCS',
-          totalStock: parseFloat(i.total_stock) || 0,
-          usedToday: parseFloat(i.used_today) || 0,
+          totalStock: parseFloat(i.current_stock || i.total_stock) || 0,
+          usedToday: 0,
           remainingStock: parseFloat(i.remaining_stock) || 0,
           unitPrice: parseFloat(i.unit_price) || 0,
-          minLevel: parseFloat(i.min_level) || 10,
-          rackLocation: i.rack_location || 'Main Store',
-          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= (parseFloat(i.min_level) || 10) ? 0 : 1
+          minLevel: parseFloat(i.min_threshold || i.min_level) || 10,
+          rackLocation: i.location || i.rack_location || 'Main Store',
+          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= (parseFloat(i.min_threshold || i.min_level) || 10) ? 0 : 1
         }));
         setItems(mappedItems);
       }
 
-      if (logsRes.status === 'fulfilled' && !logsRes.value.error && logsRes.value.data) {
-        setUsageLogs(logsRes.value.data.map(l => ({
+      if (logsRes.status === 'fulfilled' && logsRes.value && logsRes.value.length > 0) {
+        setUsageLogs(logsRes.value.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
           itemCode: l.item_code || 'N/A',
           itemName: l.item_name || 'Item',
           qtyUsed: parseFloat(l.qty_used) || 1,
-          unitPrice: 0,
-          lineTotal: 0,
+          unitPrice: parseFloat(l.unit_price) || 0,
+          discountAmount: parseFloat(l.discount_amount) || 0,
+          lineTotal: parseFloat(l.line_total) || 0,
           usedBy: l.used_by || 'Store',
           department: l.department || 'Store',
           issuedBy: l.issued_by || 'Store Manager',
-          time: l.date_iso ? new Date(l.date_iso).toLocaleString() : 'Today',
-          dateISO: l.date_iso || l.created_at || new Date().toISOString()
+          time: l.time || new Date(l.created_at).toLocaleString(),
+          dateISO: l.created_at || new Date().toISOString()
         })));
       }
 
-      if (vendorsRes.status === 'fulfilled' && !vendorsRes.value.error && vendorsRes.value.data) {
-        setVendors(vendorsRes.value.data.map(v => ({
+      if (vendorsRes.status === 'fulfilled' && vendorsRes.value && vendorsRes.value.length > 0) {
+        setVendors(vendorsRes.value.map(v => ({
           id: v.id,
           name: v.name,
-          contactPerson: v.contact_person || v.name,
-          companyName: v.name,
+          contactPerson: v.company_name || v.name,
+          companyName: v.company_name || v.name,
           phone: v.phone || 'N/A',
           email: v.email || 'N/A',
-          address: v.address || 'Local',
+          address: v.city_address || v.address || 'Local',
           suppliedCategory: v.supplied_category || 'General',
-          openingBalance: 0,
-          currentBalance: 0
+          openingBalance: parseFloat(v.opening_balance) || 0,
+          currentBalance: parseFloat(v.current_balance) || 0
         })));
       }
 
-      if (salesRes.status === 'fulfilled' && !salesRes.value.error && salesRes.value.data) {
-        setMachineSales(salesRes.value.data.map(s => ({
+      if (salesRes.status === 'fulfilled' && salesRes.value && salesRes.value.length > 0) {
+        setMachineSales(salesRes.value.map(s => ({
           id: s.id,
           saleNo: s.sale_no || s.id,
           customerName: s.customer_name,
@@ -359,8 +363,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (custPayRes.status === 'fulfilled' && custPayRes.value.data) {
-        setCustomerPayments(custPayRes.value.data.map(cp => ({
+      if (custPayRes.status === 'fulfilled' && custPayRes.value && custPayRes.value.length > 0) {
+        setCustomerPayments(custPayRes.value.map(cp => ({
           id: cp.id,
           customerName: cp.customer_name,
           date: cp.payment_date,
@@ -371,8 +375,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (vndPayRes.status === 'fulfilled' && vndPayRes.value.data) {
-        setVendorPayments(vndPayRes.value.data.map(vp => ({
+      if (vndPayRes.status === 'fulfilled' && vndPayRes.value && vndPayRes.value.length > 0) {
+        setVendorPayments(vndPayRes.value.map(vp => ({
           id: vp.id,
           vendorName: vp.vendor_name,
           date: vp.payment_date,
@@ -383,16 +387,16 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (catRes.status === 'fulfilled' && !catRes.value.error && catRes.value.data) {
-        setCategories(catRes.value.data.map((c) => ({
+      if (catRes.status === 'fulfilled' && catRes.value && catRes.value.length > 0) {
+        setCategories(catRes.value.map((c) => ({
           id: c.id,
           name: c.name,
           description: c.description
         })));
       }
 
-      if (repairsRes.status === 'fulfilled' && !repairsRes.value.error && repairsRes.value.data) {
-        setMachineRepairs(repairsRes.value.data.map(r => ({
+      if (repairsRes.status === 'fulfilled' && repairsRes.value && repairsRes.value.length > 0) {
+        setMachineRepairs(repairsRes.value.map(r => ({
           id: r.id,
           repairNo: r.repair_no || r.id,
           customerName: r.customer_name,
@@ -403,6 +407,7 @@ export function StoreInventoryProvider({ children }) {
           faultDescription: r.fault_description || 'General Service',
           partsCost: parseFloat(r.parts_cost) || 0,
           laborCost: parseFloat(r.labor_cost) || 0,
+          discountAmount: parseFloat(r.discount_amount) || 0,
           totalCost: parseFloat(r.total_cost) || 0,
           paidAmount: parseFloat(r.paid_amount) || 0,
           balanceAmount: parseFloat(r.balance_amount) || 0,
@@ -410,11 +415,15 @@ export function StoreInventoryProvider({ children }) {
           paymentStatus: r.payment_status || 'Pending',
           receivedDate: r.received_date || new Date().toLocaleDateString(),
           promisedDate: r.promised_date || '1-2 Days',
-          technicianNotes: r.technician_notes || ''
+          repairItems: r.repair_items || []
         })));
       }
+
+      if (masterItemsRes.status === 'fulfilled' && masterItemsRes.value && masterItemsRes.value.length > 0) {
+        setMasterItemNames(masterItemsRes.value);
+      }
     } catch (err) {
-      console.log('Supabase Sync Notice:', err.message);
+      console.log('Neon Database Sync Notice:', err.message);
     }
   };
 
@@ -1558,30 +1567,34 @@ export function StoreInventoryProvider({ children }) {
     setMachineRepairs((prev) => [newRepair, ...prev]);
 
     try {
-      const { error } = await supabase.from('machine_repairs').upsert([{
-        id: repairId,
-        repair_no: repairNo,
-        customer_name: repairData.customerName || 'Walk-in Customer',
-        customer_phone: repairData.customerPhone || 'N/A',
-        city_address: repairData.cityAddress || 'Lahore',
-        machine_name: repairData.machineName || 'Lawn Mower Machine',
-        serial_no: repairData.serialNo || 'N/A',
-        fault_description: repairData.faultDescription || 'General Service & Repair',
-        parts_cost: partsCost,
-        labor_cost: laborCost,
-        total_cost: totalCost,
-        paid_amount: paidAmount,
-        balance_amount: balanceAmount,
-        repair_status: repairData.repairStatus || 'Received',
-        payment_status: paymentStatus,
-        received_date: formattedDate,
-        promised_date: repairData.promisedDate || '1-2 Days',
-        technician_notes: repairData.technicianNotes || ''
-      }]);
-      if (error) console.error('Supabase addMachineRepair Error:', error);
-      else await fetchSupabaseData();
+      await sql`
+        INSERT INTO machine_repairs (
+          id, repair_no, customer_name, customer_phone, city_address,
+          machine_name, serial_no, fault_description, parts_cost,
+          labor_cost, discount_amount, total_cost, paid_amount,
+          balance_amount, repair_status, received_date, promised_date,
+          repair_items, created_at
+        ) VALUES (
+          ${repairId}, ${repairNo}, ${repairData.customerName || 'Walk-in Customer'},
+          ${repairData.customerPhone || 'N/A'}, ${repairData.cityAddress || 'Lahore'},
+          ${repairData.machineName || 'Lawn Mower Machine'}, ${repairData.serialNo || 'N/A'},
+          ${repairData.faultDescription || 'General Service & Repair'},
+          ${partsCost}, ${laborCost}, ${parseFloat(repairData.discountAmount) || 0},
+          ${totalCost}, ${paidAmount}, ${balanceAmount},
+          ${repairData.repairStatus || 'Received'}, ${formattedDate},
+          ${repairData.promisedDate || '1-2 Days'},
+          ${JSON.stringify(repairData.repairItems || [])}, NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          customer_name = EXCLUDED.customer_name,
+          customer_phone = EXCLUDED.customer_phone,
+          city_address = EXCLUDED.city_address,
+          repair_status = EXCLUDED.repair_status,
+          paid_amount = EXCLUDED.paid_amount,
+          balance_amount = EXCLUDED.balance_amount;
+      `;
     } catch (e) {
-      console.error('Supabase addMachineRepair Exception:', e);
+      console.error('Neon addMachineRepair Exception:', e);
     }
     return newRepair;
   };
@@ -1613,28 +1626,37 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      const dbFields = {};
-      if (updatedFields.repairStatus) dbFields.repair_status = updatedFields.repairStatus;
-      if (updatedFields.partsCost !== undefined) dbFields.parts_cost = parseFloat(updatedFields.partsCost) || 0;
-      if (updatedFields.laborCost !== undefined) dbFields.labor_cost = parseFloat(updatedFields.laborCost) || 0;
-      if (updatedFields.paidAmount !== undefined) dbFields.paid_amount = parseFloat(updatedFields.paidAmount) || 0;
-      if (updatedFields.technicianNotes) dbFields.technician_notes = updatedFields.technicianNotes;
-
-      const { error } = await supabase.from('machine_repairs').update(dbFields).eq('id', repairId);
-      if (error) console.error('Supabase updateMachineRepair Error:', error);
-      else await fetchSupabaseData();
+      if (updatedFields.repairStatus && updatedFields.paidAmount !== undefined) {
+        await sql`
+          UPDATE machine_repairs
+          SET repair_status = ${updatedFields.repairStatus},
+              paid_amount = ${parseFloat(updatedFields.paidAmount) || 0}
+          WHERE id = ${repairId};
+        `;
+      } else if (updatedFields.repairStatus) {
+        await sql`
+          UPDATE machine_repairs
+          SET repair_status = ${updatedFields.repairStatus}
+          WHERE id = ${repairId};
+        `;
+      } else if (updatedFields.paidAmount !== undefined) {
+        await sql`
+          UPDATE machine_repairs
+          SET paid_amount = ${parseFloat(updatedFields.paidAmount) || 0}
+          WHERE id = ${repairId};
+        `;
+      }
     } catch (e) {
-      console.error('Supabase updateMachineRepair Exception:', e);
+      console.error('Neon updateMachineRepair Exception:', e);
     }
   };
 
   const deleteMachineRepair = async (repairId) => {
     setMachineRepairs((prev) => prev.filter((r) => r.id !== repairId));
     try {
-      await supabase.from('machine_repairs').delete().eq('id', repairId);
-      await fetchSupabaseData();
+      await sql`DELETE FROM machine_repairs WHERE id = ${repairId};`;
     } catch (e) {
-      console.error(e);
+      console.error('Neon deleteMachineRepair Exception:', e);
     }
   };
 
