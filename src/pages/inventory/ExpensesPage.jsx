@@ -753,24 +753,85 @@ export default function ExpensesPage() {
       </MainCard>
 
       {/* 4. PRINTABLE VOUCHER / STATEMENT DIALOG */}
-      <Dialog open={printOpen} onClose={() => setPrintOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Dialog
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        maxWidth="md"
+        fullWidth
+        sx={{
+          '@media print': {
+            '& .MuiDialog-container': {
+              display: 'block !important',
+              padding: '0 !important',
+              margin: '0 !important'
+            },
+            '& .MuiPaper-root': {
+              boxShadow: 'none !important',
+              border: 'none !important',
+              maxWidth: '100% !important',
+              margin: '0 !important',
+              padding: '0 !important',
+              borderRadius: '0 !important',
+              overflow: 'visible !important'
+            }
+          }
+        }}
+      >
+        <style>
+          {`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 8mm 10mm;
+              }
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-expense-sheet, #printable-expense-sheet * {
+                visibility: visible !important;
+              }
+              #printable-expense-sheet {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+              }
+              .no-print, .MuiDialogTitle-root, .MuiDialogActions-root, .MuiBackdrop-root {
+                display: none !important;
+                visibility: hidden !important;
+              }
+              .MuiDialogContent-root {
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                overflow: visible !important;
+              }
+            }
+          `}
+        </style>
+
+        <DialogTitle className="no-print" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h5" fontWeight={700}>
             {selectedExpenseForPrint ? 'Expense Payment Voucher' : 'Daily Expenses Statement'}
           </Typography>
-          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint}>
+          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint} className="no-print">
             Print Now
           </Button>
         </DialogTitle>
-        <DialogContent dividers>
-          <Box id="printable-expense-sheet" sx={{ p: 2, bgcolor: '#ffffff' }}>
+
+        <DialogContent sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#ffffff' }}>
+          <Box id="printable-expense-sheet" sx={{ bgcolor: '#ffffff', color: '#0f172a', width: '100%' }}>
             {/* Company Header */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pb: 2, borderBottom: '2px solid #0f172a', mb: 2 }}>
               <Box>
-                <Typography variant="h4" fontWeight={900} sx={{ color: '#0f172a', letterSpacing: 1 }}>
+                <Typography variant="h4" fontWeight={900} sx={{ color: '#0f172a', letterSpacing: 0.5, fontSize: '1.5rem' }}>
                   REHMAT LAWN MOWERS
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#475569' }}>
+                <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600 }}>
                   Store & Workshop Daily Expense Statement
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#64748b' }}>
@@ -781,101 +842,116 @@ export default function ExpensesPage() {
                 component="img"
                 src={rehmatLogo}
                 alt="Logo"
-                sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '50%', border: '1px solid #cbd5e1' }}
+                sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: '50%', border: '1px solid #cbd5e1' }}
               />
             </Stack>
 
-            {/* Date & Meta */}
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 2, bgcolor: '#f8fafc', p: 1.5, borderRadius: 1 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Report Date:{' '}
+            {/* Date & Meta Header */}
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 2, bgcolor: '#f8fafc', p: 1.25, borderRadius: 1, border: '1px solid #e2e8f0' }}>
+              <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                Statement Date:{' '}
                 <Box component="span" fontWeight={800}>
-                  {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Period'}
+                  {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Records'}
                 </Box>
               </Typography>
-              <Typography variant="body2" fontWeight={600}>
-                Total Expenses:{' '}
-                <Box component="span" fontWeight={800} color="#b91c1c">
+              <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                Total Amount:{' '}
+                <Box component="span" fontWeight={800} sx={{ color: '#b91c1c' }}>
                   PKR {selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount).toLocaleString() : filteredTotal.toLocaleString()}
                 </Box>
               </Typography>
             </Stack>
 
             {/* Print Table */}
-            <Table size="small" sx={{ border: '1px solid #cbd5e1', mb: 3 }}>
+            <Table size="small" sx={{ width: '100%', border: '1px solid #94a3b8', mb: 2.5, '& th, & td': { borderColor: '#cbd5e1' } }}>
               <TableHead sx={{ bgcolor: '#0f172a' }}>
                 <TableRow>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Sr</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Date</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Expense Description</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Category</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Paid To</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>Mode</TableCell>
-                  <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                    Amount (PKR)
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 40, py: 1 }}>SR</TableCell>
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 100, py: 1 }}>DATE</TableCell>
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, py: 1 }}>EXPENSE DESCRIPTION</TableCell>
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 150, py: 1 }}>CATEGORY</TableCell>
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 130, py: 1 }}>PAID TO</TableCell>
+                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 110, py: 1 }}>PAYMENT MODE</TableCell>
+                  <TableCell align="right" sx={{ color: '#ffffff !important', fontWeight: 700, width: 120, py: 1 }}>
+                    AMOUNT (PKR)
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {selectedExpenseForPrint ? (
                   <TableRow>
-                    <TableCell>1</TableCell>
-                    <TableCell>{selectedExpenseForPrint.expenseDate}</TableCell>
-                    <TableCell fontWeight={700}>{selectedExpenseForPrint.title}</TableCell>
-                    <TableCell>{selectedExpenseForPrint.category}</TableCell>
-                    <TableCell>{selectedExpenseForPrint.paidTo || 'N/A'}</TableCell>
-                    <TableCell>{selectedExpenseForPrint.paymentMethod || 'Cash'}</TableCell>
-                    <TableCell align="right" fontWeight={800}>
+                    <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>1</TableCell>
+                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.expenseDate}</TableCell>
+                    <TableCell sx={{ color: '#0f172a', fontWeight: 700 }}>
+                      {selectedExpenseForPrint.title}
+                      {selectedExpenseForPrint.notes && (
+                        <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
+                          Ref: {selectedExpenseForPrint.notes}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.category}</TableCell>
+                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.paidTo || 'N/A'}</TableCell>
+                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.paymentMethod || 'Cash'}</TableCell>
+                    <TableCell align="right" sx={{ color: '#b91c1c', fontWeight: 800 }}>
                       PKR {parseFloat(selectedExpenseForPrint.amount).toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredExpenses.map((exp, idx) => (
                     <TableRow key={exp.id || idx}>
-                      <TableCell>{idx + 1}</TableCell>
-                      <TableCell>{exp.expenseDate}</TableCell>
-                      <TableCell fontWeight={600}>{exp.title}</TableCell>
-                      <TableCell>{exp.category}</TableCell>
-                      <TableCell>{exp.paidTo || 'N/A'}</TableCell>
-                      <TableCell>{exp.paymentMethod || 'Cash'}</TableCell>
-                      <TableCell align="right" fontWeight={700}>
+                      <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>{idx + 1}</TableCell>
+                      <TableCell sx={{ color: '#0f172a' }}>{exp.expenseDate}</TableCell>
+                      <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>
+                        {exp.title}
+                        {exp.notes && (
+                          <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
+                            Ref: {exp.notes}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ color: '#0f172a' }}>{exp.category}</TableCell>
+                      <TableCell sx={{ color: '#0f172a' }}>{exp.paidTo || 'N/A'}</TableCell>
+                      <TableCell sx={{ color: '#0f172a' }}>{exp.paymentMethod || 'Cash'}</TableCell>
+                      <TableCell align="right" sx={{ color: '#0f172a', fontWeight: 700 }}>
                         PKR {parseFloat(exp.amount).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
                 <TableRow sx={{ bgcolor: '#f1f5f9' }}>
-                  <TableCell colSpan={6} align="right" sx={{ fontWeight: 800 }}>
-                    Total Amount:
+                  <TableCell colSpan={6} align="right" sx={{ fontWeight: 800, color: '#0f172a', py: 1 }}>
+                    Total Expenses:
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 900, color: '#b91c1c', fontSize: '1rem' }}>
+                  <TableCell align="right" sx={{ fontWeight: 900, color: '#b91c1c', fontSize: '1rem', py: 1 }}>
                     PKR {selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount).toLocaleString() : filteredTotal.toLocaleString()}
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
 
-            {/* Signatures */}
-            <Stack direction="row" justifyContent="space-between" sx={{ mt: 5, pt: 2 }}>
-              <Box sx={{ borderTop: '1px solid #94a3b8', width: 180, textAlign: 'center', pt: 0.5 }}>
-                <Typography variant="caption" fontWeight={700}>
+            {/* Signatures Section */}
+            <Stack direction="row" justifyContent="space-between" sx={{ mt: 4, pt: 2 }}>
+              <Box sx={{ borderTop: '1px solid #64748b', width: 180, textAlign: 'center', pt: 0.5 }}>
+                <Typography variant="caption" fontWeight={700} sx={{ color: '#334155' }}>
                   Prepared By (Cashier)
                 </Typography>
               </Box>
-              <Box sx={{ borderTop: '1px solid #94a3b8', width: 180, textAlign: 'center', pt: 0.5 }}>
-                <Typography variant="caption" fontWeight={700}>
+              <Box sx={{ borderTop: '1px solid #64748b', width: 180, textAlign: 'center', pt: 0.5 }}>
+                <Typography variant="caption" fontWeight={700} sx={{ color: '#334155' }}>
                   Verified / Approved By
                 </Typography>
               </Box>
             </Stack>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPrintOpen(false)} color="secondary">
+
+        <DialogActions className="no-print" sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+          <Button onClick={() => setPrintOpen(false)} color="secondary" variant="outlined" className="no-print">
             Close
           </Button>
-          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint}>
-            Print
+          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint} className="no-print" sx={{ fontWeight: 700 }}>
+            Print Statement
           </Button>
         </DialogActions>
       </Dialog>
