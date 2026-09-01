@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 
 // material-ui
 import Grid from '@mui/material/Grid';
@@ -8,10 +8,17 @@ import Typography from '@mui/material/Typography';
 // project imports
 import AuthWrapper from 'sections/auth/AuthWrapper';
 import AuthLogin from 'sections/auth/AuthLogin';
+import { useAuth } from 'context/AuthContext';
 
 // ================================|| JWT - LOGIN ||================================ //
 
 export default function Login() {
+  const { user } = useAuth();
+
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <AuthWrapper>
       <Grid container spacing={3}>

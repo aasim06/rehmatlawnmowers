@@ -82,16 +82,23 @@ export function AuthProvider({ children }) {
   });
 
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('factory_store_user');
-    const parsedUser = saved ? JSON.parse(saved) : initialStaffUsers[0];
-    return {
-      ...parsedUser,
-      permissions: parsedUser.permissions || (parsedUser.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
-    };
+    try {
+      const saved = localStorage.getItem('factory_store_user');
+      if (saved) {
+        const parsedUser = JSON.parse(saved);
+        return {
+          ...parsedUser,
+          permissions: parsedUser.permissions || (parsedUser.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
   });
 
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Sync staffUsers to localStorage
   useEffect(() => {
