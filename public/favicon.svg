@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e" />
+      <stop offset="100%" stop-color="#15803d" />
+    </linearGradient>
+    <!-- Gold Emblem Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Circular Badge Fill -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad)" stroke="#86efac" stroke-width="12" filter="url(#shadow)" />
+  <circle cx="256" cy="256" r="220" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="4" stroke-dasharray="12 8" />
+
+  <!-- Central Gear / Lawn Mower Emblem Ring -->
+  <g transform="translate(256, 220)">
+    <!-- Gear teeth -->
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(45)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(90)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(135)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(180)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(225)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(270)" />
+    <path d="M-30,-120 L30,-120 L25,-80 L-25,-80 Z" fill="url(#goldGrad)" transform="rotate(315)" />
+
+    <!-- Outer Gear Circle -->
+    <circle cx="0" cy="0" r="95" fill="none" stroke="url(#goldGrad)" stroke-width="18" />
+    <!-- Inner Dark Circle -->
+    <circle cx="0" cy="0" r="76" fill="#052e16" stroke="#fef08a" stroke-width="4" />
+
+    <!-- Bold Letter "R" for Rehmat -->
+    <text x="0" y="32" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="105" font-weight="900" text-anchor="middle" fill="url(#goldGrad)" letter-spacing="-2">R</text>
+  </g>
+
+  <!-- Bottom Banner Ribbon "REHMAT" -->
+  <path d="M 80,380 Q 256,430 432,380 L 410,435 Q 256,480 102,435 Z" fill="#052e16" stroke="url(#goldGrad)" stroke-width="4" />
+  <text x="256" y="428" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="44" font-weight="900" text-anchor="middle" fill="#ffffff" letter-spacing="4">REHMAT</text>
+</svg>
