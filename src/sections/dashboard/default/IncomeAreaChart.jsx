@@ -115,7 +115,7 @@ export default function IncomeAreaChart({ view }) {
       showMark: false,
       area: true,
       id: 'stock-in',
-      color: theme.vars.palette.primary.main || '#52c41a',
+      color: theme.vars.palette.primary.main || '#0096D6',
       visible: visibility['Stock In (Receiving)']
     },
     {
@@ -124,7 +124,7 @@ export default function IncomeAreaChart({ view }) {
       showMark: false,
       area: true,
       id: 'stock-out',
-      color: theme.vars.palette.primary[700] || '#389e0d',
+      color: theme.vars.palette.primary[700] || '#00578A',
       visible: visibility['Stock Out (Issuance)']
     }
   ];

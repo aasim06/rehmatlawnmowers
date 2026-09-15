@@ -15,7 +15,7 @@ export default function CustomShadows(palette) {
   };
 
   const grey900 = palette?.grey?.[900] ?? '#000000';
-  const primaryMain = palette?.primary?.main ?? '#52c41a';
+  const primaryMain = palette?.primary?.main ?? '#0096D6';
   const secondaryMain = palette?.secondary?.main ?? '#8c8c8c';
   const errorMain = palette?.error?.main ?? '#ff4d4f';
   const warningMain = palette?.warning?.main ?? '#faad14';

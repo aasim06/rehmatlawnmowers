@@ -341,7 +341,8 @@ export default function DashboardDefault() {
           <Grid>
             <Button
               variant="contained"
-              sx={{ bgcolor: '#52c41a', '&:hover': { bgcolor: '#389e0d' }, fontWeight: 700 }}
+              color="primary"
+              sx={{ fontWeight: 700 }}
               startIcon={<FileTextOutlined />}
               onClick={() => navigate('/inventory/machine-sales')}
             >

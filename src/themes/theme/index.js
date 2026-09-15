@@ -1,7 +1,10 @@
+import { generate } from '@ant-design/colors';
+
 // ==============================|| PRESET THEME - DEFAULT ||============================== //
 
 export default function Default(colors) {
   const { blue, red, gold, cyan, green, grey } = colors;
+  const primaryShades = generate('#0096D6');
   const greyColors = {
     0: grey[0],
     50: grey[1],
@@ -25,16 +28,16 @@ export default function Default(colors) {
 
   return {
     primary: {
-      lighter: green[0],
-      100: green[1],
-      200: green[2],
-      light: green[3],
-      400: green[4],
-      main: green[5],
-      dark: green[6],
-      700: green[7],
-      darker: green[8],
-      900: green[9],
+      lighter: primaryShades[0],
+      100: primaryShades[1],
+      200: primaryShades[2],
+      light: primaryShades[3],
+      400: primaryShades[4],
+      main: '#0096D6',
+      dark: primaryShades[6],
+      700: primaryShades[7],
+      darker: primaryShades[8],
+      900: primaryShades[9],
       contrastText
     },
     secondary: {

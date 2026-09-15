@@ -20,7 +20,7 @@
     "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
     "prettier": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "push": "git add . && git commit -m \"code update\" && git push origin main",
-    "auto-push": "node scripts/auto-push.js"
+    "auto-push": "node scripts/auto-push.mjs"
   },
   "dependencies": {
     "@ant-design/colors": "8.0.1",
