@@ -68,6 +68,13 @@ const inventoryMenu = {
       icon: icons.DatabaseOutlined
     },
     {
+      id: 'categories',
+      title: 'Categories',
+      type: 'item',
+      url: '/inventory/categories',
+      icon: icons.AppstoreOutlined
+    },
+    {
       id: 'stock-in',
       title: 'Stock In',
       type: 'item',
@@ -109,13 +116,6 @@ const inventoryMenu = {
           icon: icons.BookOutlined
         }
       ]
-    },
-    {
-      id: 'vendor-ledgers',
-      title: 'Vendor Payables',
-      type: 'item',
-      url: '/inventory/vendor-ledgers',
-      icon: icons.PayCircleOutlined
     },
     {
       id: 'vendors',

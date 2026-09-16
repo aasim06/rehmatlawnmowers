@@ -9,6 +9,7 @@ export const defaultAdminPermissions = {
   'stock-out': true,
   'stock-in': true,
   'items': true,
+  'categories': true,
   'machine-sales': true,
   'machine-repairs': true,
   'customer-ledgers': true,

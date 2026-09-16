@@ -56,6 +56,10 @@ const MainRoutes = {
           element: <ItemsPage />
         },
         {
+          path: 'categories',
+          element: <CategoriesPage />
+        },
+        {
           path: 'add-item-name',
           element: <AddItemNamePage />
         },

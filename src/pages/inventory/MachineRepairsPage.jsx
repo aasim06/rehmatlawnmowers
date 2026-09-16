@@ -5,6 +5,7 @@ import { useDebounce } from 'hooks/useDebounce';
 // material-ui
 import {
   Autocomplete,
+  Avatar,
   Box,
   Button,
   Checkbox,
@@ -38,7 +39,18 @@ import {
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
-  PrinterOutlined
+  PrinterOutlined,
+  BuildOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  UserOutlined,
+  PhoneOutlined,
+  EnvironmentOutlined,
+  ToolOutlined,
+  ScheduleOutlined,
+  SafetyCertificateOutlined,
+  TagOutlined,
+  DollarOutlined
 } from '@ant-design/icons';
 
 // project imports
@@ -46,6 +58,47 @@ import MainCard from 'components/MainCard';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 
 const REPAIR_STATUS_OPTIONS = ['Received', 'In Repair', 'Ready for Delivery', 'Delivered'];
+
+// Helper to clean & format phone and city if concatenated
+const parseCustomerInfo = (phoneStr, cityStr) => {
+  let phone = (phoneStr || '').trim();
+  let city = (cityStr || '').trim();
+
+  if (phone && (!city || city === 'Lahore')) {
+    const match = phone.match(/^(\d{10,12}|[\d\-+]+)([A-Za-z\s]+)$/);
+    if (match) {
+      phone = match[1].trim();
+      city = match[2].trim();
+    }
+  }
+
+  if (phone.length === 11 && phone.startsWith('03')) {
+    phone = `${phone.slice(0, 4)}-${phone.slice(4)}`;
+  }
+
+  return { phone: phone || 'N/A', city: city || 'Lahore' };
+};
+
+const getInitials = (name) => {
+  if (!name) return 'C';
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+};
+
+const avatarGradients = [
+  'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+  'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+  'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'
+];
+
+const getAvatarGradient = (str) => {
+  let hash = 0;
+  for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return avatarGradients[Math.abs(hash) % avatarGradients.length];
+};
 
 export default function MachineRepairsPage() {
   const {
@@ -378,19 +431,80 @@ export default function MachineRepairsPage() {
   const readyCount = machineRepairs.filter((r) => r.repairStatus === 'Ready for Delivery').length;
   const totalRepairRevenue = machineRepairs.reduce((sum, r) => sum + (parseFloat(r.paidAmount) || 0), 0);
 
-  const getStatusChipColor = (status) => {
-    switch (status) {
-      case 'Received':
-        return 'warning';
-      case 'In Repair':
-        return 'primary';
-      case 'Ready for Delivery':
-        return 'success';
-      case 'Delivered':
-        return 'secondary';
-      default:
-        return 'default';
-    }
+const STATUS_DESCRIPTIONS = {
+  'Received': {
+    label: 'Machine Received',
+    subtext: 'Workshop Inflow',
+    tooltip: 'Customer ne machine repair ke liye dukan/workshop par jama karwayi hai.',
+    color: '#d46b08',
+    bg: '#fffbe6',
+    border: '#ffe58f',
+    dot: '#fa8c16'
+  },
+  'In Repair': {
+    label: 'In Repairing',
+    subtext: 'Work in Progress',
+    tooltip: 'Mechanic iss machine ki repairing aur servicing kar raha hai.',
+    color: '#096dd9',
+    bg: '#e6f7ff',
+    border: '#91caff',
+    dot: '#1890ff'
+  },
+  'Ready for Delivery': {
+    label: 'Ready for Delivery',
+    subtext: 'Repair Complete',
+    tooltip: 'Machine repair ho chuki hai, customer ko hand-over ke liye tayar hai.',
+    color: '#389e0d',
+    bg: '#f6ffed',
+    border: '#b7eb8f',
+    dot: '#52c41a'
+  },
+  'Delivered': {
+    label: 'Delivered to Customer',
+    subtext: 'Handover Completed',
+    tooltip: 'Customer ne bill settle karke machine le li hai.',
+    color: '#595959',
+    bg: '#f5f5f5',
+    border: '#d9d9d9',
+    dot: '#8c8c8c'
+  }
+};
+
+  const renderStatusBadge = (statusKey) => {
+    const info = STATUS_DESCRIPTIONS[statusKey] || {
+      label: statusKey || 'Received',
+      subtext: 'Status',
+      tooltip: 'Job Status',
+      color: '#d46b08',
+      bg: '#fffbe6',
+      border: '#ffe58f',
+      dot: '#fa8c16'
+    };
+
+    return (
+      <Tooltip title={info.tooltip} arrow placement="top">
+        <Box
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.25,
+            py: 0.4,
+            borderRadius: '20px',
+            bgcolor: info.bg,
+            color: info.color,
+            border: `1px solid ${info.border}`,
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            lineHeight: 1.2,
+            cursor: 'help'
+          }}
+        >
+          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: info.dot }} />
+          <span>{info.label}</span>
+        </Box>
+      </Tooltip>
+    );
   };
 
   const formatSr = (num) => (num < 10 ? `0${num}` : `${num}`);
@@ -454,7 +568,11 @@ export default function MachineRepairsPage() {
 
       {/* 2. RECORD MACHINE REPAIR FORM CARD */}
       <MainCard
-        title="Record Machine Repairing Service & Job Card"
+        title={
+          <Typography variant="h4" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BuildOutlined style={{ color: '#1890ff' }} /> Record Machine Repairing Service & Job Card
+          </Typography>
+        }
         sx={{
           boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
           borderRadius: 2
@@ -794,11 +912,11 @@ export default function MachineRepairsPage() {
                   }
                 }}
               >
-                {REPAIR_STATUS_OPTIONS.map((st) => (
-                  <MenuItem key={st} value={st}>
-                    {st}
-                  </MenuItem>
-                ))}
+                  {REPAIR_STATUS_OPTIONS.map((st) => (
+                    <MenuItem key={st} value={st}>
+                      {STATUS_DESCRIPTIONS[st]?.label || st}
+                    </MenuItem>
+                  ))}
               </TextField>
             </Grid>
 
@@ -826,87 +944,168 @@ export default function MachineRepairsPage() {
 
       {/* 3. REPAIR RECORDS TABLE CARD */}
       <MainCard
-        title="Machine Repairing & Job Card Ledgers"
-        secondary={
-          selected.length > 0 && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteOutlined />}
-              onClick={() => {
-                if (window.confirm(`Delete ${selected.length} selected job card records?`)) {
-                  selected.forEach((id) => deleteMachineRepair(id));
-                  setSelected([]);
-                }
-              }}
-              size="small"
-              sx={{ fontWeight: 700 }}
-            >
-              Delete Selected ({selected.length})
-            </Button>
-          )
-        }
+        content={false}
+        sx={{
+          borderRadius: 2.5,
+          border: '1px solid',
+          borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#eaecf0'),
+          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.4)' : '0 1px 3px rgba(16, 24, 40, 0.05)'),
+          overflow: 'hidden'
+        }}
       >
-        {/* Search & Filter Toolbar */}
-        <Grid container spacing={2} sx={{ mb: 2.5, alignItems: 'center' }}>
-          <Grid size={{ xs: 12, sm: 6, md: 5 }}>
-            <OutlinedInput
-              fullWidth
-              placeholder="Search by Job No (e.g. REP-1001), Customer, Phone, Model..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              startAdornment={
-                <InputAdornment position="start">
-                  <SearchOutlined />
-                </InputAdornment>
-              }
-              sx={{
-                height: '41.38px',
-                minHeight: '41.38px'
-              }}
-            />
-          </Grid>
+        {/* Stripe / Linear Header & Filter Toolbar */}
+        <Box
+          sx={{
+            p: 2.5,
+            borderBottom: '1px solid',
+            borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#eaecf0'),
+            bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#ffffff')
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' }, gap: 2, mb: 2 }}>
+            <Box>
+              <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary', letterSpacing: '-0.3px' }}>
+                Job Cards & Repairs Ledger
+              </Typography>
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 0.25 }}>
+                Manage customer machinery repair status, specifications, and payment balances.
+              </Typography>
+            </Box>
 
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <TextField
-              select
-              fullWidth
-              label="Filter By Status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  height: '41.38px',
-                  minHeight: '41.38px'
+            {selected.length > 0 && (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteOutlined />}
+                onClick={() => {
+                  if (window.confirm(`Delete ${selected.length} selected job card records?`)) {
+                    selected.forEach((id) => deleteMachineRepair(id));
+                    setSelected([]);
+                  }
+                }}
+                size="small"
+                sx={{ fontWeight: 600, borderRadius: 1.5, textTransform: 'none' }}
+              >
+                Delete Selected ({selected.length})
+              </Button>
+            )}
+          </Box>
+
+          {/* Segmented Filter Control & Search Bar Row */}
+          <Grid container spacing={2} alignItems="center">
+            {/* Linear-style Segmented Status Control Tabs */}
+            <Grid size={{ xs: 12, lg: 8 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  flexWrap: 'wrap',
+                  gap: 0.5,
+                  p: 0.5,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9'),
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0')
+                }}
+              >
+                <Box
+                  onClick={() => setStatusFilter('All')}
+                  sx={{
+                    px: 1.75,
+                    py: 0.6,
+                    borderRadius: 1.5,
+                    fontSize: '0.82rem',
+                    fontWeight: statusFilter === 'All' ? 700 : 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    bgcolor: statusFilter === 'All' ? (theme => theme.palette.mode === 'dark' ? '#1e293b' : '#ffffff') : 'transparent',
+                    color: statusFilter === 'All' ? 'text.primary' : 'text.secondary',
+                    boxShadow: statusFilter === 'All' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  All Statuses ({machineRepairs.length})
+                </Box>
+                {REPAIR_STATUS_OPTIONS.map((st) => {
+                  const count = machineRepairs.filter((r) => r.repairStatus === st).length;
+                  const isActive = statusFilter === st;
+                  const displayLabel = STATUS_DESCRIPTIONS[st]?.label || st;
+                  return (
+                    <Box
+                      key={st}
+                      onClick={() => setStatusFilter(st)}
+                      sx={{
+                        px: 1.75,
+                        py: 0.6,
+                        borderRadius: 1.5,
+                        fontSize: '0.82rem',
+                        fontWeight: isActive ? 700 : 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        bgcolor: isActive ? (theme => theme.palette.mode === 'dark' ? '#1e293b' : '#ffffff') : 'transparent',
+                        color: isActive ? 'text.primary' : 'text.secondary',
+                        boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      {displayLabel} ({count})
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Grid>
+
+            {/* Linear Search Bar */}
+            <Grid size={{ xs: 12, lg: 4 }}>
+              <OutlinedInput
+                fullWidth
+                size="small"
+                placeholder="Search Job No, Customer, Model..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                startAdornment={
+                  <InputAdornment position="start">
+                    <SearchOutlined style={{ color: '#94a3b8' }} />
+                  </InputAdornment>
                 }
+                endAdornment={
+                  <InputAdornment position="end">
+                    <Box
+                      sx={{
+                        px: 0.75,
+                        py: 0.2,
+                        borderRadius: 1,
+                        bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#f1f5f9'),
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        color: 'text.secondary',
+                        border: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      Ctrl+K
+                    </Box>
+                  </InputAdornment>
+                }
+                sx={{
+                  height: '38px',
+                  borderRadius: 2,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#ffffff')
+                }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Stripe Minimalist Table */}
+        <TableContainer>
+          <Table sx={{ minWidth: 950 }}>
+            <TableHead
+              sx={{
+                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc'),
+                borderBottom: '1px solid',
+                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#eaecf0')
               }}
             >
-              <MenuItem value="All">All Statuses ({machineRepairs.length})</MenuItem>
-              {REPAIR_STATUS_OPTIONS.map((st) => (
-                <MenuItem key={st} value={st}>
-                  {st} ({machineRepairs.filter((r) => r.repairStatus === st).length})
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 3 }} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-            <Typography variant="caption" color="textSecondary" fontWeight={600}>
-              {selected.length > 0 ? (
-                <strong style={{ color: '#ff4d4f' }}>{selected.length} records selected</strong>
-              ) : (
-                `Showing ${filteredRepairs.length} of ${machineRepairs.length} Job Cards`
-              )}
-            </Typography>
-          </Grid>
-        </Grid>
-
-        {/* Repair Records Ledger Table */}
-        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-          <Table sx={{ minWidth: 900 }}>
-            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc') }}>
               <TableRow>
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" sx={{ py: 1.5, pl: 2.5 }}>
                   <Checkbox
                     color="primary"
                     indeterminate={selected.length > 0 && selected.length < filteredRepairs.length}
@@ -914,23 +1113,39 @@ export default function MachineRepairsPage() {
                     onChange={handleSelectAllClick}
                   />
                 </TableCell>
-                <TableCell><strong>JOB NO & DATE</strong></TableCell>
-                <TableCell><strong>CUSTOMER DETAILS</strong></TableCell>
-                <TableCell><strong>MACHINE MODEL</strong></TableCell>
-                <TableCell><strong>SPECIFICATION & REPAIR BREAKDOWN</strong></TableCell>
-                <TableCell align="right"><strong>TOTAL BILL</strong></TableCell>
-                <TableCell align="center"><strong>PAYMENT STATUS</strong></TableCell>
-                <TableCell align="center"><strong>JOB STATUS</strong></TableCell>
-                <TableCell align="center"><strong>ACTIONS</strong></TableCell>
+                <TableCell sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  JOB NO & DATE
+                </TableCell>
+                <TableCell sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  CUSTOMER DETAILS
+                </TableCell>
+                <TableCell sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  EQUIPMENT MODEL
+                </TableCell>
+                <TableCell sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PARTS & REPAIR BREAKDOWN
+                </TableCell>
+                <TableCell align="right" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL BILL
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PAYMENT
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  STATUS
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.5, pr: 2.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  ACTIONS
+                </TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
               {filteredRepairs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                     <Typography variant="body1" color="textSecondary" fontWeight={600}>
-                      No machine repair job cards found matching your search.
+                      No machine repair records found matching your filters.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -940,10 +1155,21 @@ export default function MachineRepairsPage() {
                   const itemsList = repair.repairItems && Array.isArray(repair.repairItems) ? repair.repairItems : [];
                   const displayedParts = itemsList.slice(0, 3);
                   const remainingPartsCount = itemsList.length - 3;
+                  const { phone, city } = parseCustomerInfo(repair.customerPhone, repair.cityAddress);
 
                   return (
-                    <TableRow key={repair.id} hover selected={isItemSelected} sx={{ verticalAlign: 'middle' }}>
-                      <TableCell padding="checkbox">
+                    <TableRow
+                      key={repair.id}
+                      hover
+                      selected={isItemSelected}
+                      sx={{
+                        borderBottom: '1px solid',
+                        borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9'),
+                        '&:hover': { bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc') },
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
+                      <TableCell padding="checkbox" sx={{ pl: 2.5, py: 1.75 }}>
                         <Checkbox
                           color="primary"
                           checked={isItemSelected}
@@ -952,66 +1178,98 @@ export default function MachineRepairsPage() {
                       </TableCell>
 
                       {/* 1. Job No & Date */}
-                      <TableCell>
-                        <Chip
-                          label={repair.repairNo}
-                          color="primary"
-                          variant="filled"
-                          size="small"
-                          sx={{ fontWeight: 800, borderRadius: 1 }}
-                        />
-                        <Typography variant="caption" display="block" color="textSecondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-                          {repair.receivedDate}
-                        </Typography>
+                      <TableCell sx={{ py: 1.75 }}>
+                        <Box>
+                          <Box
+                            sx={{
+                              display: 'inline-block',
+                              px: 1,
+                              py: 0.3,
+                              borderRadius: 1.2,
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9'),
+                              color: 'text.primary',
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1'),
+                              fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                              letterSpacing: '0.3px'
+                            }}
+                          >
+                            #{repair.repairNo}
+                          </Box>
+                          <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5, fontWeight: 500 }}>
+                            {repair.receivedDate}
+                          </Typography>
+                        </Box>
                       </TableCell>
 
                       {/* 2. Customer Details */}
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={700} color="text.primary">
-                          {repair.customerName}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          {repair.customerPhone}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          {repair.cityAddress}
-                        </Typography>
+                      <TableCell sx={{ py: 1.75 }}>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ lineHeight: 1.3 }}>
+                            {repair.customerName}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.25 }}>
+                            {phone} <span style={{ color: '#94a3b8', margin: '0 4px' }}>•</span> {city}
+                          </Typography>
+                        </Box>
                       </TableCell>
 
                       {/* 3. Machine Model */}
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={700} color="primary.dark">
+                      <TableCell sx={{ py: 1.75 }}>
+                        <Typography variant="subtitle2" fontWeight={600} color="text.primary">
                           {repair.machineName || 'Lawn Mower'}
                         </Typography>
                       </TableCell>
 
-                      {/* 4. Specification Breakdown Tags */}
-                      <TableCell sx={{ maxWidth: 260 }}>
+                      {/* 4. Specification Breakdown */}
+                      <TableCell sx={{ py: 1.75, maxWidth: 280 }}>
                         {itemsList.length > 0 ? (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {displayedParts.map((part, pIdx) => (
-                              <Chip
+                              <Box
                                 key={pIdx}
-                                label={`${part.specification || part.itemName || 'Item'} × ${part.qnty || 1}`}
-                                size="small"
-                                variant="outlined"
-                                color="default"
                                 sx={{
-                                  height: 22,
+                                  px: 0.85,
+                                  py: 0.3,
+                                  borderRadius: 1,
+                                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc'),
+                                  border: '1px solid',
+                                  borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0'),
                                   fontSize: '0.72rem',
-                                  fontWeight: 600,
-                                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9')
+                                  fontWeight: 500,
+                                  color: 'text.primary',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5
                                 }}
-                              />
+                              >
+                                <span style={{ color: '#0284c7', fontWeight: 700 }}>{part.qnty || 1}×</span>
+                                <span>{part.specification || part.itemName || 'Item'}</span>
+                              </Box>
                             ))}
                             {remainingPartsCount > 0 && (
-                              <Chip
-                                label={`+${remainingPartsCount} more`}
-                                size="small"
-                                color="info"
-                                variant="outlined"
-                                sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700 }}
-                              />
+                              <Tooltip
+                                title={itemsList.slice(3).map((p) => `${p.qnty || 1}x ${p.specification || p.itemName}`).join(', ')}
+                                arrow
+                              >
+                                <Box
+                                  sx={{
+                                    px: 0.85,
+                                    py: 0.3,
+                                    borderRadius: 1,
+                                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : '#e0f2fe'),
+                                    color: '#0369a1',
+                                    border: '1px solid #bae6fd',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  +{remainingPartsCount} more
+                                </Box>
+                              </Tooltip>
                             )}
                           </Box>
                         ) : (
@@ -1022,69 +1280,119 @@ export default function MachineRepairsPage() {
                       </TableCell>
 
                       {/* 5. Total Bill */}
-                      <TableCell align="right">
-                        <Typography variant="subtitle1" fontWeight={800} color="primary.main">
+                      <TableCell align="right" sx={{ py: 1.75 }}>
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={700}
+                          sx={{
+                            fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                            color: 'text.primary'
+                          }}
+                        >
                           Rs. {(repair.totalCost || 0).toLocaleString()}
                         </Typography>
                         {repair.discountAmount > 0 && (
                           <Typography variant="caption" display="block" color="error.main" fontWeight={600}>
-                            Disc: -Rs. {repair.discountAmount.toLocaleString()}
+                            -Rs. {repair.discountAmount.toLocaleString()}
                           </Typography>
                         )}
                       </TableCell>
 
                       {/* 6. Payment Status */}
-                      <TableCell align="center">
-                        <Typography variant="body2" fontWeight={700} color="success.main">
-                          Paid: Rs. {(repair.paidAmount || 0).toLocaleString()}
-                        </Typography>
+                      <TableCell align="center" sx={{ py: 1.75 }}>
                         {repair.balanceAmount > 0 ? (
-                          <Chip
-                            label={`Due: Rs. ${repair.balanceAmount.toLocaleString()}`}
-                            color="error"
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.7rem', fontWeight: 800, mt: 0.5 }}
-                          />
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              px: 1.25,
+                              py: 0.4,
+                              borderRadius: 1.5,
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.15)' : '#fff1f0'),
+                              color: '#cf1322',
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.3)' : '#ffa39e')
+                            }}
+                          >
+                            <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.72rem', lineHeight: 1.2 }}>
+                              Due: Rs. {repair.balanceAmount.toLocaleString()}
+                            </Typography>
+                          </Box>
                         ) : (
-                          <Chip
-                            label="Full Paid"
-                            color="success"
-                            size="small"
-                            sx={{ height: 20, fontSize: '0.7rem', fontWeight: 800, mt: 0.5 }}
-                          />
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              px: 1.25,
+                              py: 0.4,
+                              borderRadius: 1.5,
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.15)' : '#f6ffed'),
+                              color: '#389e0d',
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.3)' : '#b7eb8f')
+                            }}
+                          >
+                            <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.72rem' }}>
+                              Paid
+                            </Typography>
+                          </Box>
                         )}
                       </TableCell>
 
                       {/* 7. Job Status */}
-                      <TableCell align="center">
-                        <Chip
-                          label={repair.repairStatus}
-                          color={getStatusChipColor(repair.repairStatus)}
-                          size="small"
-                          sx={{ fontWeight: 700, borderRadius: 1 }}
-                        />
+                      <TableCell align="center" sx={{ py: 1.75 }}>
+                        {renderStatusBadge(repair.repairStatus)}
                       </TableCell>
 
                       {/* 8. Actions */}
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center">
-                          <Tooltip title="Print Job Card Receipt">
-                            <IconButton color="info" size="small" onClick={() => handleOpenPrint(repair)}>
-                              <PrinterOutlined />
+                      <TableCell align="center" sx={{ py: 1.75, pr: 2.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'center' }}>
+                          <Tooltip title="Print Receipt">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenPrint(repair)}
+                              sx={{
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#e2e8f0'),
+                                borderRadius: 1.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: 'action.hover', color: 'primary.main' }
+                              }}
+                            >
+                              <PrinterOutlined style={{ fontSize: 13 }} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Status / Payment">
-                            <IconButton color="primary" size="small" onClick={() => handleOpenEdit(repair)}>
-                              <EditOutlined />
+                          <Tooltip title="Edit Job">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenEdit(repair)}
+                              sx={{
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#e2e8f0'),
+                                borderRadius: 1.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: 'action.hover', color: 'primary.main' }
+                              }}
+                            >
+                              <EditOutlined style={{ fontSize: 13 }} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Record">
-                            <IconButton color="error" size="small" onClick={() => handleOpenDelete(repair)}>
-                              <DeleteOutlined />
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDelete(repair)}
+                              sx={{
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#e2e8f0'),
+                                borderRadius: 1.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: 'error.lighter', color: 'error.main', borderColor: 'error.light' }
+                              }}
+                            >
+                              <DeleteOutlined style={{ fontSize: 13 }} />
                             </IconButton>
                           </Tooltip>
-                        </Stack>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
@@ -1115,7 +1423,7 @@ export default function MachineRepairsPage() {
                 >
                   {REPAIR_STATUS_OPTIONS.map((st) => (
                     <MenuItem key={st} value={st}>
-                      {st}
+                      {STATUS_DESCRIPTIONS[st]?.label || st}
                     </MenuItem>
                   ))}
                 </TextField>

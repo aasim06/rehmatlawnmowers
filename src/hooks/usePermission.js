@@ -45,6 +45,7 @@ export function usePermission() {
     '/inventory/stock-out': 'stock-out',
     '/inventory/stock-in': 'stock-in',
     '/inventory/items': 'items',
+    '/inventory/categories': 'categories',
     '/inventory/machine-sales': 'machine-sales',
     '/inventory/machine-repairs': 'machine-repairs',
     '/inventory/customer-ledgers': 'customer-ledgers',
