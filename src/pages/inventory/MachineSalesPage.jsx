@@ -649,6 +649,449 @@ export default function MachineSalesPage() {
         </form>
       </MainCard>
 
+      {/* 2. BOTTOM SECTION: Machine Sales History Logs Table Card */}
+      <MainCard
+        title="Machine Sales & Billing History Logs"
+        secondary={
+          selected.length > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteOutlined />}
+              onClick={() => setBulkDeleteDialogOpen(true)}
+              size="small"
+              sx={{ fontWeight: 700 }}
+            >
+              Delete Selected ({selected.length})
+            </Button>
+          )
+        }
+      >
+        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <OutlinedInput
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by Customer, Phone, Machine Model, City..."
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchOutlined />
+                </InputAdornment>
+              }
+              sx={{ height: '42px', width: '100%' }}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField
+              select
+              fullWidth
+              label="Filter by Status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  height: '42px',
+                  minHeight: '42px'
+                }
+              }}
+            >
+              <MenuItem value="ALL">All Payment Statuses</MenuItem>
+              <MenuItem value="Paid">Paid</MenuItem>
+              <MenuItem value="Partial">Partial</MenuItem>
+              <MenuItem value="Unpaid">Unpaid</MenuItem>
+            </TextField>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 3 }} sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" color="textSecondary">
+              Showing <strong>{filteredSales.length}</strong> Machine Sales Log Records
+            </Typography>
+          </Grid>
+        </Grid>
+
+        {/* Mobile View Cards */}
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+          {filteredSales.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body2" color="textSecondary">
+                No Machine Sales records found.
+              </Typography>
+            </Paper>
+          ) : (
+            <Stack spacing={2}>
+              {filteredSales.map((sale) => {
+                const isItemSel = isSelected(sale.id);
+                return (
+                  <Paper
+                    key={sale.id}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      borderColor: isItemSel ? 'primary.main' : 'divider',
+                      bgcolor: isItemSel ? 'action.selected' : 'background.paper'
+                    }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                          {sale.saleNo || sale.id}
+                        </Typography>
+                        <Chip
+                          label={sale.paymentStatus || 'Paid'}
+                          color={sale.paymentStatus === 'Paid' ? 'success' : sale.paymentStatus === 'Partial' ? 'warning' : 'error'}
+                          size="small"
+                          sx={{ fontWeight: 700 }}
+                        />
+                      </Stack>
+
+                      <Box>
+                        <Typography variant="h6" fontWeight={800}>
+                          {sale.customerName}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {sale.customerPhone ? `${sale.customerPhone} | ` : ''}{sale.cityAddress || 'Local'}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 1.5 }}>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          📦 {sale.machineName}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          Qty: {sale.qty || 1} {sale.serialNo ? `| S/N: ${sale.serialNo}` : ''}
+                        </Typography>
+                        <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+                          <Typography variant="caption">
+                            Bill: <strong>Rs. {(sale.lineTotal || sale.subTotal || 0).toLocaleString()}</strong>
+                          </Typography>
+                          <Typography variant="caption" color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'} fontWeight={700}>
+                            Bal: Rs. {(sale.balanceAmount || 0).toLocaleString()}
+                          </Typography>
+                        </Stack>
+                      </Box>
+
+                      <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" sx={{ pt: 0.5 }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          startIcon={<PrinterOutlined />}
+                          onClick={() => handleOpenPrint(sale)}
+                          sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                        >
+                          Print Bill
+                        </Button>
+                        <IconButton color="primary" size="small" onClick={() => handleOpenEdit(sale)}>
+                          <EditOutlined />
+                        </IconButton>
+                        <IconButton color="error" size="small" onClick={() => { setSaleToDelete(sale); setDeleteDialogOpen(true); }}>
+                          <DeleteOutlined />
+                        </IconButton>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          )}
+        </Box>
+
+        {/* Desktop Table View */}
+        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+          <TableContainer>
+            <Table sx={{ minWidth: 700 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      color="primary"
+                      indeterminate={selected.length > 0 && selected.length < filteredSales.length}
+                      checked={filteredSales.length > 0 && selected.length === filteredSales.length}
+                      onChange={handleSelectAllClick}
+                    />
+                  </TableCell>
+                  <TableCell>SALE NO / ID</TableCell>
+                  <TableCell>CUSTOMER &amp; CITY</TableCell>
+                  <TableCell>MACHINE MODEL &amp; QTY</TableCell>
+                  <TableCell align="right">TOTAL BILL</TableCell>
+                  <TableCell align="right">PAID</TableCell>
+                  <TableCell align="right">BALANCE</TableCell>
+                  <TableCell align="center">STATUS</TableCell>
+                  <TableCell align="right">DATE &amp; TIME</TableCell>
+                  <TableCell align="center">ACTIONS</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredSales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                      <Typography variant="body2" color="textSecondary">
+                        No Machine Sales records found.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSales.map((sale) => {
+                    const isItemSel = isSelected(sale.id);
+                    return (
+                      <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => handleSelectOne(e, sale.id)}>
+                        <TableCell padding="checkbox">
+                          <Checkbox color="primary" checked={isItemSel} onChange={(e) => handleSelectOne(e, sale.id)} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                            {sale.saleNo || sale.id}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="subtitle2" fontWeight={800}>
+                            {sale.customerName}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {sale.customerPhone ? `${sale.customerPhone} | ` : ''}{sale.cityAddress || 'Lahore'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {sale.machineName}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            Qty: <strong>{sale.qty || 1}</strong> {sale.serialNo ? `| S/N: ${sale.serialNo}` : ''}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="subtitle2" fontWeight={700} color="success.main">
+                            Rs. {(sale.lineTotal || sale.subTotal || 0).toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight={600}>
+                            Rs. {(sale.paidAmount || 0).toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight={800}
+                            color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'}
+                          >
+                            Rs. {(sale.balanceAmount || 0).toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={sale.paymentStatus || 'Paid'}
+                            color={sale.paymentStatus === 'Paid' ? 'success' : sale.paymentStatus === 'Partial' ? 'warning' : 'error'}
+                            size="small"
+                            sx={{ fontWeight: 700 }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="caption" color="textSecondary">
+                            {formatFullDate(sale.time, sale.created_at || sale.dateISO)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Stack direction="row" spacing={1} justifyContent="center">
+                            <Tooltip title="Print Machine Invoice">
+                              <IconButton color="info" size="small" onClick={() => handleOpenPrint(sale)}>
+                                <PrinterOutlined />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Edit Sale Record">
+                              <IconButton color="primary" size="small" onClick={() => handleOpenEdit(sale)}>
+                                <EditOutlined />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete Sale Record">
+                              <IconButton
+                                color="error"
+                                size="small"
+                                onClick={() => {
+                                  setSaleToDelete(sale);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <DeleteOutlined />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      </MainCard>
+
+      {/* ✏️ Edit Machine Sale Drawer */}
+      <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
+        <Box sx={{ width: { xs: '100vw', sm: 520 }, p: 3 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 3, color: 'primary.main' }}>
+            Edit Machine Sale Record
+          </Typography>
+
+          {editingSale && (
+            <form onSubmit={handleEditSubmit}>
+              <Stack spacing={2.5}>
+                <TextField
+                  label="Customer Name *"
+                  fullWidth
+                  required
+                  value={editingSale.customerName || ''}
+                  onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
+                />
+                <TextField
+                  label="Customer Phone"
+                  fullWidth
+                  value={editingSale.customerPhone || ''}
+                  onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
+                />
+                <TextField
+                  label="City / Address"
+                  fullWidth
+                  value={editingSale.cityAddress || ''}
+                  onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
+                />
+
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Purchased Machines ({(editingSale.items || []).length || 1} Items)
+                </Typography>
+
+                {(editingSale.items || []).map((editItem, idx) => (
+                  <Paper key={idx} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                    <Stack spacing={1.5}>
+                      <Autocomplete
+                        freeSolo
+                        options={machineModels}
+                        value={editItem.machineName || ''}
+                        onChange={(event, newValue) => handleEditItemChange(idx, 'machineName', newValue || '')}
+                        onInputChange={(event, newInputValue) => handleEditItemChange(idx, 'machineName', newInputValue || '')}
+                        renderInput={(params) => <TextField {...params} label={`Machine Model #${idx + 1} *`} required size="small" />}
+                      />
+                      <Grid container spacing={1.5}>
+                        <Grid size={{ xs: 6 }}>
+                          <TextField
+                            label="Serial No"
+                            size="small"
+                            fullWidth
+                            value={editItem.serialNo || ''}
+                            onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <TextField
+                            label="Qty"
+                            type="number"
+                            size="small"
+                            fullWidth
+                            required
+                            inputProps={{ min: 1 }}
+                            value={editItem.qty || 1}
+                            onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <TextField
+                            label="Unit Price (PKR)"
+                            type="number"
+                            size="small"
+                            fullWidth
+                            required
+                            value={editItem.unitPrice || 0}
+                            onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <TextField
+                            label="Discount (%)"
+                            type="number"
+                            size="small"
+                            fullWidth
+                            value={editItem.discount || 0}
+                            onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                          />
+                        </Grid>
+                      </Grid>
+                      {(editingSale.items || []).length > 1 && (
+                        <Button color="error" size="small" onClick={() => handleRemoveEditItemRow(idx)}>
+                          Remove Item Row
+                        </Button>
+                      )}
+                    </Stack>
+                  </Paper>
+                ))}
+
+                <Button variant="outlined" size="small" onClick={handleAddEditItemRow}>
+                  + Add Machine Row
+                </Button>
+
+                <TextField
+                  label="Paid Amount (PKR)"
+                  type="number"
+                  fullWidth
+                  value={editingSale.paidAmount || 0}
+                  onChange={(e) => setEditingSale({ ...editingSale, paidAmount: parseFloat(e.target.value) || 0 })}
+                />
+
+                <TextField
+                  label="Warranty Terms"
+                  fullWidth
+                  value={editingSale.warrantyTerms || ''}
+                  onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
+                />
+
+                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
+                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="contained" type="submit" color="primary" sx={{ fontWeight: 700 }}>
+                    Save Changes
+                  </Button>
+                </Stack>
+              </Stack>
+            </form>
+          )}
+        </Box>
+      </Drawer>
+
+      {/* 🗑️ Single Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Confirm Delete Sale Record</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the machine sale invoice for <strong>{saleToDelete?.customerName}</strong> ({saleToDelete?.machineName})?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleConfirmDelete} sx={{ fontWeight: 700 }}>
+            Delete Sale Invoice
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 🗑️ Bulk Delete Dialog */}
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Bulk Delete Selected Sales Records</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete <strong>{selected.length}</strong> selected machine sales records? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleConfirmBulkDelete} sx={{ fontWeight: 700 }}>
+            Delete Selected Records ({selected.length})
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Add New Machine Model Dialog */}
       <Dialog open={newModelDialogOpen} onClose={() => setNewModelDialogOpen(false)} maxWidth="xs" fullWidth>
         <form onSubmit={handleAddNewModelSubmit}>
