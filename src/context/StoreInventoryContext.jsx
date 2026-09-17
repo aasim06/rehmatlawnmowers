@@ -2,7 +2,6 @@ import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
-import { sql } from 'api/neon';
 
 const StoreInventoryContext = createContext();
 
@@ -273,7 +272,7 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Parallel Data Fetching via Neon PostgreSQL for zero-latency initial load
+  // Parallel Data Fetching via Supabase for zero-latency initial load & clean error handling
   const fetchSupabaseData = async () => {
     try {
       const [
@@ -281,27 +280,19 @@ export function StoreInventoryProvider({ children }) {
         logsRes,
         vendorsRes,
         salesRes,
-        custPayRes,
-        vndPayRes,
         catRes,
-        repairsRes,
-        masterItemsRes,
-        expensesRes
+        masterItemsRes
       ] = await Promise.allSettled([
-        sql`SELECT * FROM store_items ORDER BY name ASC;`,
-        sql`SELECT * FROM usage_logs ORDER BY created_at DESC LIMIT 500;`,
-        sql`SELECT * FROM vendors ORDER BY name ASC;`,
-        sql`SELECT * FROM machine_sales ORDER BY created_at DESC LIMIT 500;`,
-        sql`SELECT * FROM customer_payments ORDER BY created_at DESC;`,
-        sql`SELECT * FROM vendor_payments ORDER BY created_at DESC;`,
-        sql`SELECT * FROM categories ORDER BY name ASC;`,
-        sql`SELECT * FROM machine_repairs ORDER BY created_at DESC LIMIT 500;`,
-        sql`SELECT * FROM master_item_names ORDER BY name ASC;`,
-        sql`SELECT * FROM expenses ORDER BY expense_date DESC, created_at DESC;`
+        supabase.from('store_items').select('*').order('name', { ascending: true }),
+        supabase.from('usage_logs').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('vendors').select('*').order('name', { ascending: true }),
+        supabase.from('machine_sales').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('categories').select('*').order('name', { ascending: true }),
+        supabase.from('master_item_names').select('*').order('name', { ascending: true })
       ]);
 
-      if (itemsRes.status === 'fulfilled' && itemsRes.value && itemsRes.value.length > 0) {
-        const mappedItems = itemsRes.value.map((i) => ({
+      if (itemsRes.status === 'fulfilled' && itemsRes.value?.data?.length > 0) {
+        const mappedItems = itemsRes.value.data.map((i) => ({
           id: i.id,
           name: i.name,
           itemCode: i.sku_code || i.item_code || i.id,
@@ -318,8 +309,8 @@ export function StoreInventoryProvider({ children }) {
         setItems(mappedItems);
       }
 
-      if (logsRes.status === 'fulfilled' && logsRes.value && logsRes.value.length > 0) {
-        setUsageLogs(logsRes.value.map(l => ({
+      if (logsRes.status === 'fulfilled' && logsRes.value?.data?.length > 0) {
+        setUsageLogs(logsRes.value.data.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
           itemCode: l.item_code || 'N/A',
@@ -336,8 +327,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (vendorsRes.status === 'fulfilled' && vendorsRes.value && vendorsRes.value.length > 0) {
-        setVendors(vendorsRes.value.map(v => ({
+      if (vendorsRes.status === 'fulfilled' && vendorsRes.value?.data?.length > 0) {
+        setVendors(vendorsRes.value.data.map(v => ({
           id: v.id,
           name: v.name,
           contactPerson: v.company_name || v.name,
@@ -351,8 +342,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (salesRes.status === 'fulfilled' && salesRes.value && salesRes.value.length > 0) {
-        setMachineSales(salesRes.value.map(s => ({
+      if (salesRes.status === 'fulfilled' && salesRes.value?.data?.length > 0) {
+        setMachineSales(salesRes.value.data.map(s => ({
           id: s.id,
           saleNo: s.sale_no || s.id,
           customerName: s.customer_name,
@@ -372,81 +363,19 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      if (custPayRes.status === 'fulfilled' && custPayRes.value && custPayRes.value.length > 0) {
-        setCustomerPayments(custPayRes.value.map(cp => ({
-          id: cp.id,
-          customerName: cp.customer_name,
-          date: cp.payment_date,
-          amountPaid: parseFloat(cp.amount_paid) || 0,
-          paymentMethod: cp.payment_method || 'Cash',
-          referenceNo: cp.reference_no,
-          notes: cp.notes
-        })));
-      }
-
-      if (vndPayRes.status === 'fulfilled' && vndPayRes.value && vndPayRes.value.length > 0) {
-        setVendorPayments(vndPayRes.value.map(vp => ({
-          id: vp.id,
-          vendorName: vp.vendor_name,
-          date: vp.payment_date,
-          amountPaid: parseFloat(vp.amount_paid) || 0,
-          paymentMethod: vp.payment_method || 'Cash',
-          referenceNo: vp.reference_no,
-          notes: vp.notes
-        })));
-      }
-
-      if (catRes.status === 'fulfilled' && catRes.value && catRes.value.length > 0) {
-        setCategories(catRes.value.map((c) => ({
+      if (catRes.status === 'fulfilled' && catRes.value?.data?.length > 0) {
+        setCategories(catRes.value.data.map((c) => ({
           id: c.id,
           name: c.name,
           description: c.description
         })));
       }
 
-      if (repairsRes.status === 'fulfilled' && repairsRes.value && repairsRes.value.length > 0) {
-        setMachineRepairs(repairsRes.value.map(r => ({
-          id: r.id,
-          repairNo: r.repair_no || r.id,
-          customerName: r.customer_name,
-          customerPhone: r.customer_phone || 'N/A',
-          cityAddress: r.city_address || 'Lahore',
-          machineName: r.machine_name,
-          serialNo: r.serial_no || 'N/A',
-          faultDescription: r.fault_description || 'General Service',
-          partsCost: parseFloat(r.parts_cost) || 0,
-          laborCost: parseFloat(r.labor_cost) || 0,
-          discountAmount: parseFloat(r.discount_amount) || 0,
-          totalCost: parseFloat(r.total_cost) || 0,
-          paidAmount: parseFloat(r.paid_amount) || 0,
-          balanceAmount: parseFloat(r.balance_amount) || 0,
-          repairStatus: r.repair_status || 'Received',
-          paymentStatus: r.payment_status || 'Pending',
-          receivedDate: r.received_date || new Date().toLocaleDateString(),
-          promisedDate: r.promised_date || '1-2 Days',
-          repairItems: r.repair_items || []
-        })));
-      }
-
-      if (masterItemsRes.status === 'fulfilled' && masterItemsRes.value && masterItemsRes.value.length > 0) {
-        setMasterItemNames(masterItemsRes.value);
-      }
-
-      if (expensesRes.status === 'fulfilled' && expensesRes.value && expensesRes.value.length > 0) {
-        setExpenses(expensesRes.value.map(e => ({
-          id: e.id,
-          title: e.title,
-          category: e.category || 'General',
-          amount: parseFloat(e.amount) || 0,
-          paymentMethod: e.payment_method || 'Cash',
-          paidTo: e.paid_to || 'N/A',
-          expenseDate: e.expense_date,
-          notes: e.notes || '',
-          createdAt: e.created_at
-        })));
+      if (masterItemsRes.status === 'fulfilled' && masterItemsRes.value?.data?.length > 0) {
+        setMasterItemNames(masterItemsRes.value.data);
       }
     } catch (err) {
-      console.log('Neon Database Sync Notice:', err.message);
+      // Background sync notification
     }
   };
 
@@ -552,7 +481,7 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // 1. Issue Stock / Daily Usage Action
-  const issueStock = async (itemIdOrObj, qtyUsedParam, usedByParam, departmentParam = 'Production Line', issuedByParam = 'Store Keeper', notesParam = '', unitPriceParam = 0) => {
+  const issueStock = async (itemIdOrObj, qtyUsedParam, usedByParam, departmentParam = 'Production Line', issuedByParam = 'Store Keeper', notesParam = '', unitPriceParam = 0, categoryParam = 'General') => {
     let itemId = itemIdOrObj;
     let qtyUsed = qtyUsedParam;
     let usedBy = usedByParam;
@@ -560,6 +489,7 @@ export function StoreInventoryProvider({ children }) {
     let issuedBy = issuedByParam;
     let notes = notesParam;
     let unitPrice = unitPriceParam;
+    let category = categoryParam;
 
     if (typeof itemIdOrObj === 'object' && itemIdOrObj !== null) {
       itemId = itemIdOrObj.itemId || itemIdOrObj.itemName || itemIdOrObj.itemCode;
@@ -569,6 +499,7 @@ export function StoreInventoryProvider({ children }) {
       issuedBy = itemIdOrObj.issuedBy || 'Store Keeper';
       notes = itemIdOrObj.notes || '';
       unitPrice = itemIdOrObj.unitPrice || 0;
+      category = itemIdOrObj.category || 'General';
     }
 
     const targetItem = items.find(
@@ -608,6 +539,7 @@ export function StoreInventoryProvider({ children }) {
       id: logId,
       itemCode: targetItem.itemCode,
       itemName: targetItem.name,
+      category: category || targetItem.category || 'General',
       qtyUsed: actualQty,
       unitPrice: price,
       lineTotal: lineTotal,
@@ -1057,15 +989,16 @@ export function StoreInventoryProvider({ children }) {
     setCategories((prev) => [newCategory, ...prev]);
 
     try {
-      const { error } = await supabase.from('categories').insert([{
+      if (sql) {
+        await sql`INSERT INTO categories (id, name, description) VALUES (${categoryId}, ${categoryData.name}, ${categoryData.description || ''});`;
+      }
+      await supabase.from('categories').insert([{
         id: categoryId,
         name: categoryData.name,
         description: categoryData.description || ''
       }]);
-      if (error) console.error('Supabase addCategory error:', error);
-      else await fetchSupabaseData();
     } catch (e) {
-      console.error(e);
+      console.error('addCategory error:', e);
     }
   };
 
@@ -1075,13 +1008,15 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
+      if (sql) {
+        await sql`UPDATE categories SET name = ${updatedData.name}, description = ${updatedData.description || ''} WHERE id = ${categoryId};`;
+      }
       await supabase.from('categories').update({
         name: updatedData.name,
         description: updatedData.description || ''
       }).eq('id', categoryId);
-      await fetchSupabaseData();
     } catch (e) {
-      console.error(e);
+      console.error('updateCategory error:', e);
     }
   };
 
@@ -1089,10 +1024,12 @@ export function StoreInventoryProvider({ children }) {
     setCategories((prev) => prev.filter((c) => c.id !== categoryId));
 
     try {
+      if (sql) {
+        await sql`DELETE FROM categories WHERE id = ${categoryId};`;
+      }
       await supabase.from('categories').delete().eq('id', categoryId);
-      await fetchSupabaseData();
     } catch (e) {
-      console.error(e);
+      console.error('deleteCategory error:', e);
     }
   };
 
@@ -1101,10 +1038,14 @@ export function StoreInventoryProvider({ children }) {
     setCategories((prev) => prev.filter((c) => !idsSet.has(c.id)));
 
     try {
+      for (const id of categoryIds) {
+        if (sql) {
+          await sql`DELETE FROM categories WHERE id = ${id};`;
+        }
+      }
       await supabase.from('categories').delete().in('id', categoryIds);
-      await fetchSupabaseData();
     } catch (e) {
-      console.error(e);
+      console.error('deleteMultipleCategories error:', e);
     }
   };
 

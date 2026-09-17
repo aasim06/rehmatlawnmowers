@@ -107,7 +107,15 @@ export default function ItemsPage() {
   // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const categoryFilterOptions = ['All', ...new Set(items.map((i) => i.category))];
+  const categoryOptions = Array.from(
+    new Set([
+      'General',
+      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean),
+      ...items.map((i) => i.category).filter(Boolean)
+    ])
+  );
+
+  const categoryFilterOptions = ['All', ...categoryOptions];
 
   const filteredItems = items.filter((i) => {
     const sTerm = (debouncedSearch || '').toLowerCase();
@@ -269,8 +277,8 @@ export default function ItemsPage() {
             }}
           >
             <Grid container spacing={2}>
-              {/* ROW 1: Item Name, SKU, Location, Unit */}
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              {/* ROW 1: Item Name, Category, SKU, Location, Unit */}
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Autocomplete
                   freeSolo
                   options={masterItemNames.map((m) => m.name)}
@@ -280,7 +288,7 @@ export default function ItemsPage() {
                     setNewItem({
                       ...newItem,
                       name: newInputValue || '',
-                      category: matchedMaster ? matchedMaster.category : 'General',
+                      category: matchedMaster ? matchedMaster.category : newItem.category || 'General',
                       unit: matchedMaster ? matchedMaster.defaultUnit : newItem.unit
                     });
                   }}
@@ -295,7 +303,30 @@ export default function ItemsPage() {
                 />
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                <Autocomplete
+                  freeSolo
+                  options={categoryOptions}
+                  value={newItem.category}
+                  onChange={(event, newValue) => {
+                    const val = typeof newValue === 'string' ? newValue : (newValue || 'General');
+                    setNewItem((prev) => ({ ...prev, category: val }));
+                  }}
+                  onInputChange={(event, newInputValue) => {
+                    setNewItem((prev) => ({ ...prev, category: newInputValue || 'General' }));
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="CATEGORY *"
+                      required
+                      placeholder="e.g. Electrical & Motors"
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <TextField
                   label="SKU CODE / SHORT ID *"
                   fullWidth
@@ -306,7 +337,7 @@ export default function ItemsPage() {
                 />
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                 <TextField
                   label="RACK / LOCATION"
                   fullWidth
@@ -410,7 +441,7 @@ export default function ItemsPage() {
       >
         {/* Search Header */}
         <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-          <Grid size={{ xs: 12, sm: 8 }}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <OutlinedInput
               fullWidth
               placeholder="Search items, SKU code, rack location..."
@@ -424,7 +455,24 @@ export default function ItemsPage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Category Filter"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              {categoryFilterOptions.map((cat) => (
+                <MenuItem key={cat} value={cat}>
+                  {cat === 'All' ? 'All Categories' : cat}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 3 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
             <Typography variant="caption" color="textSecondary">
               {selected.length > 0 ? (
                 <strong style={{ color: '#ff4d4f' }}>{selected.length} items selected for deletion</strong>
@@ -450,6 +498,7 @@ export default function ItemsPage() {
                   />
                 </TableCell>
                 <TableCell>Item Name</TableCell>
+                <TableCell>Category</TableCell>
                 <TableCell>SKU Code</TableCell>
                 <TableCell align="right">Price Per Unit</TableCell>
                 <TableCell align="center">Units</TableCell>
@@ -480,8 +529,17 @@ export default function ItemsPage() {
                           {item.name}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
-                          {item.category || 'General'} | Rack: {item.rackLocation || 'N/A'}
+                          Rack: {item.rackLocation || 'N/A'}
                         </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Chip
+                          label={item.category || 'General'}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
                       </TableCell>
 
                       <TableCell>
@@ -690,13 +748,10 @@ export default function ItemsPage() {
                   label="Category"
                   fullWidth
                   required
-                  value={editingItem.category}
+                  value={editingItem.category || 'General'}
                   onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
                 >
-                  {(categories.length > 0
-                    ? categories.map((c) => c.name)
-                    : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
-                  ).map((cat) => (
+                  {categoryOptions.map((cat) => (
                     <MenuItem key={cat} value={cat}>
                       {cat}
                     </MenuItem>

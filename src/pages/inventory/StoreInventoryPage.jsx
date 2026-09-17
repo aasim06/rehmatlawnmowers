@@ -38,7 +38,7 @@ import { PlusOutlined, SearchOutlined, ExportOutlined, ImportOutlined, DeleteOut
 import MainCard from 'components/MainCard';
 
 export default function StoreInventoryPage() {
-  const { items, issueStock, receiveStock, addNewItem, deleteItem } = useStoreInventory();
+  const { items, categories: contextCategories = [], issueStock, receiveStock, addNewItem, deleteItem } = useStoreInventory();
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,7 +62,7 @@ export default function StoreInventoryPage() {
   const [newItem, setNewItem] = useState({
     itemCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
     name: '',
-    category: 'Hardware',
+    category: 'General',
     totalStock: 50,
     unit: 'pcs',
     unitPrice: 20,
@@ -70,7 +70,15 @@ export default function StoreInventoryPage() {
     rackLocation: 'Rack A-01'
   });
 
-  const categories = ['All', ...new Set(items.map((i) => i.category))];
+  const categoryOptions = Array.from(
+    new Set([
+      'General',
+      ...(contextCategories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean),
+      ...items.map((i) => i.category).filter(Boolean)
+    ])
+  );
+
+  const categoriesFilter = ['All', ...categoryOptions];
 
   const filteredItems = items.filter((i) => {
     const matchesSearch =
@@ -143,7 +151,7 @@ export default function StoreInventoryPage() {
           <FormControl sx={{ minWidth: 240, width: 240 }}>
             <InputLabel>Category</InputLabel>
             <Select value={selectedCategory} label="Category" onChange={(e) => setSelectedCategory(e.target.value)}>
-              {categories.map((cat) => (
+              {categoriesFilter.map((cat) => (
                 <MenuItem key={cat} value={cat}>
                   {cat}
                 </MenuItem>
@@ -367,11 +375,18 @@ export default function StoreInventoryPage() {
               />
 
               <TextField
+                select
                 label="Category"
                 fullWidth
                 value={newItem.category}
                 onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-              />
+              >
+                {categoryOptions.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <Grid container spacing={2}>
                 <Grid item xs={6}>

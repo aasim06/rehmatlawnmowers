@@ -1,13 +1,11 @@
-import { sql } from './neon';
+import { supabase } from './supabase';
 
 const API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   'http://localhost:5000/api';
 
 /**
- * High-performance hybrid client:
- * 1. Tries Express REST API first.
- * 2. If REST API is offline, gracefully falls back directly to Neon Serverless SQL driver.
+ * High-performance hybrid client using Supabase fallback
  */
 export const backendApi = {
   // Items & Catalog
@@ -17,7 +15,8 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      return await sql`SELECT * FROM store_items ORDER BY name ASC;`;
+      const { data } = await supabase.from('store_items').select('*').order('name', { ascending: true });
+      return data || [];
     }
   },
 

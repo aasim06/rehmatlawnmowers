@@ -153,37 +153,33 @@ export default function CategoriesPage() {
             startIcon={<PlusOutlined />}
             onClick={() => setAddDrawerOpen(true)}
           >
-            + Add Category
+            Add Category
           </Button>
         </Stack>
       }
     >
       {/* Search Bar Controls */}
-      <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} sm={6}>
-          <OutlinedInput
-            fullWidth
-            placeholder="Search categories by Name or Description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchOutlined />
-              </InputAdornment>
-            }
-          />
-        </Grid>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+        <OutlinedInput
+          placeholder="Search categories by name or description..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          startAdornment={
+            <InputAdornment position="start">
+              <SearchOutlined />
+            </InputAdornment>
+          }
+          sx={{ width: { xs: '100%', sm: 380 } }}
+        />
 
-        <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" color="textSecondary">
-            {selected.length > 0 ? (
-              <strong style={{ color: '#52c41a' }}>{selected.length} selected</strong>
-            ) : (
-              `Total ${filteredCategories.length} Categories`
-            )}
-          </Typography>
-        </Grid>
-      </Grid>
+        <Typography variant="caption" color="textSecondary">
+          {selected.length > 0 ? (
+            <strong style={{ color: '#52c41a' }}>{selected.length} selected</strong>
+          ) : (
+            `Total ${filteredCategories.length} Categories`
+          )}
+        </Typography>
+      </Stack>
 
       {/* Categories Table */}
       <TableContainer>
@@ -196,7 +192,7 @@ export default function CategoriesPage() {
                   indeterminate={selected.length > 0 && selected.length < filteredCategories.length}
                   checked={filteredCategories.length > 0 && selected.length === filteredCategories.length}
                   onChange={handleSelectAllClick}
-                  inputProps={{ 'aria-label': 'select all categories' }}
+                  aria-label="select all categories"
                 />
               </TableCell>
               <TableCell>Category ID</TableCell>

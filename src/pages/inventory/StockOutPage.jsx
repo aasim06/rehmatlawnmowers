@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
+import CeoSignature from 'components/CeoSignature';
 
 // material-ui
 import {
@@ -39,13 +40,16 @@ import { ExportOutlined, SearchOutlined, ArrowDownOutlined, DeleteOutlined, Edit
 // project imports
 import MainCard from 'components/MainCard';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 import usePermission from 'hooks/usePermission';
 
 export default function StockOutPage() {
+  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { canDelete, canEditPrice, isStoreKeeper } = usePermission();
-  const { items = [], vendors = [], masterItemNames = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs, addNotification } = useStoreInventory();
+  const { items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs, addNotification } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
   const itemSelectRef = useRef(null);
   const qtyRef = useRef(null);
@@ -53,11 +57,20 @@ export default function StockOutPage() {
   // Available customer/parties list from real Vendors & Parties added by user
   const partyList = (vendors || []).map((v) => v.name).filter(Boolean);
 
+  // Category options list from StoreInventoryContext
+  const categoryOptions = Array.from(
+    new Set([
+      'General',
+      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
+    ])
+  );
+
   // Add Stock Out Drawer Form State
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState({
     customer: '',
     itemName: '',
+    category: 'General',
     qty: 1,
     unitPrice: 0
   });
@@ -109,8 +122,10 @@ export default function StockOutPage() {
   const stockOutLogs = usageLogs.filter(
     (log) =>
       log.type && log.type.toUpperCase().includes('OUT') &&
+      (selectedCategory === 'All' || (log.category || 'General') === selectedCategory) &&
       ((log.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (log.itemCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (log.department && log.department.toLowerCase().includes(searchTerm.toLowerCase())))
   );
@@ -152,7 +167,7 @@ export default function StockOutPage() {
 
   const isSelected = (id) => selected.indexOf(id) !== -1;
 
-  // Auto-fill unit price when selecting item name
+  // Auto-fill unit price and category when selecting item name
   const handleItemNameChange = (event, newInputValue) => {
     const val = typeof newInputValue === 'string' ? newInputValue : (newInputValue?.name || '');
     const matchedItem = items.find((i) => i.name.toLowerCase() === val.toLowerCase());
@@ -160,12 +175,15 @@ export default function StockOutPage() {
       setForm((prev) => ({
         ...prev,
         itemName: val,
+        category: matchedItem.category || prev.category || 'General',
         unitPrice: matchedItem.unitPrice || 0
       }));
     } else {
+      const matchedMaster = (masterItemNames || []).find((m) => m.name.toLowerCase() === val.toLowerCase());
       setForm((prev) => ({
         ...prev,
         itemName: val,
+        category: matchedMaster?.category || prev.category || 'General',
         unitPrice: 0
       }));
     }
@@ -192,12 +210,14 @@ export default function StockOutPage() {
       'Sales / Issuance',
       'Store Keeper',
       `Unit Price: ${priceVal}`,
-      priceVal
+      priceVal,
+      form.category || targetItem.category || 'General'
     );
     if (success) {
       setForm((prev) => ({
         ...prev,
         itemName: '',
+        category: 'General',
         qty: 1,
         unitPrice: 0
       }));
@@ -262,7 +282,8 @@ export default function StockOutPage() {
       'Sales / Issuance',
       'Store Keeper',
       `Unit Price: ${priceVal}`,
-      priceVal
+      priceVal,
+      form.category || targetItem.category || 'General'
     );
     if (success) {
       setDrawerOpen(false);
@@ -282,6 +303,7 @@ export default function StockOutPage() {
       setForm({
         customer: '',
         itemName: '',
+        category: 'General',
         qty: 1,
         unitPrice: 0
       });
@@ -460,8 +482,38 @@ export default function StockOutPage() {
               />
             </Grid>
 
-            {/* 3. QTY */}
-            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
+            {/* 3. CATEGORY SELECT */}
+            <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+              <Autocomplete
+                freeSolo
+                options={categoryOptions}
+                value={form.category}
+                onChange={(event, newValue) => {
+                  const val = typeof newValue === 'string' ? newValue : (newValue || 'General');
+                  setForm((prev) => ({ ...prev, category: val }));
+                }}
+                onInputChange={(event, newInputValue) => {
+                  setForm((prev) => ({ ...prev, category: newInputValue || 'General' }));
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '41.38px',
+                    minHeight: '41.38px',
+                    py: 0
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="CATEGORY"
+                    placeholder="Category"
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* 4. QTY */}
+            <Grid size={{ xs: 12, sm: 3, md: 1.5 }}>
               <TextField
                 label="QTY *"
                 type="number"
@@ -486,8 +538,8 @@ export default function StockOutPage() {
               />
             </Grid>
 
-            {/* 4. SAVE BUTTON */}
-            <Grid size={{ xs: 12, sm: 8, md: 4 }}>
+            {/* 5. SAVE BUTTON */}
+            <Grid size={{ xs: 12, sm: 3, md: 2 }}>
               <Button
                 variant="contained"
                 type="button"
@@ -498,12 +550,12 @@ export default function StockOutPage() {
                   height: '41.38px',
                   bgcolor: '#ff4d4f',
                   '&:hover': { bgcolor: '#d9363e' },
-                  fontSize: '0.9rem',
+                  fontSize: '0.85rem',
                   fontWeight: 700,
                   boxShadow: '0 4px 14px rgba(255, 77, 79, 0.3)'
                 }}
               >
-                Confirm Sales Invoice & Save
+                Save Invoice
               </Button>
             </Grid>
           </Grid>
@@ -529,7 +581,7 @@ export default function StockOutPage() {
         }
       >
         <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <OutlinedInput
               fullWidth
               size="small"
@@ -544,7 +596,25 @@ export default function StockOutPage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }} sx={{ textAlign: 'right' }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Category Filter"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <MenuItem value="All">All Categories</MenuItem>
+              {categoryOptions.map((cat) => (
+                <MenuItem key={cat} value={cat}>
+                  {cat}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 3 }} sx={{ textAlign: 'right' }}>
             <Typography variant="caption" color="textSecondary">
               {selected.length > 0 ? (
                 <strong style={{ color: '#ff4d4f' }}>{selected.length} records selected for deletion</strong>
@@ -592,9 +662,12 @@ export default function StockOutPage() {
                       </Stack>
 
                       <Box>
-                        <Typography variant="subtitle1" fontWeight={700}>
-                          {log.itemName}
-                        </Typography>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="subtitle1" fontWeight={700}>
+                            {log.itemName}
+                          </Typography>
+                          <Chip label={log.category || 'General'} size="small" variant="outlined" color="primary" />
+                        </Stack>
                         <Typography variant="caption" color="textSecondary">
                           Code: {log.itemCode || log.id}
                         </Typography>
@@ -655,6 +728,7 @@ export default function StockOutPage() {
                     />
                   </TableCell>
                   <TableCell>ITEM SELECT</TableCell>
+                  <TableCell>CATEGORY</TableCell>
                   <TableCell align="center">QTY</TableCell>
                   <TableCell align="right">DATE & TIME</TableCell>
                   <TableCell align="center">ACTIONS</TableCell>
@@ -663,7 +737,7 @@ export default function StockOutPage() {
               <TableBody>
                 {stockOutLogs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="textSecondary">
                         No Stock Out usage records found.
                       </Typography>
@@ -690,6 +764,15 @@ export default function StockOutPage() {
                           <Typography variant="caption" color="textSecondary">
                             {log.itemCode}
                           </Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            label={log.category || 'General'}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
                         </TableCell>
 
                         <TableCell align="center">
@@ -852,8 +935,8 @@ export default function StockOutPage() {
           {`
             @media print {
               @page {
-                size: auto;
-                margin: 8mm;
+                size: A4 portrait;
+                margin: 6mm;
               }
               body * {
                 visibility: hidden !important;
@@ -866,6 +949,15 @@ export default function StockOutPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
+                padding: 10px !important;
+              }
+              #printable-invoice-stockout .watermark-logo {
+                top: 58% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 390px !important;
+                max-width: 70% !important;
+                opacity: 0.15 !important;
               }
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
@@ -882,7 +974,7 @@ export default function StockOutPage() {
           <Chip label={printData?.type || 'Stock Out Receipt'} color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printData && (() => {
             const activeCustomerLogs = stockOutLogs.filter(
               (log) => (log.usedBy || log.department || '').toLowerCase() === (printData.customer || '').toLowerCase()
@@ -909,53 +1001,66 @@ export default function StockOutPage() {
                 {/* 🏢 Watermark Background Logo */}
                 <Box
                   component="img"
-                  src={rehmatLogo}
+                  className="watermark-logo"
+                  src={transparentLogo || rehmatLogo}
                   alt="Watermark Logo"
                   sx={{
                     position: 'absolute',
-                    top: '50%',
+                    top: '58%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: '55%',
-                    maxWidth: 360,
-                    opacity: 0.08,
+                    width: '390px',
+                    maxWidth: '70%',
+                    opacity: 0.15,
                     pointerEvents: 'none',
-                    zIndex: 0,
-                    borderRadius: '50%'
+                    zIndex: 0
                   }}
                 />
                 <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                    REHMAT LAWN MOWERS
-                  </Typography>
-                  <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 0.5 }}>
-                    FACTORY STORE INVENTORY & ISSUANCE
-                  </Typography>
-                  <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
-                    Official Sales & Stock Issuance Invoice Voucher
-                  </Typography>
+                  {/* Brand Header with Emblem Logo */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                    <Box
+                      component="img"
+                      src={transparentLogo || rehmatLogo}
+                      alt="Rehmat Logo Emblem"
+                      sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                    />
+                    <Box sx={{ textAlign: 'left' }}>
+                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                        REHMAT LAWN MOWERS
+                      </Typography>
+                      <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
+                        FACTORY STORE INVENTORY & ISSUANCE
+                      </Typography>
+                      <Typography variant="caption" display="block" color="textSecondary">
+                        Official Sales & Stock Issuance Invoice Voucher
+                      </Typography>
+                    </Box>
+                  </Box>
 
                   <Divider sx={{ my: 1.5 }} />
 
                   <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                    <Grid size={{ xs: 6 }}>
-                      <Typography variant="caption" color="textSecondary" display="block">INVOICE NO:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700}>{printData.id}</Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">DATE & TIME:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700}>{printData.time}</Typography>
-                    </Grid>
-                    <Grid size={{ xs: 12 }} sx={{ mt: 1 }}>
-                      <Typography variant="caption" color="textSecondary" display="block">CUSTOMER / RECEIVED BY:</Typography>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="textSecondary" display="block">CUSTOMER / DEPARTMENT:</Typography>
                       <Typography variant="h5" fontWeight={800} color="primary.main">{printData.customer}</Typography>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        Issued Date: {printData.date} | Ref/Log ID: #{printData.id}
+                      </Typography>
+                    </Grid>
+
+                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                      <Typography variant="caption" color="textSecondary" display="block">INVOICE TYPE:</Typography>
+                      <Typography variant="subtitle2" fontWeight={700} color="success.main">{printData.type || 'Stock Out Issuance'}</Typography>
+                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>ITEMS COUNT:</Typography>
+                      <Typography variant="subtitle2" fontWeight={700}>{displayLogs.length} Stock Out Entries</Typography>
                     </Grid>
                   </Grid>
 
                   {/* Complete Multi-Item Table for Customer */}
                   <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
                     <Table size="small">
-                      <TableHead sx={{ bgcolor: '#f9fafb' }}>
+                      <TableHead sx={{ bgcolor: 'transparent' }}>
                         <TableRow>
                           <TableCell><strong>#</strong></TableCell>
                           <TableCell><strong>ITEM DESCRIPTION</strong></TableCell>
@@ -997,12 +1102,26 @@ export default function StockOutPage() {
                     </Table>
                   </TableContainer>
 
-                  <Box sx={{ bgcolor: '#ecfdf5', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #a7f3d0' }}>
+                  <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #a7f3d0' }}>
                     <Typography variant="caption" color="textSecondary" display="block">TOTAL CUSTOMER INVOICE AMOUNT ({displayLogs.length} Items):</Typography>
                     <Typography variant="h3" fontWeight={800} color="#059669">
                       Rs. {grandTotalSum.toLocaleString()}
                     </Typography>
                   </Box>
+
+                  {/* Signatures Footer */}
+                  <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
+                    <Grid size={{ xs: 6 }} textAlign="center">
+                      <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
+                        Customer Signature / Receiver
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6 }} textAlign="right">
+                      <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                        <CeoSignature />
+                      </Box>
+                    </Grid>
+                  </Grid>
                 </Box>
               </Box>
             );

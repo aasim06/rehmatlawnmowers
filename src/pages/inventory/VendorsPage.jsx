@@ -176,7 +176,7 @@ export default function VendorsPage() {
             </Button>
           )}
           <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
-            + Add New Vendor / Party
+            Add New Vendor / Party
           </Button>
         </Stack>
       }

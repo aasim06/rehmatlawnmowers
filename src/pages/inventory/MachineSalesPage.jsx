@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
+import CeoSignature from 'components/CeoSignature';
 
 // material-ui
 import {
@@ -48,6 +49,7 @@ import {
 // project imports
 import MainCard from 'components/MainCard';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 
 const defaultMachineModels = [
   'Rehmat 20" Lawn Mower (Petrol Engine)',
@@ -74,6 +76,7 @@ const formatFullDate = (timeStr, dateISO) => {
 };
 
 export default function MachineSalesPage() {
+  const transparentLogo = useTransparentLogo(rehmatLogo);
   const {
     machineSales = [],
     machineModels = [],
@@ -410,7 +413,7 @@ export default function MachineSalesPage() {
             onClick={() => setNewModelDialogOpen(true)}
             sx={{ fontWeight: 700 }}
           >
-            + Add New Machine Model
+            Add New Machine Model
           </Button>
         }
         sx={{
@@ -567,7 +570,7 @@ export default function MachineSalesPage() {
                   onClick={handleAddItemRow}
                   sx={{ mt: 1, fontWeight: 700 }}
                 >
-                  + Add Another Machine to Bill
+                  Add Another Machine to Bill
                 </Button>
               </Box>
             </Grid>
@@ -693,9 +696,17 @@ export default function MachineSalesPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
-                padding: 0 !important;
+                padding: 10px !important;
                 margin: 0 !important;
                 box-shadow: none !important;
+              }
+              #printable-machine-invoice .watermark-logo {
+                top: 58% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 390px !important;
+                max-width: 70% !important;
+                opacity: 0.15 !important;
               }
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
@@ -712,7 +723,7 @@ export default function MachineSalesPage() {
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printData && (() => {
             const displayItems = (printData.items && printData.items.length > 0) ? printData.items : [
               {
@@ -725,36 +736,57 @@ export default function MachineSalesPage() {
             ];
 
             return (
-              <Box id="printable-machine-invoice" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+              <Box
+                id="printable-machine-invoice"
+                sx={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  p: { xs: 2, sm: 3 },
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  borderRadius: 1
+                }}
+              >
                 {/* 🏢 Watermark Background Logo */}
                 <Box
                   component="img"
-                  src={rehmatLogo}
+                  className="watermark-logo"
+                  src={transparentLogo || rehmatLogo}
                   alt="Watermark Logo"
                   sx={{
                     position: 'absolute',
-                    top: '50%',
+                    top: '58%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: '55%',
-                    maxWidth: 360,
-                    opacity: 0.08,
+                    width: '390px',
+                    maxWidth: '70%',
+                    opacity: 0.15,
                     pointerEvents: 'none',
-                    zIndex: 0,
-                    borderRadius: '50%'
+                    zIndex: 0
                   }}
                 />
 
                 <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                    REHMAT LAWN MOWERS
-                  </Typography>
-                  <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 0.5 }}>
-                    FACTORY STORE MACHINE SALES & DISTRIBUTION
-                  </Typography>
-                  <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
-                    Official Machine Sales & Customer Invoice Statement
-                  </Typography>
+                  {/* Brand Header with Emblem Logo */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                    <Box
+                      component="img"
+                      src={transparentLogo || rehmatLogo}
+                      alt="Rehmat Logo Emblem"
+                      sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                    />
+                    <Box sx={{ textAlign: 'left' }}>
+                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                        REHMAT LAWN MOWERS
+                      </Typography>
+                      <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
+                        FACTORY STORE MACHINE SALES & DISTRIBUTION
+                      </Typography>
+                      <Typography variant="caption" display="block" color="textSecondary">
+                        Official Machine Sales & Customer Invoice Statement
+                      </Typography>
+                    </Box>
+                  </Box>
 
                   <Divider sx={{ my: 1.5 }} />
 
@@ -786,7 +818,7 @@ export default function MachineSalesPage() {
                   {/* Multi-Item Machine Table */}
                   <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
                     <Table size="small">
-                      <TableHead sx={{ bgcolor: '#f9fafb' }}>
+                      <TableHead sx={{ bgcolor: 'transparent' }}>
                         <TableRow>
                           <TableCell><strong>#</strong></TableCell>
                           <TableCell><strong>MACHINE MODEL & SPECS</strong></TableCell>
@@ -829,7 +861,7 @@ export default function MachineSalesPage() {
                     </Table>
                   </TableContainer>
 
-                  <Box sx={{ bgcolor: '#ecfdf5', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
+                  <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
                     <Grid container spacing={1} alignItems="center">
                       <Grid size={{ xs: 6 }}>
                         <Typography variant="caption" color="textSecondary" display="block">TOTAL BILL: Rs. {(printData.lineTotal || 0).toLocaleString()}</Typography>
@@ -851,10 +883,10 @@ export default function MachineSalesPage() {
                         Customer Signature / Receiver
                       </Typography>
                     </Grid>
-                    <Grid size={{ xs: 6 }} textAlign="center">
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2, fontWeight: 700 }}>
-                        Authorized Signature (Rehmat Lawn Mowers)
-                      </Typography>
+                    <Grid size={{ xs: 6 }} textAlign="right">
+                      <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                        <CeoSignature />
+                      </Box>
                     </Grid>
                   </Grid>
                 </Box>

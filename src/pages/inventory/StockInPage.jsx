@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
+import CeoSignature from 'components/CeoSignature';
 
 // material-ui
 import {
@@ -39,11 +40,14 @@ import { ImportOutlined, SearchOutlined, ArrowUpOutlined, PlusOutlined, DeleteOu
 // project imports
 import MainCard from 'components/MainCard';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 
 export default function StockInPage() {
-  const { items = [], vendors = [], masterItemNames = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
+  const transparentLogo = useTransparentLogo(rehmatLogo);
+  const { items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
   const itemSelectRef = useRef(null);
   const qtyRef = useRef(null);
@@ -52,11 +56,20 @@ export default function StockInPage() {
   // Vendor options list (Only from real Vendors & Parties added by user)
   const vendorList = (vendors || []).map((v) => v.name).filter(Boolean);
 
+  // Category options list from StoreInventoryContext
+  const categoryOptions = Array.from(
+    new Set([
+      'General',
+      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
+    ])
+  );
+
   // Add Drawer Form State
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState({
     vendor: '',
     itemName: '',
+    category: 'General',
     qty: 1,
     unitPrice: 0,
     discount: 0
@@ -91,12 +104,15 @@ export default function StockInPage() {
       setForm((prev) => ({
         ...prev,
         itemName: val,
+        category: matchedItem.category || prev.category || 'General',
         unitPrice: matchedItem.unitPrice || prev.unitPrice
       }));
     } else {
+      const matchedMaster = (masterItemNames || []).find((m) => m.name.toLowerCase() === val.toLowerCase());
       setForm((prev) => ({
         ...prev,
-        itemName: val
+        itemName: val,
+        category: matchedMaster?.category || prev.category || 'General'
       }));
     }
   };
@@ -113,20 +129,20 @@ export default function StockInPage() {
     const poCode = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
 
     if (matchedItem) {
-      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal);
+      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal, form.category || matchedItem.category || 'General');
     } else {
       const newCode = `RM-${Math.floor(100 + Math.random() * 900)}`;
       const createdItem = await addNewItem({
         name: form.itemName.trim(),
         itemCode: newCode,
-        category: 'General',
+        category: form.category || 'General',
         unit: 'PCS',
         totalStock: 0,
         minLevel: 10,
         unitPrice: priceVal,
         rackLocation: 'Main Store'
       });
-      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal);
+      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal, form.category || 'General');
     }
 
     setForm((prev) => ({
@@ -256,12 +272,18 @@ export default function StockInPage() {
   // Filter logs for IN transactions
   const stockInLogs = usageLogs.filter((log) => {
     const isIN = log.type && log.type.toUpperCase().includes('IN');
+    const matchedItem = items.find((i) => i.name.toLowerCase() === (log.itemName || '').toLowerCase());
+    const logCat = log.category || matchedItem?.category || 'General';
+
     const matchesSearch =
       (log.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.itemCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase()));
+      (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      logCat.toLowerCase().includes(searchTerm.toLowerCase());
 
-    return isIN && matchesSearch;
+    const matchesCategory = selectedCategory === 'All' || logCat.toLowerCase() === selectedCategory.toLowerCase();
+
+    return isIN && matchesSearch && matchesCategory;
   });
 
   // Checkbox Selection Handlers
@@ -309,7 +331,7 @@ export default function StockInPage() {
           <Grid container spacing={2.5} alignItems="center">
             {/* ROW 1: 50% / 50% split */}
             {/* 1. SELECT VENDOR / SUPPLIER */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Autocomplete
                 freeSolo
                 options={vendorList}
@@ -340,7 +362,7 @@ export default function StockInPage() {
             </Grid>
 
             {/* 2. ITEM SELECT */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Autocomplete
                 freeSolo
                 options={existingNamesList}
@@ -361,15 +383,36 @@ export default function StockInPage() {
                     label="ITEM SELECT *"
                     required
                     placeholder="Select Item"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (qtyRef.current) {
-                          qtyRef.current.focus();
-                          qtyRef.current.select();
-                        }
-                      }
-                    }}
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* 3. CATEGORY SELECT */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <Autocomplete
+                freeSolo
+                options={categoryOptions}
+                value={form.category}
+                onChange={(event, newValue) => {
+                  const val = typeof newValue === 'string' ? newValue : (newValue || 'General');
+                  setForm((prev) => ({ ...prev, category: val }));
+                }}
+                onInputChange={(event, newInputValue) => {
+                  setForm((prev) => ({ ...prev, category: newInputValue || 'General' }));
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '44px',
+                    minHeight: '44px',
+                    py: 0
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="CATEGORY"
+                    placeholder="Category"
                   />
                 )}
               />
@@ -526,24 +569,41 @@ export default function StockInPage() {
             <OutlinedInput
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Stock In logs by Name..."
               startAdornment={
                 <InputAdornment position="start">
                   <SearchOutlined />
                 </InputAdornment>
               }
-              fullWidth
-              size="small"
+              sx={{ height: '42px' }}
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }} sx={{ textAlign: 'right' }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField
+              select
+              fullWidth
+              label="Filter by Category"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  height: '42px',
+                  minHeight: '42px'
+                }
+              }}
+            >
+              <MenuItem value="All">All Categories</MenuItem>
+              {categoryOptions.map((cat) => (
+                <MenuItem key={cat} value={cat}>
+                  {cat}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 5 }} sx={{ textAlign: 'right' }}>
             <Typography variant="caption" color="textSecondary">
-              {selected.length > 0 ? (
-                <strong style={{ color: '#10b981' }}>{selected.length} records selected for deletion</strong>
-              ) : (
-                `Total ${stockInLogs.length} Stock In Records`
-              )}
+              Showing <strong>{stockInLogs.length}</strong> Stock In Log Records
             </Typography>
           </Grid>
         </Grid>
@@ -644,6 +704,7 @@ export default function StockInPage() {
                     />
                   </TableCell>
                   <TableCell>ITEM SELECT</TableCell>
+                  <TableCell>CATEGORY</TableCell>
                   <TableCell align="center">QTY</TableCell>
                   <TableCell align="right">UNIT PRICE</TableCell>
                   <TableCell align="right">LINE TOTAL</TableCell>
@@ -655,7 +716,7 @@ export default function StockInPage() {
               <TableBody>
                 {stockInLogs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="textSecondary">
                         No Stock In shipment records found.
                       </Typography>
@@ -664,9 +725,11 @@ export default function StockInPage() {
                 ) : (
                   stockInLogs.map((log) => {
                     const isItemSelected = isSelected(log.id);
+                    const matchedItem = items.find((i) => i.name.toLowerCase() === (log.itemName || '').toLowerCase());
+                    const logCat = log.category || matchedItem?.category || 'General';
 
                     return (
-                      <TableRow key={log.id} hover selected={isItemSelected}>
+                      <TableRow key={log.id} hover selected={isItemSelected} onClick={(e) => handleSelectOne(e, log.id)}>
                         <TableCell padding="checkbox">
                           <Checkbox
                             color="primary"
@@ -676,12 +739,16 @@ export default function StockInPage() {
                         </TableCell>
 
                         <TableCell>
-                          <Typography variant="subtitle2" fontWeight={600}>
+                          <Typography variant="subtitle2" fontWeight={700}>
                             {log.itemName}
                           </Typography>
                           <Typography variant="caption" color="textSecondary">
-                            {log.itemCode}
+                            {log.itemCode || log.id}
                           </Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip label={logCat} size="small" variant="light" color="primary" sx={{ fontWeight: 600 }} />
                         </TableCell>
 
                         <TableCell align="center">
@@ -862,8 +929,8 @@ export default function StockInPage() {
           {`
             @media print {
               @page {
-                size: auto;
-                margin: 8mm;
+                size: A4 portrait;
+                margin: 6mm;
               }
               body * {
                 visibility: hidden !important;
@@ -876,6 +943,15 @@ export default function StockInPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
+                padding: 10px !important;
+              }
+              #printable-invoice-stockin .watermark-logo {
+                top: 58% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 390px !important;
+                max-width: 70% !important;
+                opacity: 0.15 !important;
               }
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
@@ -892,7 +968,7 @@ export default function StockInPage() {
           <Chip label={printData?.type || 'Stock In'} color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printData && (() => {
             const activeVendorLogs = stockInLogs.filter(
               (log) => (log.usedBy || '').toLowerCase() === (printData.vendor || '').toLowerCase()
@@ -919,28 +995,39 @@ export default function StockInPage() {
                 {/* 🏢 Watermark Background Logo */}
                 <Box
                   component="img"
-                  src={rehmatLogo}
+                  className="watermark-logo"
+                  src={transparentLogo || rehmatLogo}
                   alt="Watermark Logo"
                   sx={{
                     position: 'absolute',
-                    top: '50%',
+                    top: '58%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: '55%',
-                    maxWidth: 360,
-                    opacity: 0.08,
+                    width: '390px',
+                    maxWidth: '70%',
+                    opacity: 0.15,
                     pointerEvents: 'none',
-                    zIndex: 0,
-                    borderRadius: '50%'
+                    zIndex: 0
                   }}
                 />
                 <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                    REHMAT LAWN MOWERS
-                  </Typography>
-                <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 0.5 }}>
-                  FACTORY STORE INVENTORY & RECEIVING
-                </Typography>
+                  {/* Brand Header with Emblem Logo */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                    <Box
+                      component="img"
+                      src={transparentLogo || rehmatLogo}
+                      alt="Rehmat Logo Emblem"
+                      sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                    />
+                    <Box sx={{ textAlign: 'left' }}>
+                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                        REHMAT LAWN MOWERS
+                      </Typography>
+                      <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
+                        FACTORY STORE INVENTORY & RECEIVING
+                      </Typography>
+                    </Box>
+                  </Box>
                 <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
                   Official Receiving & Vendor Shipment Statement
                 </Typography>
@@ -965,7 +1052,7 @@ export default function StockInPage() {
                 {/* Complete Multi-Item Table for Vendor */}
                 <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
                   <Table size="small">
-                    <TableHead sx={{ bgcolor: '#f9fafb' }}>
+                    <TableHead sx={{ bgcolor: 'transparent' }}>
                       <TableRow>
                         <TableCell><strong>#</strong></TableCell>
                         <TableCell><strong>ITEM DESCRIPTION</strong></TableCell>
@@ -1007,12 +1094,26 @@ export default function StockInPage() {
                   </Table>
                 </TableContainer>
 
-                <Box sx={{ bgcolor: '#ecfdf5', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #a7f3d0' }}>
+                <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #a7f3d0' }}>
                   <Typography variant="caption" color="textSecondary" display="block">TOTAL VENDOR INVOICE AMOUNT ({displayLogs.length} Items):</Typography>
                   <Typography variant="h3" fontWeight={800} color="#059669">
                     Rs. {grandTotalSum.toLocaleString()}
                   </Typography>
                 </Box>
+
+                {/* Signatures Footer */}
+                <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
+                  <Grid size={{ xs: 6 }} textAlign="center">
+                    <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
+                      Vendor Signature / Receiver
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6 }} textAlign="right">
+                    <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                      <CeoSignature />
+                    </Box>
+                  </Grid>
+                </Grid>
               </Box>
             </Box>
           );

@@ -10,10 +10,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: API_URL,
+    clearScreen: false,
     server: {
-      open: true,
+      open: false,
       port: PORT,
-      host: true
+      host: true,
+      watch: {
+        ignored: ['**/src-tauri/**']
+      }
     },
     preview: {
       open: true,

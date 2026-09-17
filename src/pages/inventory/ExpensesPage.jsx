@@ -34,6 +34,7 @@ import MainCard from 'components/MainCard';
 import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 
 // assets
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
@@ -65,6 +66,7 @@ const QUICK_EXPENSE_SUGGESTIONS = [
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
 export default function ExpensesPage() {
+  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { expenses = [], addExpense, deleteExpense } = useStoreInventory();
 
   // Form State
@@ -840,9 +842,9 @@ export default function ExpensesPage() {
               </Box>
               <Box
                 component="img"
-                src={rehmatLogo}
+                src={transparentLogo || rehmatLogo}
                 alt="Logo"
-                sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: '50%', border: '1px solid #cbd5e1' }}
+                sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
               />
             </Stack>
 

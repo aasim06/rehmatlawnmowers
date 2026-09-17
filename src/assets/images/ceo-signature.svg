@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 105" width="220" height="95">
+  <!-- Top Title -->
+  <text x="5" y="20" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-style="italic" font-size="17" fill="#000000">Rehmat Lawn Mowers</text>
+  
+  <!-- i dot -->
+  <circle cx="28" cy="40" r="2.5" fill="#000000" />
+
+  <!-- Signature path tracing exact uploaded signature -->
+  <path d="M 15 50 C 20 44, 24 40, 28 41 C 31 42, 30 47, 28 52 L 24 58 C 30 58, 34 52, 37 43 L 50 22 C 54 19, 58 24, 52 38 L 40 64 C 37 70, 35 76, 45 66 C 52 60, 58 48, 61 44 C 65 38, 61 54, 55 66 C 51 74, 47 86, 57 86 C 65 86, 70 74, 75 62 C 80 53, 84 49, 87 52 C 91 56, 87 62, 83 63 C 79 64, 82 60, 89 57 L 105 55" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- 'Proprietor' text -->
+  <text x="115" y="58" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-style="italic" font-size="17" fill="#000000">Proprietor</text>
+  
+  <!-- Solid Line -->
+  <line x1="0" y1="68" x2="240" y2="68" stroke="#000000" stroke-width="2" />
+  
+  <!-- CEO Name & Role -->
+  <text x="0" y="86" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="15" fill="#000000">Ilyas Rehmat Ali</text>
+  <text x="0" y="102" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="14" fill="#000000">CEO</text>
+</svg>

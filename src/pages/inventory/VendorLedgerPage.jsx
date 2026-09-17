@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CeoSignature from 'components/CeoSignature';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -30,8 +31,10 @@ import TeamOutlined from '@ant-design/icons/TeamOutlined';
 import MainCard from 'components/MainCard';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 
 export default function VendorLedgerPage() {
+  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { vendors, usageLogs, vendorPayments, addVendorPayment } = useStoreInventory();
 
   // Search State
@@ -372,8 +375,8 @@ export default function VendorLedgerPage() {
           {`
             @media print {
               @page {
-                size: auto;
-                margin: 8mm;
+                size: A4 portrait;
+                margin: 6mm;
               }
               body * {
                 visibility: hidden !important;
@@ -386,6 +389,15 @@ export default function VendorLedgerPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
+                padding: 10px !important;
+              }
+              #printable-vendor-statement .watermark-logo {
+                top: 58% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 390px !important;
+                max-width: 70% !important;
+                opacity: 0.15 !important;
               }
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
@@ -402,35 +414,56 @@ export default function VendorLedgerPage() {
           <Chip label="Vendor Statement" color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printVendorData && (
-            <Box id="printable-vendor-statement" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+            <Box
+              id="printable-vendor-statement"
+              sx={{
+                position: 'relative',
+                overflow: 'hidden',
+                p: { xs: 2, sm: 3 },
+                bgcolor: '#ffffff',
+                color: '#111827',
+                borderRadius: 1
+              }}
+            >
               {/* 🏢 Watermark Background Logo */}
               <Box
                 component="img"
-                src={rehmatLogo}
+                className="watermark-logo"
+                src={transparentLogo || rehmatLogo}
                 alt="Watermark Logo"
                 sx={{
                   position: 'absolute',
-                  top: '50%',
+                  top: '58%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  width: '55%',
-                  maxWidth: 360,
-                  opacity: 0.08,
+                  width: '390px',
+                  maxWidth: '70%',
+                  opacity: 0.15,
                   pointerEvents: 'none',
-                  zIndex: 0,
-                  borderRadius: '50%'
+                  zIndex: 0
                 }}
               />
 
               <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                  REHMAT LAWN MOWERS
-                </Typography>
-                <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 0.5 }}>
-                  FACTORY STORE VENDOR & SUPPLIER PAYABLE LEDGER
-                </Typography>
+                {/* Brand Header with Emblem Logo */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                  <Box
+                    component="img"
+                    src={transparentLogo || rehmatLogo}
+                    alt="Rehmat Logo Emblem"
+                    sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                  />
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                      REHMAT LAWN MOWERS
+                    </Typography>
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
+                      FACTORY STORE VENDOR & SUPPLIER PAYABLE LEDGER
+                    </Typography>
+                  </Box>
+                </Box>
                 <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
                   Official Vendor Account Statement & Receiving Voucher
                 </Typography>
@@ -452,7 +485,7 @@ export default function VendorLedgerPage() {
                   </Grid>
                 </Grid>
 
-                <Box sx={{ bgcolor: '#ecfdf5', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
+                <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
                   <Grid container spacing={1} alignItems="center">
                     <Grid item xs={6}>
                       <Typography variant="caption" color="textSecondary" display="block">TOTAL SUPPLIES BILLED: Rs. {printVendorData.totalPurchasesVal.toLocaleString()}</Typography>
@@ -466,6 +499,20 @@ export default function VendorLedgerPage() {
                     </Grid>
                   </Grid>
                 </Box>
+
+                {/* Signatures Footer */}
+                <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
+                  <Grid item xs={6} textAlign="center">
+                    <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
+                      Vendor Signature / Receiver
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} textAlign="right">
+                    <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                      <CeoSignature />
+                    </Box>
+                  </Grid>
+                </Grid>
               </Box>
             </Box>
           )}

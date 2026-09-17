@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import { useDebounce } from 'hooks/useDebounce';
+import CeoSignature from 'components/CeoSignature';
 
 // material-ui
 import {
@@ -56,6 +57,7 @@ import {
 // project imports
 import MainCard from 'components/MainCard';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
+import { useTransparentLogo } from 'components/logo/LogoMain';
 
 const REPAIR_STATUS_OPTIONS = ['Received', 'In Repair', 'Ready for Delivery', 'Delivered'];
 
@@ -101,6 +103,7 @@ const getAvatarGradient = (str) => {
 };
 
 export default function MachineRepairsPage() {
+  const transparentLogo = useTransparentLogo(rehmatLogo);
   const {
     machineRepairs = [],
     machineModels = [],
@@ -1516,14 +1519,18 @@ const STATUS_DESCRIPTIONS = {
         </DialogActions>
       </Dialog>
 
-      {/* PRINT JOB CARD INVOICE RECEIPT MODAL (EXACT MATCH WITH IMAGE 1) */}
+      {/* PRINT JOB CARD INVOICE RECEIPT MODAL */}
       <Dialog open={printModalOpen} onClose={() => setPrintModalOpen(false)} maxWidth="md" fullWidth>
         <style>
           {`
             @media print {
               @page {
-                size: auto;
-                margin: 8mm;
+                size: A4 portrait;
+                margin: 6mm;
+              }
+              html, body {
+                height: 100% !important;
+                overflow: hidden !important;
               }
               body * {
                 visibility: hidden !important;
@@ -1536,6 +1543,17 @@ const STATUS_DESCRIPTIONS = {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
+                margin: 0 !important;
+                padding: 10px !important;
+                box-sizing: border-box !important;
+              }
+              #printable-repair-jobcard .watermark-logo {
+                top: 58% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 390px !important;
+                max-width: 70% !important;
+                opacity: 0.15 !important;
               }
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
@@ -1552,35 +1570,53 @@ const STATUS_DESCRIPTIONS = {
           <Chip label="Repair Receipt" color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printData && (
-            <Box id="printable-repair-jobcard" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+            <Box
+              id="printable-repair-jobcard"
+              sx={{
+                position: 'relative',
+                overflow: 'hidden',
+                p: { xs: 2, sm: 3 },
+                bgcolor: '#ffffff',
+                color: '#111827',
+                borderRadius: 1
+              }}
+            >
               {/* Watermark Background Logo */}
               <Box
                 component="img"
-                src={rehmatLogo}
+                className="watermark-logo"
+                src={transparentLogo || rehmatLogo}
                 alt="Watermark Logo"
                 sx={{
                   position: 'absolute',
-                  top: '50%',
+                  top: '58%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  width: '60%',
-                  maxWidth: 420,
-                  opacity: 0.08,
+                  width: '390px',
+                  maxWidth: '70%',
+                  opacity: 0.15,
                   pointerEvents: 'none',
-                  zIndex: 0,
-                  borderRadius: '50%'
+                  zIndex: 0
                 }}
               />
 
               <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                  REHMAT LAWN MOWERS
-                </Typography>
-                <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 1.5 }}>
-                  FACTORY STORE REPAIRING & SERVICE
-                </Typography>
+                {/* Brand Header with Emblem Logo */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                  <Box
+                    component="img"
+                    src={transparentLogo || rehmatLogo}
+                    alt="Rehmat Logo Emblem"
+                    sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
+                  />
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                      REHMAT LAWN MOWERS
+                    </Typography>
+                  </Box>
+                </Box>
 
                 <Divider sx={{ my: 1.5 }} />
 
@@ -1589,7 +1625,7 @@ const STATUS_DESCRIPTIONS = {
                   border: '1.5px solid #111827',
                   borderRadius: '4px',
                   marginBottom: '16px',
-                  backgroundColor: '#ffffff',
+                  backgroundColor: 'rgba(255, 255, 255, 0.45)',
                   overflow: 'hidden'
                 }}>
                   <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
@@ -1608,7 +1644,7 @@ const STATUS_DESCRIPTIONS = {
                     </div>
 
                     {/* Right Column: Job Card Meta */}
-                    <div style={{ flex: '1', padding: '10px 14px', backgroundColor: '#f9fafb' }}>
+                    <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
                         <span style={{ color: '#6b7280', fontWeight: 700 }}>Job Card No:</span>
                         <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{printData.repairNo}</span>
@@ -1625,16 +1661,16 @@ const STATUS_DESCRIPTIONS = {
                   </div>
 
                   {/* Machine Model Highlight Strip */}
-                  <div style={{ padding: '7px 14px', backgroundColor: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.88rem' }}>
+                  <div style={{ padding: '7px 14px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.88rem' }}>
                     <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Model Under Repair:</span>
                     <span style={{ fontWeight: 800, color: '#111827' }}>{printData.machineName || printData.machineModel}</span>
                   </div>
                 </div>
 
                 {/* EXACT TABLE AS SHOWN IN IMAGE 1 (Sr | Specification | QTY | Rate | Total Amount) */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: '#f9fafb' }}>
+                    <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
                       <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
                         <strong>Sr</strong>
                       </th>
@@ -1660,7 +1696,7 @@ const STATUS_DESCRIPTIONS = {
                         const itemTotal = item.totalAmount || (itemQty * itemRate);
 
                         return (
-                          <tr key={idx} style={{ borderBottom: '1px solid #111827' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
                               {formatSr(idx + 1)}
                             </td>
@@ -1680,7 +1716,7 @@ const STATUS_DESCRIPTIONS = {
                         );
                       })
                     ) : (
-                      <tr style={{ borderBottom: '1px solid #111827' }}>
+                      <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
                         <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800 }}>
                           01
                         </td>
@@ -1700,7 +1736,7 @@ const STATUS_DESCRIPTIONS = {
                     )}
 
                     {/* Total Amount Bottom Row */}
-                    <tr style={{ backgroundColor: '#fcfcfc', borderTop: '1.5px solid #111827' }}>
+                    <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
                       <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
                         Total amount
                       </td>
@@ -1714,7 +1750,7 @@ const STATUS_DESCRIPTIONS = {
                 </table>
 
                 {/* Advance, Discount & Balance Row */}
-                <Box sx={{ bgcolor: '#f0fdf4', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
                   <Grid container spacing={1} alignItems="center">
                     <Grid size={{ xs: 6 }}>
                       {printData.discountAmount > 0 && (
@@ -1745,9 +1781,9 @@ const STATUS_DESCRIPTIONS = {
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180, ml: 'auto' }}>
-                      Authorized Store Incharge
-                    </Typography>
+                    <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                      <CeoSignature />
+                    </Box>
                   </Grid>
                 </Grid>
               </Box>

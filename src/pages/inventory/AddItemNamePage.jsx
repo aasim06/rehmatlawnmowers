@@ -42,7 +42,16 @@ export default function AddItemNamePage() {
   const { items, categories = [], masterItemNames, addMasterItemName, updateMasterItemName, deleteMasterItemName, deleteMultipleMasterItemNames } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
+
+  // Category options list from StoreInventoryContext
+  const categoryOptions = Array.from(
+    new Set([
+      'General',
+      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
+    ])
+  );
 
   // Add Master Item Drawer State (7 inputs)
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
@@ -68,10 +77,11 @@ export default function AddItemNamePage() {
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   const filteredMasterNames = masterItemNames.filter((m) => {
-    return (
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const matchesSearch =
+      (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || (m.category || 'General') === selectedCategory;
+    return matchesSearch && matchesCategory;
   });
 
   // Checkbox Selection Handlers
@@ -164,7 +174,7 @@ export default function AddItemNamePage() {
             </Button>
           )}
           <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
-            + Add Master Item Name
+            Add Master Item Name
           </Button>
         </Stack>
       }
@@ -181,7 +191,7 @@ export default function AddItemNamePage() {
 
       {/* Search Header */}
       <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} sm={6}>
+        <Grid item xs={12} sm={5}>
           <OutlinedInput
             fullWidth
             placeholder="Search saved item names, categories..."
@@ -195,7 +205,25 @@ export default function AddItemNamePage() {
           />
         </Grid>
 
-        <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
+        <Grid item xs={12} sm={4}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Category Filter"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <MenuItem value="All">All Categories</MenuItem>
+            {categoryOptions.map((cat) => (
+              <MenuItem key={cat} value={cat}>
+                {cat}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid item xs={12} sm={3} sx={{ textAlign: 'right' }}>
           <Typography variant="caption" color="textSecondary">
             {selected.length > 0 ? (
               <strong style={{ color: '#ff4d4f' }}>{selected.length} item names selected for deletion</strong>
@@ -350,13 +378,10 @@ export default function AddItemNamePage() {
                 label="Category"
                 fullWidth
                 required
-                value={newItemName.category}
+                value={newItemName.category || 'General'}
                 onChange={(e) => setNewItemName({ ...newItemName, category: e.target.value })}
               >
-                {(categories.length > 0
-                  ? categories.map((c) => c.name)
-                  : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
-                ).map((cat) => (
+                {categoryOptions.map((cat) => (
                   <MenuItem key={cat} value={cat}>
                     {cat}
                   </MenuItem>
@@ -462,10 +487,7 @@ export default function AddItemNamePage() {
                   value={editingItemName.category || 'General'}
                   onChange={(e) => setEditingItemName({ ...editingItemName, category: e.target.value })}
                 >
-                  {(categories.length > 0
-                    ? categories.map((c) => c.name)
-                    : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
-                  ).map((cat) => (
+                  {categoryOptions.map((cat) => (
                     <MenuItem key={cat} value={cat}>
                       {cat}
                     </MenuItem>

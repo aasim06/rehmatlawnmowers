@@ -222,7 +222,7 @@ export default function MachineBOMPage() {
           onClick={() => handleOpenRecipeModal()}
           sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 700, px: 2.5, py: 1 }}
         >
-          + Add New Recipe
+          Add New Recipe
         </Button>
       </Box>
 
@@ -554,7 +554,7 @@ export default function MachineBOMPage() {
                   onClick={handleAddIngredientRow}
                   sx={{ mt: 1.5, fontWeight: 700 }}
                 >
-                  + Add Component
+                  Add Component
                 </Button>
               </Box>
             </Box>
