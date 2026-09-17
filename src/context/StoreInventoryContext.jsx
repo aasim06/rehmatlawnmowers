@@ -646,7 +646,8 @@ export function StoreInventoryProvider({ children }) {
     try {
       await supabase.from('store_items').update({
         used_today: newUsedToday,
-        remaining_stock: newRemainingStock
+        remaining_stock: newRemainingStock,
+        unit_price: price > 0 ? price : targetItem.unitPrice
       }).eq('id', targetItem.id);
 
       const { error } = await supabase.from('usage_logs').insert([{
@@ -655,6 +656,8 @@ export function StoreInventoryProvider({ children }) {
         item_code: targetItem.itemCode || 'N/A',
         item_name: targetItem.name || 'Item',
         qty_used: actualQty,
+        unit_price: price,
+        line_total: lineTotal,
         used_by: usedBy,
         department: department || 'Production',
         issued_by: issuedBy || 'Store Keeper',
@@ -768,7 +771,8 @@ export function StoreInventoryProvider({ children }) {
         unit: targetItem.unit || 'PCS',
         total_stock: newTotalStock,
         used_today: targetItem.usedToday || 0,
-        remaining_stock: newRemainingStock
+        remaining_stock: newRemainingStock,
+        unit_price: price > 0 ? price : (targetItem.unitPrice || 0)
       }]);
 
       const { error } = await supabase.from('usage_logs').insert([{
@@ -777,6 +781,8 @@ export function StoreInventoryProvider({ children }) {
         item_code: targetItem.itemCode || 'N/A',
         item_name: targetItem.name || 'Item',
         qty_used: actualQty,
+        unit_price: price,
+        line_total: lineTotal,
         used_by: supplierName,
         department: 'Store Inward',
         issued_by: 'Store Manager',
@@ -1222,7 +1228,9 @@ export function StoreInventoryProvider({ children }) {
       await supabase.from('usage_logs').update({
         item_name: updatedData.itemName,
         used_by: updatedData.usedBy,
-        qty_used: updatedData.qtyUsed
+        qty_used: updatedData.qtyUsed,
+        unit_price: updatedData.unitPrice,
+        line_total: updatedData.lineTotal
       }).eq('id', logId);
       await fetchSupabaseData();
     } catch (e) {
