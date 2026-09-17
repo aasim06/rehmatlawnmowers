@@ -1411,114 +1411,151 @@ export default function CustomerLedgerPage() {
                       component="img"
                       src={transparentLogo || rehmatLogo}
                       alt="Rehmat Logo Emblem"
-                      sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                      sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
                     />
                     <Box sx={{ textAlign: 'left' }}>
                       <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
                         REHMAT LAWN MOWERS
-                      </Typography>
-                      <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
-                        FACTORY STORE MACHINE SALES RECEIPT
                       </Typography>
                     </Box>
                   </Box>
 
                   <Divider sx={{ my: 1.5 }} />
 
-                  <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="textSecondary" display="block">INVOICE NO:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700}>{printInvoiceData.id}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>CUSTOMER NAME:</Typography>
-                      <Typography variant="h5" fontWeight={800} color="primary.main">{printInvoiceData.customerName}</Typography>
-                      {printInvoiceData.customerPhone && (
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          Contact: {printInvoiceData.customerPhone} | {printInvoiceData.cityAddress}
-                        </Typography>
-                      )}
-                    </Grid>
-                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">DATE & TIME:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700}>{formatFullDate(printInvoiceData.time, printInvoiceData.dateISO)}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>PAYMENT STATUS:</Typography>
-                      <Chip
-                        label={printInvoiceData.paymentStatus || 'Paid'}
-                        color={(printInvoiceData.paidAmount >= printInvoiceData.lineTotal) ? 'success' : printInvoiceData.paidAmount > 0 ? 'warning' : 'error'}
-                        size="small"
-                        sx={{ fontWeight: 700 }}
-                      />
-                    </Grid>
-                  </Grid>
+                  {/* Structured Professional Customer & Invoice Metadata Card */}
+                  <div style={{
+                    border: '1.5px solid #111827',
+                    borderRadius: '4px',
+                    marginBottom: '16px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                      {/* Left Column: Customer Details */}
+                      <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                          Customer Details
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                          {printInvoiceData.customerName}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                          {printInvoiceData.customerPhone && <div><strong>Phone:</strong> {printInvoiceData.customerPhone}</div>}
+                          {printInvoiceData.cityAddress && <div><strong>City / Address:</strong> {printInvoiceData.cityAddress}</div>}
+                        </div>
+                      </div>
 
-                  {/* Multi-Item Machine Table */}
-                  <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: '#f9fafb' }}>
-                        <TableRow>
-                          <TableCell><strong>#</strong></TableCell>
-                          <TableCell><strong>MACHINE MODEL & SPECS</strong></TableCell>
-                          <TableCell align="center"><strong>SERIAL NO</strong></TableCell>
-                          <TableCell align="center"><strong>QTY</strong></TableCell>
-                          <TableCell align="right"><strong>RATE</strong></TableCell>
-                          <TableCell align="right"><strong>TOTAL AMOUNT</strong></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {displayItems.map((item, idx) => {
-                          const q = parseInt(item.qty) || 1;
-                          const p = parseFloat(item.unitPrice) || 0;
-                          const d = parseFloat(item.discount) || 0;
-                          const gross = q * p;
-                          const lineAmt = item.lineTotal !== undefined && !isNaN(item.lineTotal) ? item.lineTotal : Math.max(0, gross - (gross * d) / 100);
+                      {/* Right Column: Invoice Meta */}
+                      <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{printInvoiceData.id}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                          <span style={{ fontWeight: 700, color: '#374151' }}>{formatFullDate(printInvoiceData.time, printInvoiceData.dateISO)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
+                          <span style={{ fontWeight: 800, color: printInvoiceData.paidAmount >= printInvoiceData.lineTotal ? '#16a34a' : '#d97706' }}>
+                            {printInvoiceData.paymentStatus || 'Paid'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                          return (
-                            <TableRow key={idx} hover>
-                              <TableCell>{idx + 1}</TableCell>
-                              <TableCell>
-                                <Typography variant="subtitle2" fontWeight={700}>{item.machineName || 'Machine'}</Typography>
-                              </TableCell>
-                              <TableCell align="center">{item.serialNo || 'N/A'}</TableCell>
-                              <TableCell align="center">
-                                <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                                  {q}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">Rs. {p.toLocaleString()}</TableCell>
-                              <TableCell align="right">
-                                <Typography variant="subtitle2" fontWeight={700}>
-                                  Rs. {lineAmt.toLocaleString()}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                  {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Sr</strong>
+                        </th>
+                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Specification / Model</strong>
+                        </th>
+                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>QTY</strong>
+                        </th>
+                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Rate</strong>
+                        </th>
+                        <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Total Amount</strong>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayItems.map((item, idx) => {
+                        const q = parseInt(item.qty) || 1;
+                        const p = parseFloat(item.unitPrice) || 0;
+                        const d = parseFloat(item.discount) || 0;
+                        const gross = q * p;
+                        const lineAmt = item.lineTotal !== undefined && !isNaN(item.lineTotal) ? item.lineTotal : Math.max(0, gross - (gross * d) / 100);
 
-                  <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(idx + 1).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                              {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(q).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {p.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {lineAmt.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* Total Amount Bottom Row */}
+                      <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                          Total amount
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                          {(printInvoiceData.lineTotal || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Financial Summary Box */}
+                  <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
                     <Grid container spacing={1} alignItems="center">
                       <Grid item xs={6}>
-                        <Typography variant="caption" color="textSecondary" display="block">TOTAL BILL: Rs. {(printInvoiceData.lineTotal || 0).toLocaleString()}</Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">PAID AMOUNT: Rs. {(printInvoiceData.paidAmount || 0).toLocaleString()}</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                          PAID AMOUNT: Rs. {(printInvoiceData.paidAmount || 0).toLocaleString()}
+                        </Typography>
                       </Grid>
                       <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                        <Typography variant="caption" color="textSecondary" display="block">REMAINING BALANCE:</Typography>
-                        <Typography variant="h3" fontWeight={800} color={(printInvoiceData.lineTotal - (printInvoiceData.paidAmount || 0)) > 0 ? '#dc2626' : '#059669'}>
-                          Rs. {Math.max(0, (printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)).toLocaleString()}
+                        <Typography variant="h6" fontWeight={800} color="success.dark">
+                          NET TOTAL: Rs. {(printInvoiceData.lineTotal || 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="subtitle2" fontWeight={800} color={((printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)) > 0 ? 'error.main' : 'success.main'}>
+                          {((printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)) > 0 ? `REMAINING DUE: Rs. ${Math.max(0, (printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)).toLocaleString()}` : 'FULL PAID (NO DUES)'}
                         </Typography>
                       </Grid>
                     </Grid>
                   </Box>
 
                   {/* Signatures Footer */}
-                  <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
-                    <Grid item xs={6} textAlign="center">
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
-                        Customer Signature / Receiver
+                  <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                        Customer Signature
                       </Typography>
                     </Grid>
-                    <Grid item xs={6} textAlign="right">
+                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
                       <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                         <CeoSignature />
                       </Box>
@@ -1610,7 +1647,7 @@ export default function CustomerLedgerPage() {
                     component="img"
                     src={transparentLogo || rehmatLogo}
                     alt="Rehmat Logo Emblem"
-                    sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                    sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
                   />
                   <Box sx={{ textAlign: 'left' }}>
                     <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
@@ -1621,111 +1658,162 @@ export default function CustomerLedgerPage() {
 
                 <Divider sx={{ my: 1.5 }} />
 
-                <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary" display="block">REPAIR JOB NO:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{printRepairData.repairNo || printRepairData.id}</Typography>
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>CUSTOMER NAME:</Typography>
-                    <Typography variant="h5" fontWeight={800} color="primary.main">{printRepairData.customerName}</Typography>
-                    <Typography variant="caption" color="textSecondary" display="block">
-                      Phone: {printRepairData.customerPhone || printRepairData.phone} | Address: {printRepairData.cityAddress || printRepairData.city}
-                    </Typography>
-                  </Grid>
+                {/* Structured Professional Customer & Repair Metadata Card */}
+                <div style={{
+                  border: '1.5px solid #111827',
+                  borderRadius: '4px',
+                  marginBottom: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                    {/* Left Column: Customer Details */}
+                    <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                        Customer Details
+                      </div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                        {printRepairData.customerName}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                        <div><strong>Phone:</strong> {printRepairData.customerPhone || printRepairData.phone || 'N/A'}</div>
+                        <div><strong>City / Address:</strong> {printRepairData.cityAddress || printRepairData.city || 'N/A'}</div>
+                      </div>
+                    </div>
 
-                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" color="textSecondary" display="block">DATE & TIME:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{printRepairData.receivedDate || printRepairData.time}</Typography>
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>PROMISED DELIVERY:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{printRepairData.promisedDate || '1-2 Days'}</Typography>
-                  </Grid>
-                </Grid>
+                    {/* Right Column: Job Card Meta */}
+                    <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#6b7280', fontWeight: 700 }}>Job Card No:</span>
+                        <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{printRepairData.repairNo || printRepairData.id}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                        <span style={{ fontWeight: 700, color: '#374151' }}>{printRepairData.receivedDate || printRepairData.time}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#6b7280', fontWeight: 600 }}>Repair Status:</span>
+                        <span style={{ fontWeight: 800, color: '#16a34a' }}>{printRepairData.repairStatus || 'Received'}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: 'transparent' }}>
-                      <TableRow>
-                        <TableCell><strong>#</strong></TableCell>
-                        <TableCell><strong>MODEL</strong></TableCell>
-                        <TableCell><strong>SPECIFICATION / REPAIR DETAIL</strong></TableCell>
-                        <TableCell align="center"><strong>QTY</strong></TableCell>
-                        <TableCell align="right"><strong>RATE</strong></TableCell>
-                        <TableCell align="right"><strong>TOTAL AMOUNT</strong></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {printRepairData.repairItems && printRepairData.repairItems.length > 0 ? (
-                        printRepairData.repairItems.map((item, idx) => {
-                          const itemQty = parseInt(item.qnty) || 1;
-                          const itemRate = parseFloat(item.rate) || 0;
-                          const itemTotal = item.totalAmount || (itemQty * itemRate);
+                  {/* Machine Model Highlight Strip */}
+                  <div style={{ padding: '7px 14px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.88rem' }}>
+                    <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Model Under Repair:</span>
+                    <span style={{ fontWeight: 800, color: '#111827' }}>{printRepairData.machineName || printRepairData.machineModel || 'Lawn Mower Machine'}</span>
+                  </div>
+                </div>
 
-                          return (
-                            <TableRow key={idx} hover>
-                              <TableCell>{idx + 1}</TableCell>
-                              <TableCell>
-                                <Typography variant="subtitle2" fontWeight={700}>{item.model}</Typography>
-                              </TableCell>
-                              <TableCell>{item.specification || 'General Repair & Service'}</TableCell>
-                              <TableCell align="center">
-                                <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                                  {itemQty}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">Rs. {itemRate.toLocaleString()}</TableCell>
-                              <TableCell align="right">
-                                <Typography variant="subtitle2" fontWeight={700}>
-                                  Rs. {itemTotal.toLocaleString()}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      ) : (
-                        <TableRow hover>
-                          <TableCell>1</TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={700}>{printRepairData.machineName}</Typography>
-                          </TableCell>
-                          <TableCell>{printRepairData.faultDescription}</TableCell>
-                          <TableCell align="center">
-                            <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                              1
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">Rs. {(printRepairData.totalCost || 0).toLocaleString()}</TableCell>
-                          <TableCell align="right">
-                            <Typography variant="subtitle2" fontWeight={700}>
-                              Rs. {(printRepairData.totalCost || 0).toLocaleString()}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                      <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <strong>Sr</strong>
+                      </th>
+                      <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <strong>Specification</strong>
+                      </th>
+                      <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <strong>QTY</strong>
+                      </th>
+                      <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <strong>Rate</strong>
+                      </th>
+                      <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <strong>Total Amount</strong>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printRepairData.repairItems && printRepairData.repairItems.length > 0 ? (
+                      printRepairData.repairItems.map((item, idx) => {
+                        const itemQty = parseInt(item.qnty) || 1;
+                        const itemRate = parseFloat(item.rate) || 0;
+                        const itemTotal = item.totalAmount || (itemQty * itemRate);
 
-                <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(idx + 1).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                              {item.specification || item.itemName || item.model}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(itemQty).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {itemRate.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {itemTotal.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800 }}>
+                          01
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600 }}>
+                          {printRepairData.faultDescription || 'General Repair & Overhauling'}
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800 }}>
+                          01
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800 }}>
+                          {(printRepairData.totalCost || 0).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800 }}>
+                          {(printRepairData.totalCost || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Total Amount Bottom Row */}
+                    <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                      <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                        Total amount
+                      </td>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                        {(printRepairData.totalCost || printRepairData.lineTotal || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Financial Summary Box */}
+                <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
                   <Grid container spacing={1} alignItems="center">
                     <Grid item xs={6}>
-                      <Typography variant="caption" color="textSecondary" display="block">TOTAL BILL: Rs. {(printRepairData.totalCost || printRepairData.lineTotal || 0).toLocaleString()}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block">PAID ADVANCE: Rs. {(printRepairData.paidAmount || 0).toLocaleString()}</Typography>
+                      <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                        PAID ADVANCE: Rs. {(printRepairData.paidAmount || 0).toLocaleString()}
+                      </Typography>
                     </Grid>
                     <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">REMAINING PAYABLE BALANCE:</Typography>
-                      <Typography variant="h3" fontWeight={800} color={printRepairData.balanceAmount > 0 ? '#dc2626' : '#059669'}>
-                        Rs. {(printRepairData.balanceAmount || 0).toLocaleString()}
+                      <Typography variant="h6" fontWeight={800} color="success.dark">
+                        NET TOTAL: Rs. {(printRepairData.totalCost || printRepairData.lineTotal || 0).toLocaleString()}
+                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={800} color={(printRepairData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}>
+                        {(printRepairData.balanceAmount || 0) > 0 ? `REMAINING DUE: Rs. ${(printRepairData.balanceAmount || 0).toLocaleString()}` : 'FULL PAID (NO DUES)'}
                       </Typography>
                     </Grid>
                   </Grid>
                 </Box>
 
-                <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
-                  <Grid item xs={6} textAlign="center">
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
+                {/* Signatures Footer */}
+                <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
                       Customer Signature
                     </Typography>
                   </Grid>
-                  <Grid item xs={6} textAlign="right">
+                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
                     <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                       <CeoSignature />
                     </Box>

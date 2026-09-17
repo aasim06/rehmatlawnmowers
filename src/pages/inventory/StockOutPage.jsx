@@ -1023,100 +1023,143 @@ export default function StockOutPage() {
                       component="img"
                       src={transparentLogo || rehmatLogo}
                       alt="Rehmat Logo Emblem"
-                      sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
+                      sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
                     />
                     <Box sx={{ textAlign: 'left' }}>
                       <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
                         REHMAT LAWN MOWERS
-                      </Typography>
-                      <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
-                        FACTORY STORE INVENTORY & ISSUANCE
-                      </Typography>
-                      <Typography variant="caption" display="block" color="textSecondary">
-                        Official Sales & Stock Issuance Invoice Voucher
                       </Typography>
                     </Box>
                   </Box>
 
                   <Divider sx={{ my: 1.5 }} />
 
-                  <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="textSecondary" display="block">CUSTOMER / DEPARTMENT:</Typography>
-                      <Typography variant="h5" fontWeight={800} color="primary.main">{printData.customer}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block">
-                        Issued Date: {printData.date} | Ref/Log ID: #{printData.id}
-                      </Typography>
+                  {/* Structured Professional Customer / Department Metadata Card */}
+                  <div style={{
+                    border: '1.5px solid #111827',
+                    borderRadius: '4px',
+                    marginBottom: '16px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                      {/* Left Column: Customer Details */}
+                      <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                          Customer / Party Details
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                          {printData.customer || 'Customer'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                          <div><strong>Issuance Category:</strong> {printData.type || 'Stock Out Sales'}</div>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Voucher Meta */}
+                      <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 700 }}>Voucher / Invoice No:</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>#{printData.id}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                          <span style={{ fontWeight: 700, color: '#374151' }}>{printData.date}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Status:</span>
+                          <span style={{ fontWeight: 800, color: '#16a34a' }}>Dispatched</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Sr</strong>
+                        </th>
+                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Specification / Item Description</strong>
+                        </th>
+                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>QTY</strong>
+                        </th>
+                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Rate</strong>
+                        </th>
+                        <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Total Amount</strong>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayLogs.map((item, idx) => {
+                        const itemUnitPrice = item.unitPrice || 0;
+                        const itemLineTotal = item.lineTotal || (item.qtyUsed * itemUnitPrice);
+                        const itemQty = item.qtyUsed || 1;
+
+                        return (
+                          <tr key={item.id || idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(idx + 1).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                              {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {String(itemQty).padStart(2, '0')}
+                            </td>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {itemUnitPrice.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {itemLineTotal.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* Total Amount Bottom Row */}
+                      <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                          Total amount
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                          {grandTotalSum.toLocaleString()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Financial Summary Box */}
+                  <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                    <Grid container spacing={1} alignItems="center">
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                          TOTAL DISPATCHED ITEMS: {displayLogs.length}
+                        </Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                        <Typography variant="h6" fontWeight={800} color="success.dark">
+                          NET TOTAL: Rs. {grandTotalSum.toLocaleString()}
+                        </Typography>
+                      </Grid>
                     </Grid>
-
-                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">INVOICE TYPE:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700} color="success.main">{printData.type || 'Stock Out Issuance'}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>ITEMS COUNT:</Typography>
-                      <Typography variant="subtitle2" fontWeight={700}>{displayLogs.length} Stock Out Entries</Typography>
-                    </Grid>
-                  </Grid>
-
-                  {/* Complete Multi-Item Table for Customer */}
-                  <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: 'transparent' }}>
-                        <TableRow>
-                          <TableCell><strong>#</strong></TableCell>
-                          <TableCell><strong>ITEM DESCRIPTION</strong></TableCell>
-                          <TableCell align="center"><strong>QTY</strong></TableCell>
-                          <TableCell align="right"><strong>UNIT PRICE</strong></TableCell>
-                          <TableCell align="right"><strong>TOTAL AMOUNT</strong></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {displayLogs.map((item, idx) => {
-                          const itemUnitPrice = item.unitPrice || 0;
-                          const itemLineTotal = item.lineTotal || (item.qtyUsed * itemUnitPrice);
-                          return (
-                            <TableRow key={item.id || idx} hover>
-                              <TableCell>{idx + 1}</TableCell>
-                              <TableCell>
-                                <Typography variant="subtitle2" fontWeight={700}>{item.itemName}</Typography>
-                                {item.itemCode && (
-                                  <Typography variant="caption" color="textSecondary" display="block">
-                                    {item.itemCode}
-                                  </Typography>
-                                )}
-                              </TableCell>
-                              <TableCell align="center">
-                                <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                                  -{item.qtyUsed}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">Rs. {itemUnitPrice.toLocaleString()}</TableCell>
-                              <TableCell align="right">
-                                <Typography variant="subtitle2" fontWeight={700}>
-                                  Rs. {itemLineTotal.toLocaleString()}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-
-                  <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #a7f3d0' }}>
-                    <Typography variant="caption" color="textSecondary" display="block">TOTAL CUSTOMER INVOICE AMOUNT ({displayLogs.length} Items):</Typography>
-                    <Typography variant="h3" fontWeight={800} color="#059669">
-                      Rs. {grandTotalSum.toLocaleString()}
-                    </Typography>
                   </Box>
 
                   {/* Signatures Footer */}
-                  <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
-                    <Grid size={{ xs: 6 }} textAlign="center">
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
-                        Customer Signature / Receiver
+                  <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                    <Grid size={{ xs: 6 }}>
+                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                        Customer / Receiver Signature
                       </Typography>
                     </Grid>
-                    <Grid size={{ xs: 6 }} textAlign="right">
+                    <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
                       <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                         <CeoSignature />
                       </Box>

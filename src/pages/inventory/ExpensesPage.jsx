@@ -12,6 +12,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Grid,
   IconButton,
   InputAdornment,
@@ -35,6 +36,7 @@ import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 import { useTransparentLogo } from 'components/logo/LogoMain';
+import CeoSignature from 'components/CeoSignature';
 
 // assets
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
@@ -826,125 +828,185 @@ export default function ExpensesPage() {
         </DialogTitle>
 
         <DialogContent sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#ffffff' }}>
-          <Box id="printable-expense-sheet" sx={{ bgcolor: '#ffffff', color: '#0f172a', width: '100%' }}>
-            {/* Company Header */}
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pb: 2, borderBottom: '2px solid #0f172a', mb: 2 }}>
-              <Box>
-                <Typography variant="h4" fontWeight={900} sx={{ color: '#0f172a', letterSpacing: 0.5, fontSize: '1.5rem' }}>
-                  REHMAT LAWN MOWERS
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600 }}>
-                  Store & Workshop Daily Expense Statement
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b' }}>
-                  Phone: 0306-0112606 | Lahore, Pakistan
-                </Typography>
-              </Box>
-              <Box
-                component="img"
-                src={transparentLogo || rehmatLogo}
-                alt="Logo"
-                sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
-              />
-            </Stack>
+          <Box id="printable-expense-sheet" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+            {/* Watermark Logo */}
+            <Box
+              component="img"
+              className="watermark-logo"
+              src={transparentLogo || rehmatLogo}
+              alt="Watermark Logo"
+              sx={{
+                position: 'absolute',
+                top: '58%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '390px',
+                maxWidth: '70%',
+                opacity: 0.15,
+                pointerEvents: 'none',
+                zIndex: 0
+              }}
+            />
 
-            {/* Date & Meta Header */}
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 2, bgcolor: '#f8fafc', p: 1.25, borderRadius: 1, border: '1px solid #e2e8f0' }}>
-              <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
-                Statement Date:{' '}
-                <Box component="span" fontWeight={800}>
-                  {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Records'}
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              {/* Brand Header with Emblem Logo */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                <Box
+                  component="img"
+                  src={transparentLogo || rehmatLogo}
+                  alt="Rehmat Logo Emblem"
+                  sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
+                />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                    REHMAT LAWN MOWERS
+                  </Typography>
                 </Box>
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
-                Total Amount:{' '}
-                <Box component="span" fontWeight={800} sx={{ color: '#b91c1c' }}>
-                  PKR {selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount).toLocaleString() : filteredTotal.toLocaleString()}
-                </Box>
-              </Typography>
-            </Stack>
-
-            {/* Print Table */}
-            <Table size="small" sx={{ width: '100%', border: '1px solid #94a3b8', mb: 2.5, '& th, & td': { borderColor: '#cbd5e1' } }}>
-              <TableHead sx={{ bgcolor: '#0f172a' }}>
-                <TableRow>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 40, py: 1 }}>SR</TableCell>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 100, py: 1 }}>DATE</TableCell>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, py: 1 }}>EXPENSE DESCRIPTION</TableCell>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 150, py: 1 }}>CATEGORY</TableCell>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 130, py: 1 }}>PAID TO</TableCell>
-                  <TableCell sx={{ color: '#ffffff !important', fontWeight: 700, width: 110, py: 1 }}>PAYMENT MODE</TableCell>
-                  <TableCell align="right" sx={{ color: '#ffffff !important', fontWeight: 700, width: 120, py: 1 }}>
-                    AMOUNT (PKR)
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {selectedExpenseForPrint ? (
-                  <TableRow>
-                    <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>1</TableCell>
-                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.expenseDate}</TableCell>
-                    <TableCell sx={{ color: '#0f172a', fontWeight: 700 }}>
-                      {selectedExpenseForPrint.title}
-                      {selectedExpenseForPrint.notes && (
-                        <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
-                          Ref: {selectedExpenseForPrint.notes}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.category}</TableCell>
-                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.paidTo || 'N/A'}</TableCell>
-                    <TableCell sx={{ color: '#0f172a' }}>{selectedExpenseForPrint.paymentMethod || 'Cash'}</TableCell>
-                    <TableCell align="right" sx={{ color: '#b91c1c', fontWeight: 800 }}>
-                      PKR {parseFloat(selectedExpenseForPrint.amount).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredExpenses.map((exp, idx) => (
-                    <TableRow key={exp.id || idx}>
-                      <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>{idx + 1}</TableCell>
-                      <TableCell sx={{ color: '#0f172a' }}>{exp.expenseDate}</TableCell>
-                      <TableCell sx={{ color: '#0f172a', fontWeight: 600 }}>
-                        {exp.title}
-                        {exp.notes && (
-                          <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
-                            Ref: {exp.notes}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={{ color: '#0f172a' }}>{exp.category}</TableCell>
-                      <TableCell sx={{ color: '#0f172a' }}>{exp.paidTo || 'N/A'}</TableCell>
-                      <TableCell sx={{ color: '#0f172a' }}>{exp.paymentMethod || 'Cash'}</TableCell>
-                      <TableCell align="right" sx={{ color: '#0f172a', fontWeight: 700 }}>
-                        PKR {parseFloat(exp.amount).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-                <TableRow sx={{ bgcolor: '#f1f5f9' }}>
-                  <TableCell colSpan={6} align="right" sx={{ fontWeight: 800, color: '#0f172a', py: 1 }}>
-                    Total Expenses:
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 900, color: '#b91c1c', fontSize: '1rem', py: 1 }}>
-                    PKR {selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount).toLocaleString() : filteredTotal.toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-
-            {/* Signatures Section */}
-            <Stack direction="row" justifyContent="space-between" sx={{ mt: 4, pt: 2 }}>
-              <Box sx={{ borderTop: '1px solid #64748b', width: 180, textAlign: 'center', pt: 0.5 }}>
-                <Typography variant="caption" fontWeight={700} sx={{ color: '#334155' }}>
-                  Prepared By (Cashier)
-                </Typography>
               </Box>
-              <Box sx={{ borderTop: '1px solid #64748b', width: 180, textAlign: 'center', pt: 0.5 }}>
-                <Typography variant="caption" fontWeight={700} sx={{ color: '#334155' }}>
-                  Verified / Approved By
-                </Typography>
+
+              <Divider sx={{ my: 1.5 }} />
+
+              {/* Structured Metadata Card */}
+              <div style={{
+                border: '1.5px solid #111827',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                overflow: 'hidden'
+              }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                      Statement Type
+                    </div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                      {selectedExpenseForPrint ? 'Expense Voucher' : 'Daily Expenses Statement'}
+                    </div>
+                  </div>
+
+                  <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Statement Date:</span>
+                      <span style={{ fontWeight: 700, color: '#374151' }}>
+                        {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Records'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Total Count:</span>
+                      <span style={{ fontWeight: 800, color: '#16a34a' }}>
+                        {selectedExpenseForPrint ? '01 Entry' : `${filteredExpenses.length} Entries`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                    <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                      <strong>Sr</strong>
+                    </th>
+                    <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                      <strong>Expense Title / Description</strong>
+                    </th>
+                    <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                      <strong>Category</strong>
+                    </th>
+                    <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                      <strong>Paid To</strong>
+                    </th>
+                    <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                      <strong>Amount (PKR)</strong>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedExpenseForPrint ? (
+                    <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        01
+                      </td>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                        {selectedExpenseForPrint.title} {selectedExpenseForPrint.notes ? `(${selectedExpenseForPrint.notes})` : ''}
+                      </td>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {selectedExpenseForPrint.category}
+                      </td>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {selectedExpenseForPrint.paidTo || 'N/A'}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {parseFloat(selectedExpenseForPrint.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredExpenses.map((exp, idx) => (
+                      <tr key={exp.id || idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {String(idx + 1).padStart(2, '0')}
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                          {exp.title} {exp.notes ? `(${exp.notes})` : ''}
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {exp.category}
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {exp.paidTo || 'N/A'}
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {parseFloat(exp.amount).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+
+                  {/* Total Amount Bottom Row */}
+                  <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                    <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                      Total amount
+                    </td>
+                    <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                    <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                      {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Financial Summary Box */}
+              <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                <Grid container spacing={1} alignItems="center">
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                      TOTAL EXPENSE VOUCHERS: {selectedExpenseForPrint ? 1 : filteredExpenses.length}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                    <Typography variant="h6" fontWeight={800} color="success.dark">
+                      NET TOTAL EXPENSES: Rs. {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
+                    </Typography>
+                  </Grid>
+                </Grid>
               </Box>
-            </Stack>
+
+              {/* Signatures Footer */}
+              <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                <Grid item xs={6}>
+                  <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                    Cashier / Manager Signature
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                  <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                    <CeoSignature />
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
           </Box>
         </DialogContent>
 

@@ -448,72 +448,154 @@ export default function VendorLedgerPage() {
 
               <Box sx={{ position: 'relative', zIndex: 1 }}>
                 {/* Brand Header with Emblem Logo */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
-                  <Box
-                    component="img"
-                    src={transparentLogo || rehmatLogo}
-                    alt="Rehmat Logo Emblem"
-                    sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '50%' }}
-                  />
-                  <Box sx={{ textAlign: 'left' }}>
-                    <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
-                      REHMAT LAWN MOWERS
-                    </Typography>
-                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#047857', letterSpacing: '0.3px', mt: 0.3 }}>
-                      FACTORY STORE VENDOR & SUPPLIER PAYABLE LEDGER
-                    </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+                    <Box
+                      component="img"
+                      src={transparentLogo || rehmatLogo}
+                      alt="Rehmat Logo Emblem"
+                      sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
+                    />
+                    <Box sx={{ textAlign: 'left' }}>
+                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                        REHMAT LAWN MOWERS
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-                <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
-                  Official Vendor Account Statement & Receiving Voucher
-                </Typography>
 
-                <Divider sx={{ my: 1.5 }} />
+                  <Divider sx={{ my: 1.5 }} />
 
-                <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary" display="block">VENDOR / SUPPLIER NAME:</Typography>
-                    <Typography variant="h5" fontWeight={800} color="primary.main">{printVendorData.vendorName}</Typography>
-                    <Typography variant="caption" color="textSecondary" display="block">
-                      Phone: {printVendorData.phone || 'N/A'}
-                    </Typography>
-                  </Grid>
+                  {/* Structured Professional Vendor Account Details Card */}
+                  <div style={{
+                    border: '1.5px solid #111827',
+                    borderRadius: '4px',
+                    marginBottom: '16px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                      {/* Left Column: Vendor Details */}
+                      <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                          Vendor Account Details
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                          {printVendorData.vendorName}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                          <div><strong>Phone:</strong> {printVendorData.phone || 'N/A'}</div>
+                          {printVendorData.category && <div><strong>Category:</strong> {printVendorData.category}</div>}
+                        </div>
+                      </div>
 
-                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" color="textSecondary" display="block">STATEMENT DATE:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</Typography>
-                  </Grid>
-                </Grid>
+                      {/* Right Column: Statement Meta */}
+                      <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 700 }}>Statement Type:</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>Payable Ledger</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Statement Date:</span>
+                          <span style={{ fontWeight: 700, color: '#374151' }}>
+                            {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Total Shipments:</span>
+                          <span style={{ fontWeight: 800, color: '#16a34a' }}>{printVendorData.totalShipmentsCount || 1} Entries</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
-                  <Grid container spacing={1} alignItems="center">
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="textSecondary" display="block">TOTAL SUPPLIES BILLED: Rs. {printVendorData.totalPurchasesVal.toLocaleString()}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block">TOTAL PAID TO VENDOR: Rs. {printVendorData.totalPaidVal.toLocaleString()}</Typography>
+                  {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Sr</strong>
+                        </th>
+                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Specification / Description</strong>
+                        </th>
+                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>QTY / Count</strong>
+                        </th>
+                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Amount Paid</strong>
+                        </th>
+                        <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                          <strong>Total Purchases</strong>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                          01
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                          Vendor Cumulative Supply Invoices & Material Deliveries
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {String(printVendorData.totalShipmentsCount || 1).padStart(2, '0')}
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {(printVendorData.totalPaidVal || 0).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                          {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
+                        </td>
+                      </tr>
+
+                      {/* Total Amount Bottom Row */}
+                      <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                          Total amount
+                        </td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px', textAlign: 'right', fontWeight: 800 }}>
+                          {(printVendorData.totalPaidVal || 0).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                          {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Financial Summary Box */}
+                  <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                    <Grid container spacing={1} alignItems="center">
+                      <Grid item xs={6}>
+                        <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                          TOTAL PAID TO VENDOR: Rs. {(printVendorData.totalPaidVal || 0).toLocaleString()}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                        <Typography variant="h6" fontWeight={800} color="success.dark">
+                          NET PURCHASES: Rs. {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="subtitle2" fontWeight={800} color={(printVendorData.balanceVal || 0) > 0 ? 'error.main' : 'success.main'}>
+                          {(printVendorData.balanceVal || 0) > 0 ? `OUTSTANDING PAYABLE BALANCE: Rs. ${(printVendorData.balanceVal || 0).toLocaleString()}` : 'FULL CLEARED (NO BALANCE DUE)'}
+                        </Typography>
+                      </Grid>
                     </Grid>
-                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">OUTSTANDING PAYABLE BALANCE:</Typography>
-                      <Typography variant="h3" fontWeight={800} color={printVendorData.balanceVal > 0 ? '#dc2626' : '#059669'}>
-                        Rs. {printVendorData.balanceVal.toLocaleString()}
+                  </Box>
+
+                  {/* Signatures Footer */}
+                  <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                        Vendor Signature
                       </Typography>
                     </Grid>
+                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                      <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                        <CeoSignature />
+                      </Box>
+                    </Grid>
                   </Grid>
                 </Box>
-
-                {/* Signatures Footer */}
-                <Grid container spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e5e7eb' }}>
-                  <Grid item xs={6} textAlign="center">
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ textDecoration: 'overline', pt: 2 }}>
-                      Vendor Signature / Receiver
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6} textAlign="right">
-                    <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
-                      <CeoSignature />
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
             </Box>
           )}
         </DialogContent>
