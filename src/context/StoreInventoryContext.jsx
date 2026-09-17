@@ -48,6 +48,18 @@ export function StoreInventoryProvider({ children }) {
   // 2. Usage & Issue Logs State (Clean Zero Start)
   const [usageLogs, setUsageLogs] = useState(() => safeParseJSON('rehmat_store_usage_logs_v2', []));
 
+  // Persistent Deleted Tracking Blacklists to prevent Supabase polling from restoring deleted items/logs
+  const [deletedLogIds, setDeletedLogIds] = useState(() => safeParseJSON('rehmat_deleted_log_ids', []));
+  const [deletedItemIds, setDeletedItemIds] = useState(() => safeParseJSON('rehmat_deleted_item_ids', []));
+
+  useEffect(() => {
+    localStorage.setItem('rehmat_deleted_log_ids', JSON.stringify(deletedLogIds));
+  }, [deletedLogIds]);
+
+  useEffect(() => {
+    localStorage.setItem('rehmat_deleted_item_ids', JSON.stringify(deletedItemIds));
+  }, [deletedItemIds]);
+
   // 3. Vendors / Suppliers State (Clean Zero Start)
   const [vendors, setVendors] = useState(() => safeParseJSON('rehmat_store_vendors_v2', []));
 
@@ -292,7 +304,11 @@ export function StoreInventoryProvider({ children }) {
       ]);
 
       if (itemsRes.status === 'fulfilled' && itemsRes.value?.data?.length > 0) {
-        const mappedItems = itemsRes.value.data.map((i) => ({
+        const deletedItemSet = new Set((deletedItemIds || []).map(String));
+        const cleanItemsData = itemsRes.value.data.filter(
+          (i) => !deletedItemSet.has(String(i.id)) && !deletedItemSet.has(String(i.sku_code || i.item_code)) && !deletedItemSet.has(String(i.name))
+        );
+        const mappedItems = cleanItemsData.map((i) => ({
           id: i.id,
           name: i.name,
           itemCode: i.sku_code || i.item_code || i.id,
@@ -310,7 +326,11 @@ export function StoreInventoryProvider({ children }) {
       }
 
       if (logsRes.status === 'fulfilled' && logsRes.value?.data?.length > 0) {
-        setUsageLogs(logsRes.value.data.map(l => ({
+        const deletedLogSet = new Set((deletedLogIds || []).map(String));
+        const cleanLogsData = logsRes.value.data.filter(
+          (l) => !deletedLogSet.has(String(l.id)) && !deletedLogSet.has(String(l.item_code)) && !deletedLogSet.has(String(l.item_name))
+        );
+        setUsageLogs(cleanLogsData.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
           itemCode: l.item_code || 'N/A',
@@ -798,8 +818,12 @@ export function StoreInventoryProvider({ children }) {
 
   // 5. Delete Inventory Item
   const deleteItem = async (itemId) => {
-    const targetItem = items.find((i) => i.id === itemId);
-    setItems((prev) => prev.filter((i) => i.id !== itemId));
+    const targetItem = items.find((i) => i.id === itemId || i.itemCode === itemId);
+    setItems((prev) => {
+      const filtered = prev.filter((i) => i.id !== itemId && i.itemCode !== itemId);
+      localStorage.setItem('rehmat_store_items_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     logActivity(
       'Inventory Item Deleted',
@@ -818,17 +842,28 @@ export function StoreInventoryProvider({ children }) {
     }
 
     try {
-      await supabase.from('store_items').delete().eq('id', itemId);
-      await fetchSupabaseData();
+      if (itemId) {
+        await supabase.from('store_items').delete().eq('id', itemId);
+        if (targetItem?.itemCode) {
+          await supabase.from('store_items').delete().eq('item_code', targetItem.itemCode);
+        }
+        if (targetItem?.name) {
+          await supabase.from('store_items').delete().eq('name', targetItem.name);
+        }
+      }
     } catch (e) {
-      console.error(e);
+      console.error('deleteItem error:', e);
     }
   };
 
   // Bulk Delete Items
   const deleteMultipleItems = async (itemIds) => {
     const idsSet = new Set(itemIds);
-    setItems((prev) => prev.filter((i) => !idsSet.has(i.id)));
+    setItems((prev) => {
+      const filtered = prev.filter((i) => !idsSet.has(i.id) && !idsSet.has(i.itemCode));
+      localStorage.setItem('rehmat_store_items_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     logActivity(
       'Bulk Items Deleted',
@@ -848,9 +883,9 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('store_items').delete().in('id', itemIds);
-      await fetchSupabaseData();
+      await supabase.from('store_items').delete().in('item_code', itemIds);
     } catch (e) {
-      console.error(e);
+      console.error('deleteMultipleItems error:', e);
     }
   };
 
@@ -867,10 +902,10 @@ export function StoreInventoryProvider({ children }) {
     });
 
     setItems(cleaned);
+    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(cleaned));
 
     try {
       await supabase.from('store_items').delete().eq('remaining_stock', 0);
-      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -898,7 +933,6 @@ export function StoreInventoryProvider({ children }) {
         rating: 5.0
       }]);
       if (error) console.error('Supabase addVendor error:', error);
-      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -919,18 +953,20 @@ export function StoreInventoryProvider({ children }) {
         supplied_category: updatedData.suppliedCategory
       }).eq('id', vendorId);
       if (error) console.error('Supabase updateVendor error:', error);
-      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
   };
 
   const deleteVendor = async (vendorId) => {
-    setVendors((prev) => prev.filter((v) => v.id !== vendorId));
+    setVendors((prev) => {
+      const filtered = prev.filter((v) => v.id !== vendorId);
+      localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     try {
       await supabase.from('vendors').delete().eq('id', vendorId);
-      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -939,11 +975,14 @@ export function StoreInventoryProvider({ children }) {
   // Bulk Delete Vendors
   const deleteMultipleVendors = async (vendorIds) => {
     const idsSet = new Set(vendorIds);
-    setVendors((prev) => prev.filter((v) => !idsSet.has(v.id)));
+    setVendors((prev) => {
+      const filtered = prev.filter((v) => !idsSet.has(v.id));
+      localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     try {
       await supabase.from('vendors').delete().in('id', vendorIds);
-      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -952,7 +991,11 @@ export function StoreInventoryProvider({ children }) {
   // 7. Delete Logs Actions
   const deleteMultipleLogs = async (logIds) => {
     const idsSet = new Set(logIds);
-    setUsageLogs((prev) => prev.filter((l) => !idsSet.has(l.id)));
+    setUsageLogs((prev) => {
+      const filtered = prev.filter((l) => !idsSet.has(l.id));
+      localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     logActivity(
       'Bulk Logs Deleted',
@@ -972,7 +1015,6 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('usage_logs').delete().in('id', logIds);
-      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -1051,8 +1093,27 @@ export function StoreInventoryProvider({ children }) {
 
   // Usage Logs Actions
   const deleteLog = async (logId) => {
-    const targetLog = usageLogs.find((l) => l.id === logId);
-    setUsageLogs((prev) => prev.filter((l) => l.id !== logId));
+    const targetLog = usageLogs.find(
+      (l) => String(l.id) === String(logId) || (l.itemCode && String(l.itemCode) === String(logId))
+    );
+
+    const idsToAdd = [String(logId)];
+    if (targetLog?.id) idsToAdd.push(String(targetLog.id));
+    if (targetLog?.itemCode) idsToAdd.push(String(targetLog.itemCode));
+    if (targetLog?.itemName) idsToAdd.push(String(targetLog.itemName));
+
+    setDeletedLogIds((prev) => Array.from(new Set([...prev, ...idsToAdd])));
+
+    setUsageLogs((prev) => {
+      const filtered = prev.filter(
+        (l) =>
+          String(l.id) !== String(logId) &&
+          String(l.itemCode) !== String(logId) &&
+          (targetLog ? l.itemName !== targetLog.itemName : true)
+      );
+      localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(filtered));
+      return filtered;
+    });
 
     logActivity(
       'Stock Log Deleted',
@@ -1071,10 +1132,21 @@ export function StoreInventoryProvider({ children }) {
     }
 
     try {
-      await supabase.from('usage_logs').delete().eq('id', logId);
-      await fetchSupabaseData();
+      if (logId) {
+        await supabase.from('usage_logs').delete().eq('id', logId);
+        const numId = parseInt(logId);
+        if (!isNaN(numId)) {
+          await supabase.from('usage_logs').delete().eq('id', numId);
+        }
+        if (targetLog?.itemCode) {
+          await supabase.from('usage_logs').delete().eq('item_code', targetLog.itemCode);
+        }
+        if (targetLog?.itemName) {
+          await supabase.from('usage_logs').delete().eq('item_name', targetLog.itemName);
+        }
+      }
     } catch (e) {
-      console.error(e);
+      console.error('deleteLog error:', e);
     }
   };
 
