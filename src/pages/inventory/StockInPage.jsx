@@ -279,6 +279,8 @@ export default function StockInPage() {
       (log.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.itemCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (log.department && log.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (log.notes && log.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
       logCat.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCategory = selectedCategory === 'All' || logCat.toLowerCase() === selectedCategory.toLowerCase();
@@ -565,8 +567,11 @@ export default function StockInPage() {
         }
       >
         <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <OutlinedInput
+              fullWidth
+              size="small"
+              placeholder="Search Stock In logs by Item Name, SKU, Supplier..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               startAdornment={
@@ -574,23 +579,17 @@ export default function StockInPage() {
                   <SearchOutlined />
                 </InputAdornment>
               }
-              sx={{ height: '42px' }}
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               select
               fullWidth
-              label="Filter by Category"
+              size="small"
+              label="Category Filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  height: '42px',
-                  minHeight: '42px'
-                }
-              }}
             >
               <MenuItem value="All">All Categories</MenuItem>
               {categoryOptions.map((cat) => (
@@ -601,9 +600,13 @@ export default function StockInPage() {
             </TextField>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 5 }} sx={{ textAlign: 'right' }}>
+          <Grid size={{ xs: 12, sm: 3 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
             <Typography variant="caption" color="textSecondary">
-              Showing <strong>{stockInLogs.length}</strong> Stock In Log Records
+              {selected.length > 0 ? (
+                <strong style={{ color: '#ff4d4f' }}>{selected.length} records selected for deletion</strong>
+              ) : (
+                `Total ${stockInLogs.length} Stock In Records`
+              )}
             </Typography>
           </Grid>
         </Grid>
