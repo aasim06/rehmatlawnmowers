@@ -417,24 +417,31 @@ export function StoreInventoryProvider({ children }) {
         const cleanSalesData = salesRes.value.data.filter(
           (s) => !deletedSaleSet.has(String(s.id))
         );
-        const mappedSales = cleanSalesData.map((s) => ({
-          id: s.id,
-          saleNo: s.sale_no || s.id,
-          customerName: s.customer_name,
-          customerPhone: s.customer_phone || 'N/A',
-          cityAddress: s.city_address || 'Lahore',
-          machineName: s.machine_name,
-          serialNo: s.serial_no,
-          qty: parseFloat(s.qty) || 1,
-          unitPrice: parseFloat(s.unit_price) || 0,
-          discountAmount: parseFloat(s.discount_amount) || 0,
-          lineTotal: parseFloat(s.line_total) || 0,
-          paidAmount: parseFloat(s.paid_amount) || 0,
-          balanceAmount: parseFloat(s.balance_amount) || 0,
-          paymentStatus: s.payment_status || 'Paid',
-          time: s.time || new Date(s.created_at).toLocaleString(),
-          items: s.items || []
-        }));
+        const mappedSales = cleanSalesData.map((s) => {
+          const rawSaleNo = s.sale_no;
+          const cleanSaleNo = (rawSaleNo && !rawSaleNo.includes('-') && rawSaleNo.length < 15) || (rawSaleNo && rawSaleNo.startsWith('MS-') && rawSaleNo.length < 15)
+            ? rawSaleNo
+            : `MS-${String(s.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`;
+
+          return {
+            id: s.id,
+            saleNo: cleanSaleNo,
+            customerName: s.customer_name,
+            customerPhone: s.customer_phone || 'N/A',
+            cityAddress: s.city_address || 'Lahore',
+            machineName: s.machine_name,
+            serialNo: s.serial_no,
+            qty: parseFloat(s.qty) || 1,
+            unitPrice: parseFloat(s.unit_price) || 0,
+            discountAmount: parseFloat(s.discount_amount) || 0,
+            lineTotal: parseFloat(s.line_total) || 0,
+            paidAmount: parseFloat(s.paid_amount) || 0,
+            balanceAmount: parseFloat(s.balance_amount) || 0,
+            paymentStatus: s.payment_status || 'Paid',
+            time: s.time || new Date(s.created_at).toLocaleString(),
+            items: s.items || []
+          };
+        });
         setMachineSales((prev) => {
           const cleanLocal = prev.filter((s) => !deletedSaleSet.has(String(s.id)));
           const fetchedMap = new Map(mappedSales.map((s) => [String(s.id), s]));

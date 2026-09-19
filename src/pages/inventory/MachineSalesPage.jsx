@@ -76,6 +76,18 @@ const formatFullDate = (timeStr, dateISO) => {
   return timeStr || '';
 };
 
+const formatInvoiceNo = (sale) => {
+  if (!sale) return 'MS-10001';
+  const num = typeof sale === 'string' ? sale : (sale.saleNo || sale.sale_no || sale.id);
+  if (!num) return 'MS-10001';
+  const str = String(num).trim();
+  if ((str.startsWith('MS-') || str.startsWith('PO-') || str.startsWith('REP-') || str.startsWith('INV-')) && str.length <= 15) {
+    return str;
+  }
+  const cleanHex = str.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
+  return `MS-${cleanHex || '10001'}`;
+};
+
 export default function MachineSalesPage() {
   const transparentLogo = useTransparentLogo(rehmatLogo);
   const {
@@ -843,7 +855,7 @@ export default function MachineSalesPage() {
                         </TableCell>
                         <TableCell>
                           <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                            {sale.saleNo || sale.id}
+                            {formatInvoiceNo(sale)}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -1255,7 +1267,7 @@ export default function MachineSalesPage() {
                       <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
-                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{printData.id}</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{formatInvoiceNo(printData)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
