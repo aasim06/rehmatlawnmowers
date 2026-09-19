@@ -4,12 +4,22 @@ import { supabase } from 'api/supabase';
 
 const AuthContext = createContext();
 
-export const defaultAdminPermissions = {
+// ==============================================================================
+// 👑 3-TIER ROLE PERMISSIONS DEFINITION
+// ==============================================================================
+
+/**
+ * 1. Super Admin: Unrestricted Full System Authority
+ * Can access every module, manage staff & roles, backup & restore, purge data, edit prices, and delete records.
+ */
+export const defaultSuperAdminPermissions = {
   'dashboard': true,
   'stock-out': true,
   'stock-in': true,
   'items': true,
   'categories': true,
+  'add-item-name': true,
+  'bom': true,
   'machine-sales': true,
   'machine-repairs': true,
   'customer-ledgers': true,
@@ -17,17 +27,55 @@ export const defaultAdminPermissions = {
   'vendors': true,
   'ledger': true,
   'reports': true,
+  'expenses': true,
   'backup-restore': true,
   'user-management': true,
   'canEditPrice': true,
-  'canDelete': true
+  'canDelete': true,
+  'canResetData': true
 };
 
+/**
+ * 2. Admin (Store Manager / Incharge): Full Operational Access
+ * Runs daily operations, sales, repairs, stock in/out, ledgers, reports, expenses, can edit prices & delete records.
+ * STRICTLY RESTRICTED FROM: User Management, Backup & Restore, and Total Database Purge.
+ */
+export const defaultAdminPermissions = {
+  'dashboard': true,
+  'stock-out': true,
+  'stock-in': true,
+  'items': true,
+  'categories': true,
+  'add-item-name': true,
+  'bom': true,
+  'machine-sales': true,
+  'machine-repairs': true,
+  'customer-ledgers': true,
+  'vendor-ledgers': true,
+  'vendors': true,
+  'ledger': true,
+  'reports': true,
+  'expenses': true,
+  'backup-restore': false, // Restricted to Super Admin
+  'user-management': false, // Restricted to Super Admin
+  'canEditPrice': true,
+  'canDelete': true,
+  'canResetData': false // Restricted to Super Admin
+};
+
+/**
+ * 3. Store Keeper (Counter / Floor Staff): Floor Stock Handling
+ * Limited to stock-out, stock-in, and browsing items catalog.
+ * Cannot edit unit prices, cannot delete records, no access to financial ledgers, reports, backup, or users.
+ */
 export const defaultStoreKeeperPermissions = {
   'dashboard': false,
   'stock-out': true,
-  'stock-in': false,
-  'items': false,
+  'stock-in': true,
+  'items': true,
+  'categories': false,
+  'add-item-name': false,
+  'bom': false,
   'machine-sales': false,
   'machine-repairs': false,
   'customer-ledgers': false,
@@ -35,25 +83,73 @@ export const defaultStoreKeeperPermissions = {
   'vendors': false,
   'ledger': false,
   'reports': false,
+  'expenses': false,
   'backup-restore': false,
   'user-management': false,
   'canEditPrice': false,
-  'canDelete': false
+  'canDelete': false,
+  'canResetData': false
+};
+
+/**
+ * Resolves default permissions by role string
+ */
+export const getRoleDefaultPermissions = (role) => {
+  switch (role) {
+    case 'Super Admin':
+      return { ...defaultSuperAdminPermissions };
+    case 'Admin':
+      return { ...defaultAdminPermissions };
+    case 'Store Keeper':
+      return { ...defaultStoreKeeperPermissions };
+    case 'Sales Manager':
+      return {
+        ...defaultStoreKeeperPermissions,
+        'dashboard': true,
+        'machine-sales': true,
+        'customer-ledgers': true,
+        'items': true,
+        'canEditPrice': false,
+        'canDelete': false
+      };
+    case 'Technician':
+      return {
+        ...defaultStoreKeeperPermissions,
+        'dashboard': true,
+        'machine-repairs': true,
+        'stock-out': true,
+        'items': true,
+        'canEditPrice': false,
+        'canDelete': false
+      };
+    default:
+      return { ...defaultStoreKeeperPermissions };
+  }
 };
 
 const initialStaffUsers = [
   {
     id: 'USR-1',
-    name: 'Sabeel (Admin)',
+    name: 'Sabeel (Super Admin)',
     email: 'admin@rehmat.com',
     password: '123456',
     role: 'Super Admin',
     status: 'Active',
     createdDate: '2026-01-01',
-    permissions: defaultAdminPermissions
+    permissions: defaultSuperAdminPermissions
   },
   {
     id: 'USR-2',
+    name: 'Store Manager Tariq',
+    email: 'manager@rehmat.com',
+    password: '123456',
+    role: 'Admin',
+    status: 'Active',
+    createdDate: '2026-01-10',
+    permissions: defaultAdminPermissions
+  },
+  {
+    id: 'USR-3',
     name: 'Store Keeper Ali',
     email: 'storekeeper@rehmat.com',
     password: '123456',
@@ -70,10 +166,10 @@ export function AuthProvider({ children }) {
       const saved = localStorage.getItem('rehmat_store_staff_users');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Ensure every staff user has a permissions object
+        // Ensure every staff user has a valid permissions object matching their role defaults
         return parsed.map((u) => ({
           ...u,
-          permissions: u.permissions || (u.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+          permissions: u.permissions || getRoleDefaultPermissions(u.role)
         }));
       }
       return initialStaffUsers;
@@ -90,7 +186,7 @@ export function AuthProvider({ children }) {
         const parsedUser = JSON.parse(saved);
         return {
           ...parsedUser,
-          permissions: parsedUser.permissions || (parsedUser.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+          permissions: parsedUser.permissions || getRoleDefaultPermissions(parsedUser.role)
         };
       }
       return null;
@@ -124,12 +220,13 @@ export function AuthProvider({ children }) {
       setSession(session);
       if (session?.user) {
         const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
+        const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
         const userData = {
           id: session.user.id,
           name: found?.name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email,
-          role: found?.role || session.user.user_metadata?.role || 'Super Admin',
-          permissions: found?.permissions || (found?.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+          role: resolvedRole,
+          permissions: found?.permissions || getRoleDefaultPermissions(resolvedRole)
         };
         setUser(userData);
       }
@@ -141,12 +238,13 @@ export function AuthProvider({ children }) {
       setSession(session);
       if (session?.user) {
         const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
+        const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
         const userData = {
           id: session.user.id,
           name: found?.name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email,
-          role: found?.role || session.user.user_metadata?.role || 'Super Admin',
-          permissions: found?.permissions || (found?.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+          role: resolvedRole,
+          permissions: found?.permissions || getRoleDefaultPermissions(resolvedRole)
         };
         setUser(userData);
       }
@@ -176,7 +274,7 @@ export function AuthProvider({ children }) {
       }
       const matchWithPerms = {
         ...localMatch,
-        permissions: localMatch.permissions || (localMatch.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions)
+        permissions: localMatch.permissions || getRoleDefaultPermissions(localMatch.role)
       };
       setUser(matchWithPerms);
       setLoading(false);
@@ -190,12 +288,14 @@ export function AuthProvider({ children }) {
         // Fallback for offline demo login
         if (cleanEmail && password.length >= 4) {
           const isStore = cleanEmail.includes('store') || cleanEmail.includes('keeper');
+          const isManager = cleanEmail.includes('manager') || (cleanEmail.includes('admin') && !cleanEmail.includes('super'));
+          const resolvedRole = isStore ? 'Store Keeper' : isManager ? 'Admin' : 'Super Admin';
           const mockUser = {
             id: 'USR-' + Date.now(),
-            name: isStore ? 'Store Keeper Ali' : 'Admin User',
+            name: isStore ? 'Store Keeper Ali' : isManager ? 'Store Manager Tariq' : 'Sabeel (Super Admin)',
             email: cleanEmail,
-            role: isStore ? 'Store Keeper' : 'Super Admin',
-            permissions: isStore ? defaultStoreKeeperPermissions : defaultAdminPermissions
+            role: resolvedRole,
+            permissions: getRoleDefaultPermissions(resolvedRole)
           };
           setUser(mockUser);
           setLoading(false);
@@ -205,12 +305,13 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message };
       }
 
+      const userRole = data.user.user_metadata?.role || (cleanEmail === 'admin@rehmat.com' ? 'Super Admin' : 'Admin');
       const userData = {
         id: data.user.id,
         name: data.user.email?.split('@')[0] || 'User',
         email: data.user.email,
-        role: data.user.user_metadata?.role || 'Super Admin',
-        permissions: defaultAdminPermissions
+        role: userRole,
+        permissions: getRoleDefaultPermissions(userRole)
       };
       setUser(userData);
       setLoading(false);
@@ -218,12 +319,14 @@ export function AuthProvider({ children }) {
     } catch (err) {
       if (cleanEmail && password.length >= 4) {
         const isStore = cleanEmail.includes('store') || cleanEmail.includes('keeper');
+        const isManager = cleanEmail.includes('manager') || (cleanEmail.includes('admin') && !cleanEmail.includes('super'));
+        const resolvedRole = isStore ? 'Store Keeper' : isManager ? 'Admin' : 'Super Admin';
         const mockUser = {
           id: 'USR-' + Date.now(),
-          name: isStore ? 'Store Keeper Ali' : 'Admin User',
+          name: isStore ? 'Store Keeper Ali' : isManager ? 'Store Manager Tariq' : 'Sabeel (Super Admin)',
           email: cleanEmail,
-          role: isStore ? 'Store Keeper' : 'Super Admin',
-          permissions: isStore ? defaultStoreKeeperPermissions : defaultAdminPermissions
+          role: resolvedRole,
+          permissions: getRoleDefaultPermissions(resolvedRole)
         };
         setUser(mockUser);
         setLoading(false);
@@ -236,23 +339,30 @@ export function AuthProvider({ children }) {
 
   // Staff CRUD Operations
   const addStaffUser = (newUser) => {
-    const isKeeper = newUser.role === 'Store Keeper';
+    const role = newUser.role || 'Store Keeper';
+    const rolePerms = getRoleDefaultPermissions(role);
     const created = {
       id: 'USR-' + Date.now(),
       name: newUser.name,
       email: newUser.email,
       password: newUser.password || '123456',
-      role: newUser.role || 'Store Keeper',
+      role: role,
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
-      permissions: isKeeper ? { ...defaultStoreKeeperPermissions } : { ...defaultAdminPermissions }
+      permissions: { ...rolePerms }
     };
     setStaffUsers((prev) => [created, ...prev]);
     return created;
   };
 
   const deleteStaffUser = (id) => {
+    const target = staffUsers.find((u) => u.id === id);
+    if (target?.email?.toLowerCase() === 'admin@rehmat.com') {
+      alert('The primary Super Admin account is permanently protected and cannot be deleted!');
+      return false;
+    }
     setStaffUsers((prev) => prev.filter((u) => u.id !== id));
+    return true;
   };
 
   const updateStaffUser = (id, updatedFields) => {
@@ -260,6 +370,10 @@ export function AuthProvider({ children }) {
       prev.map((u) => {
         if (u.id === id) {
           const updated = { ...u, ...updatedFields };
+          // If role changed without explicit custom permissions, assign role defaults
+          if (updatedFields.role && updatedFields.role !== u.role && !updatedFields.permissions) {
+            updated.permissions = getRoleDefaultPermissions(updatedFields.role);
+          }
           if (user?.id === id) {
             setUser(updated);
           }
@@ -285,23 +399,33 @@ export function AuthProvider({ children }) {
     );
   };
 
-  // Switch Active User / Role helper
+  // Switch Active User / Role helper (Only Super Admin can invoke this)
   const switchUserRole = (targetRoleOrUser) => {
     if (typeof targetRoleOrUser === 'object') {
-      const perms = targetRoleOrUser.permissions || (targetRoleOrUser.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions);
+      const perms = targetRoleOrUser.permissions || getRoleDefaultPermissions(targetRoleOrUser.role);
       setUser({ ...targetRoleOrUser, permissions: perms });
     } else {
       const match = staffUsers.find((u) => u.role === targetRoleOrUser);
       if (match) {
         setUser(match);
       } else {
-        const isKeeper = targetRoleOrUser === 'Store Keeper';
+        const perms = getRoleDefaultPermissions(targetRoleOrUser);
+        const nameMap = {
+          'Super Admin': 'Sabeel (Super Admin)',
+          'Admin': 'Store Manager Tariq',
+          'Store Keeper': 'Store Keeper Ali'
+        };
+        const emailMap = {
+          'Super Admin': 'admin@rehmat.com',
+          'Admin': 'manager@rehmat.com',
+          'Store Keeper': 'storekeeper@rehmat.com'
+        };
         setUser({
           id: 'USR-' + Date.now(),
-          name: isKeeper ? 'Store Keeper Ali' : 'Admin User',
-          email: isKeeper ? 'storekeeper@rehmat.com' : 'admin@rehmat.com',
+          name: nameMap[targetRoleOrUser] || `${targetRoleOrUser} User`,
+          email: emailMap[targetRoleOrUser] || `${targetRoleOrUser.toLowerCase().replace(/\s+/g, '')}@rehmat.com`,
           role: targetRoleOrUser,
-          permissions: isKeeper ? defaultStoreKeeperPermissions : defaultAdminPermissions
+          permissions: perms
         });
       }
     }
@@ -316,6 +440,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     setSession(null);
+    sessionStorage.removeItem('rehmat_erp_active_user');
     localStorage.removeItem('factory_store_user');
   };
 

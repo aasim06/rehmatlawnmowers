@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
+import usePermission from 'hooks/usePermission';
 import CeoSignature from 'components/CeoSignature';
 
 // material-ui
@@ -90,6 +91,7 @@ const formatInvoiceNo = (sale) => {
 
 export default function MachineSalesPage() {
   const transparentLogo = useTransparentLogo(rehmatLogo);
+  const { canDelete, canEditPrice } = usePermission();
   const {
     machineSales = [],
     machineModels = [],
@@ -538,6 +540,7 @@ export default function MachineSalesPage() {
                                 size="small"
                                 fullWidth
                                 required
+                                disabled={!canEditPrice}
                                 inputProps={{ min: 0, style: { textAlign: 'right' } }}
                                 value={rowItem.unitPrice}
                                 onChange={(e) => handleItemRowChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
@@ -666,7 +669,7 @@ export default function MachineSalesPage() {
       <MainCard
         title="Machine Sales & Billing History Logs"
         secondary={
-          selected.length > 0 && (
+          selected.length > 0 && canDelete && (
             <Button
               variant="contained"
               color="error"
@@ -799,9 +802,11 @@ export default function MachineSalesPage() {
                         <IconButton color="primary" size="small" onClick={() => handleOpenEdit(sale)}>
                           <EditOutlined />
                         </IconButton>
-                        <IconButton color="error" size="small" onClick={() => { setSaleToDelete(sale); setDeleteDialogOpen(true); }}>
-                          <DeleteOutlined />
-                        </IconButton>
+                        {canDelete && (
+                          <IconButton color="error" size="small" onClick={() => { setSaleToDelete(sale); setDeleteDialogOpen(true); }}>
+                            <DeleteOutlined />
+                          </IconButton>
+                        )}
                       </Stack>
                     </Stack>
                   </Paper>
@@ -817,14 +822,16 @@ export default function MachineSalesPage() {
             <Table sx={{ minWidth: 700 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      color="primary"
-                      indeterminate={selected.length > 0 && selected.length < filteredSales.length}
-                      checked={filteredSales.length > 0 && selected.length === filteredSales.length}
-                      onChange={handleSelectAllClick}
-                    />
-                  </TableCell>
+                  {canDelete && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        color="primary"
+                        indeterminate={selected.length > 0 && selected.length < filteredSales.length}
+                        checked={filteredSales.length > 0 && selected.length === filteredSales.length}
+                        onChange={handleSelectAllClick}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>SALE NO / ID</TableCell>
                   <TableCell>CUSTOMER &amp; CITY</TableCell>
                   <TableCell>MACHINE MODEL &amp; QTY</TableCell>
@@ -849,10 +856,12 @@ export default function MachineSalesPage() {
                   filteredSales.map((sale) => {
                     const isItemSel = isSelected(sale.id);
                     return (
-                      <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => handleSelectOne(e, sale.id)}>
-                        <TableCell padding="checkbox">
-                          <Checkbox color="primary" checked={isItemSel} onChange={(e) => handleSelectOne(e, sale.id)} />
-                        </TableCell>
+                      <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => canDelete && handleSelectOne(e, sale.id)}>
+                        {canDelete && (
+                          <TableCell padding="checkbox">
+                            <Checkbox color="primary" checked={isItemSel} onChange={(e) => handleSelectOne(e, sale.id)} />
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Typography variant="subtitle2" fontWeight={700} color="primary.main">
                             {formatInvoiceNo(sale)}
@@ -918,18 +927,20 @@ export default function MachineSalesPage() {
                                 <EditOutlined />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Delete Sale Record">
-                              <IconButton
-                                color="error"
-                                size="small"
-                                onClick={() => {
-                                  setSaleToDelete(sale);
-                                  setDeleteDialogOpen(true);
-                                }}
-                              >
-                                <DeleteOutlined />
-                              </IconButton>
-                            </Tooltip>
+                            {canDelete && (
+                              <Tooltip title="Delete Sale Record">
+                                <IconButton
+                                  color="error"
+                                  size="small"
+                                  onClick={() => {
+                                    setSaleToDelete(sale);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <DeleteOutlined />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Stack>
                         </TableCell>
                       </TableRow>
@@ -1016,6 +1027,7 @@ export default function MachineSalesPage() {
                             size="small"
                             fullWidth
                             required
+                            disabled={!canEditPrice}
                             value={editItem.unitPrice || 0}
                             onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
                           />

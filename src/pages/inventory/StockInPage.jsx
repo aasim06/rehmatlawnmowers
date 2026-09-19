@@ -39,11 +39,13 @@ import { ImportOutlined, SearchOutlined, ArrowUpOutlined, PlusOutlined, DeleteOu
 
 // project imports
 import MainCard from 'components/MainCard';
+import usePermission from 'hooks/usePermission';
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 import { useTransparentLogo } from 'components/logo/LogoMain';
 
 export default function StockInPage() {
   const transparentLogo = useTransparentLogo(rehmatLogo);
+  const { canDelete, canEditPrice } = usePermission();
   const { items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -456,6 +458,7 @@ export default function StockInPage() {
                 label="UNIT PRICE (PKR)"
                 type="number"
                 fullWidth
+                disabled={!canEditPrice}
                 inputRef={priceRef}
                 inputProps={{ min: 0, step: 'any' }}
                 value={form.unitPrice}
@@ -552,7 +555,7 @@ export default function StockInPage() {
       <MainCard
         title="Stock In (Receiving Logs)"
         secondary={
-          selected.length > 0 && (
+          selected.length > 0 && canDelete && (
             <Button
               variant="contained"
               color="error"
@@ -679,9 +682,11 @@ export default function StockInPage() {
                         <IconButton color="primary" size="small" onClick={() => handleOpenEdit(log)}>
                           <EditOutlined />
                         </IconButton>
-                        <IconButton color="error" size="small" onClick={() => handleOpenDelete(log)}>
-                          <DeleteOutlined />
-                        </IconButton>
+                        {canDelete && (
+                          <IconButton color="error" size="small" onClick={() => handleOpenDelete(log)}>
+                            <DeleteOutlined />
+                          </IconButton>
+                        )}
                       </Stack>
                     </Stack>
                   </Paper>
@@ -697,15 +702,17 @@ export default function StockInPage() {
             <Table sx={{ minWidth: 600 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      color="primary"
-                      indeterminate={selected.length > 0 && selected.length < stockInLogs.length}
-                      checked={stockInLogs.length > 0 && selected.length === stockInLogs.length}
-                      onChange={handleSelectAllClick}
-                      inputProps={{ 'aria-label': 'select all stock in' }}
-                    />
-                  </TableCell>
+                  {canDelete && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        color="primary"
+                        indeterminate={selected.length > 0 && selected.length < stockInLogs.length}
+                        checked={stockInLogs.length > 0 && selected.length === stockInLogs.length}
+                        onChange={handleSelectAllClick}
+                        inputProps={{ 'aria-label': 'select all stock in' }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>ITEM SELECT</TableCell>
                   <TableCell>CATEGORY</TableCell>
                   <TableCell align="center">QTY</TableCell>
@@ -732,14 +739,16 @@ export default function StockInPage() {
                     const logCat = log.category || matchedItem?.category || 'General';
 
                     return (
-                      <TableRow key={log.id} hover selected={isItemSelected} onClick={(e) => handleSelectOne(e, log.id)}>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            color="primary"
-                            checked={isItemSelected}
-                            onChange={(e) => handleSelectOne(e, log.id)}
-                          />
-                        </TableCell>
+                      <TableRow key={log.id} hover selected={isItemSelected} onClick={(e) => canDelete && handleSelectOne(e, log.id)}>
+                        {canDelete && (
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              color="primary"
+                              checked={isItemSelected}
+                              onChange={(e) => handleSelectOne(e, log.id)}
+                            />
+                          </TableCell>
+                        )}
 
                         <TableCell>
                           <Typography variant="subtitle2" fontWeight={700}>
@@ -800,11 +809,13 @@ export default function StockInPage() {
                                 <EditOutlined />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Delete Record">
-                              <IconButton color="error" size="small" onClick={() => handleOpenDelete(log)}>
-                                <DeleteOutlined />
-                              </IconButton>
-                            </Tooltip>
+                            {canDelete && (
+                              <Tooltip title="Delete Record">
+                                <IconButton color="error" size="small" onClick={() => handleOpenDelete(log)}>
+                                  <DeleteOutlined />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Stack>
                         </TableCell>
                       </TableRow>
@@ -864,6 +875,7 @@ export default function StockInPage() {
                   label="UNIT PRICE"
                   type="number"
                   fullWidth
+                  disabled={!canEditPrice}
                   inputProps={{ min: 0 }}
                   value={editingLog.unitPrice}
                   onChange={(e) => setEditingLog({ ...editingLog, unitPrice: parseFloat(e.target.value) || 0 })}

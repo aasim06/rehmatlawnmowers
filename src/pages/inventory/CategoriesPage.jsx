@@ -33,8 +33,10 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, AppstoreOut
 
 // project imports
 import MainCard from 'components/MainCard';
+import usePermission from 'hooks/usePermission';
 
 export default function CategoriesPage() {
+  const { canDelete } = usePermission();
   const { categories = [], addCategory, updateCategory, deleteCategory, deleteMultipleCategories } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,7 +138,7 @@ export default function CategoriesPage() {
       title="Categories Directory"
       secondary={
         <Stack direction="row" spacing={1.5}>
-          {selected.length > 0 && (
+          {selected.length > 0 && canDelete && (
             <Button
               variant="contained"
               color="error"
@@ -186,15 +188,17 @@ export default function CategoriesPage() {
         <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  color="primary"
-                  indeterminate={selected.length > 0 && selected.length < filteredCategories.length}
-                  checked={filteredCategories.length > 0 && selected.length === filteredCategories.length}
-                  onChange={handleSelectAllClick}
-                  aria-label="select all categories"
-                />
-              </TableCell>
+              {canDelete && (
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    color="primary"
+                    indeterminate={selected.length > 0 && selected.length < filteredCategories.length}
+                    checked={filteredCategories.length > 0 && selected.length === filteredCategories.length}
+                    onChange={handleSelectAllClick}
+                    aria-label="select all categories"
+                  />
+                </TableCell>
+              )}
               <TableCell>Category ID</TableCell>
               <TableCell>Category Name</TableCell>
               <TableCell>Description</TableCell>
@@ -216,16 +220,17 @@ export default function CategoriesPage() {
 
                 return (
                   <TableRow key={c.id} hover selected={isCategorySelected}>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        checked={isCategorySelected}
-                        onChange={(e) => handleSelectOne(e, c.id)}
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
+                    {canDelete && (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          checked={isCategorySelected}
+                          onChange={(e) => handleSelectOne(e, c.id)}
+                          aria-label={`select category ${c.name}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>  <Typography variant="subtitle2" fontWeight={600}>
                         {c.id}
                       </Typography>
                     </TableCell>
@@ -244,7 +249,7 @@ export default function CategoriesPage() {
 
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                        <Tooltip title="Edit Category">
+                        <Tooltip title="Edit Category Details">
                           <IconButton
                             color="primary"
                             size="small"
@@ -257,18 +262,20 @@ export default function CategoriesPage() {
                           </IconButton>
                         </Tooltip>
 
-                        <Tooltip title="Delete Category">
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {
-                              setCategoryToDelete(c);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <DeleteOutlined />
-                          </IconButton>
-                        </Tooltip>
+                        {canDelete && (
+                          <Tooltip title="Delete Category">
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => {
+                                setCategoryToDelete(c);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <DeleteOutlined />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>

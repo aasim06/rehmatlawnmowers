@@ -21,11 +21,12 @@ import Typography from 'pages/component-overview/typography';
 import Shadow from 'pages/component-overview/shadows';
 import SamplePage from 'pages/extra-pages/sample-page';
 
-// layout & auth
+// layout, auth & RBAC guards
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from 'components/ProtectedRoute';
+import RoleGuard from 'components/RoleGuard';
 
-// ==============================|| MAIN ROUTING (ZERO-LATENCY INSTANT NAVIGATION) ||============================== //
+// ==============================|| MAIN ROUTING (ZERO-LATENCY INSTANT NAVIGATION WITH RBAC ROLEGUARDS) ||============================== //
 
 const MainRoutes = {
   path: '/',
@@ -37,14 +38,22 @@ const MainRoutes = {
   children: [
     {
       path: '/',
-      element: <DashboardDefault />
+      element: (
+        <RoleGuard permission="dashboard">
+          <DashboardDefault />
+        </RoleGuard>
+      )
     },
     {
       path: 'dashboard',
       children: [
         {
           path: 'default',
-          element: <DashboardDefault />
+          element: (
+            <RoleGuard permission="dashboard">
+              <DashboardDefault />
+            </RoleGuard>
+          )
         }
       ]
     },
@@ -53,71 +62,139 @@ const MainRoutes = {
       children: [
         {
           path: 'items',
-          element: <ItemsPage />
+          element: (
+            <RoleGuard permission="items">
+              <ItemsPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'categories',
-          element: <CategoriesPage />
+          element: (
+            <RoleGuard permission="categories">
+              <CategoriesPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'add-item-name',
-          element: <AddItemNamePage />
+          element: (
+            <RoleGuard permission="categories">
+              <AddItemNamePage />
+            </RoleGuard>
+          )
         },
         {
           path: 'stock-in',
-          element: <StockInPage />
+          element: (
+            <RoleGuard permission="stock-in">
+              <StockInPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'stock-out',
-          element: <StockOutPage />
+          element: (
+            <RoleGuard permission="stock-out">
+              <StockOutPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'bom',
-          element: <MachineBOMPage />
+          element: (
+            <RoleGuard permission="items">
+              <MachineBOMPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'machine-sales',
-          element: <MachineSalesPage />
+          element: (
+            <RoleGuard permission="machine-sales">
+              <MachineSalesPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'machine-repairs',
-          element: <MachineRepairsPage />
+          element: (
+            <RoleGuard permission="machine-repairs">
+              <MachineRepairsPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'customer-ledgers',
-          element: <CustomerLedgerPage />
+          element: (
+            <RoleGuard permission="customer-ledgers">
+              <CustomerLedgerPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'vendor-ledgers',
-          element: <VendorLedgerPage />
+          element: (
+            <RoleGuard permission="vendor-ledgers">
+              <VendorLedgerPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'vendors',
-          element: <VendorsPage />
+          element: (
+            <RoleGuard permission="vendors">
+              <VendorsPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'ledger',
-          element: <UsageLogPage />
+          element: (
+            <RoleGuard permission="ledger">
+              <UsageLogPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'usage-log',
-          element: <UsageLogPage />
+          element: (
+            <RoleGuard permission="ledger">
+              <UsageLogPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'reports',
-          element: <ReportsPage />
+          element: (
+            <RoleGuard permission="reports">
+              <ReportsPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'expenses',
-          element: <ExpensesPage />
+          element: (
+            <RoleGuard permission="expenses">
+              <ExpensesPage />
+            </RoleGuard>
+          )
         },
         {
           path: 'backup-restore',
-          element: <BackupRestorePage />
+          element: (
+            <RoleGuard permission="backup-restore" allowedRoles={['Super Admin']}>
+              <BackupRestorePage />
+            </RoleGuard>
+          )
         },
         {
           path: 'user-management',
-          element: <UserManagementPage />
+          element: (
+            <RoleGuard permission="user-management" allowedRoles={['Super Admin']}>
+              <UserManagementPage />
+            </RoleGuard>
+          )
         }
       ]
     },
@@ -126,7 +203,11 @@ const MainRoutes = {
       children: [
         {
           path: 'users',
-          element: <UserManagementPage />
+          element: (
+            <RoleGuard permission="user-management" allowedRoles={['Super Admin']}>
+              <UserManagementPage />
+            </RoleGuard>
+          )
         }
       ]
     },

@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { useAuth, defaultAdminPermissions, defaultStoreKeeperPermissions } from 'context/AuthContext';
+import {
+  useAuth,
+  defaultSuperAdminPermissions,
+  defaultAdminPermissions,
+  defaultStoreKeeperPermissions,
+  getRoleDefaultPermissions
+} from 'context/AuthContext';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -13,7 +19,6 @@ import {
   DialogTitle,
   Divider,
   Drawer,
-  FormControlLabel,
   Grid,
   IconButton,
   InputAdornment,
@@ -45,16 +50,20 @@ import {
   HistoryOutlined,
   SafetyCertificateOutlined,
   CheckCircleOutlined,
-  ControlOutlined
+  ControlOutlined,
+  LockOutlined,
+  CrownOutlined
 } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
 
 const MODULE_LIST = [
+  { key: 'dashboard', label: 'Main Store Dashboard', desc: 'Allows viewing executive dashboard analytics & alerts' },
   { key: 'stock-out', label: 'Stock Out Page', desc: 'Allows recording stock issuance & daily usage' },
-  { key: 'stock-in', label: 'Stock In Page', desc: 'Allows receiving new stock from vendors' },
+  { key: 'stock-in', label: 'Stock In Page', desc: 'Allows receiving new stock shipments from vendors' },
   { key: 'items', label: 'Store Items Catalogue', desc: 'View store items stock levels & rack locations' },
+  { key: 'categories', label: 'Categories Master', desc: 'Manage item categories and racks' },
   { key: 'machine-sales', label: 'Machine Sales Page', desc: 'Allows selling machines to customers' },
   { key: 'machine-repairs', label: 'Machine Repairing', desc: 'Allows managing workshop repair jobs' },
   { key: 'customer-ledgers', label: 'Machine & Customer Ledgers', desc: 'View customer balance history' },
@@ -62,7 +71,9 @@ const MODULE_LIST = [
   { key: 'vendors', label: 'Vendors & Parties Master', desc: 'Add/edit supplier and customer contacts' },
   { key: 'ledger', label: 'Store History Log', desc: 'View complete item transaction history' },
   { key: 'reports', label: 'Reports & Analytics', desc: 'View store financial reports & graphs' },
-  { key: 'backup-restore', label: 'Data Backup & Restore', desc: 'Export & import system data' },
+  { key: 'expenses', label: 'Daily Expenses', desc: 'Record and track shop daily expenses' },
+  { key: 'backup-restore', label: 'Data Backup & Restore', desc: 'Export & import system data (Super Admin Only)' },
+  { key: 'user-management', label: 'User Management & Logs', desc: 'Manage staff accounts and permissions (Super Admin Only)' },
   { key: 'canEditPrice', label: 'Edit Unit Prices Permission', desc: 'Allow user to change prices on sales/stock out' },
   { key: 'canDelete', label: 'Delete Records Permission', desc: 'Allow user to delete logs or catalog items' }
 ];
@@ -77,7 +88,7 @@ export default function UserManagementPage() {
     user: activeUser,
     switchUserRole
   } = useAuth();
-  const { auditLogs = [], deleteAuditLog, clearAuditLogs } = useStoreInventory();
+  const { auditLogs = [] } = useStoreInventory();
 
   const [activeTab, setActiveTab] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,7 +153,7 @@ export default function UserManagementPage() {
 
   const handleOpenPerms = (staff) => {
     setTargetStaffPerms(staff);
-    const existing = staff.permissions || (staff.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions);
+    const existing = staff.permissions || getRoleDefaultPermissions(staff.role);
     setTempPerms({ ...existing });
     setPermsDrawerOpen(true);
   };
@@ -164,7 +175,12 @@ export default function UserManagementPage() {
 
   const handlePresetPreset = (presetType) => {
     if (presetType === 'strict') {
-      setTempPerms({ ...defaultStoreKeeperPermissions });
+      setTempPerms({
+        ...defaultStoreKeeperPermissions,
+        'stock-out': true,
+        'stock-in': false,
+        'items': false
+      });
     } else if (presetType === 'fullKeeper') {
       setTempPerms({
         ...defaultStoreKeeperPermissions,
@@ -172,8 +188,10 @@ export default function UserManagementPage() {
         'stock-out': true,
         'items': true
       });
-    } else if (presetType === 'allowAll') {
+    } else if (presetType === 'admin') {
       setTempPerms({ ...defaultAdminPermissions });
+    } else if (presetType === 'superAdmin' || presetType === 'allowAll') {
+      setTempPerms({ ...defaultSuperAdminPermissions });
     }
   };
 
@@ -182,6 +200,19 @@ export default function UserManagementPage() {
       deleteStaffUser(staffToDelete.id);
       setDeleteDialogOpen(false);
       setStaffToDelete(null);
+    }
+  };
+
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case 'Super Admin':
+        return <Chip icon={<CrownOutlined />} label="Super Admin" color="primary" size="small" sx={{ fontWeight: 700 }} />;
+      case 'Admin':
+        return <Chip icon={<SafetyCertificateOutlined />} label="Admin (Manager)" color="info" size="small" sx={{ fontWeight: 700 }} />;
+      case 'Store Keeper':
+        return <Chip icon={<UserOutlined />} label="Store Keeper" color="warning" size="small" sx={{ fontWeight: 700 }} />;
+      default:
+        return <Chip label={role} color="secondary" size="small" sx={{ fontWeight: 700 }} />;
     }
   };
 
@@ -209,10 +240,10 @@ export default function UserManagementPage() {
               </Box>
               <Box>
                 <Typography variant="h4" fontWeight={700}>
-                  Admin Panel — Staff Users & Access Toggles
+                  User Management & Access Control (RBAC)
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  Create staff login credentials and toggle ON/OFF individual module access for each worker.
+                  Manage Super Admin, Admin, and Store Keeper accounts with fine-grained page & action toggles.
                 </Typography>
               </Box>
             </Stack>
@@ -222,20 +253,20 @@ export default function UserManagementPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} alignItems={{ xs: 'stretch', sm: 'center' }}>
               <Chip
                 avatar={<UserOutlined />}
-                label={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'Super Admin'})`}
-                color={activeUser?.role === 'Store Keeper' ? 'warning' : 'primary'}
+                label={`Logged as: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'Super Admin'})`}
+                color={activeUser?.role === 'Super Admin' ? 'primary' : activeUser?.role === 'Admin' ? 'info' : 'warning'}
                 variant="outlined"
                 sx={{ fontWeight: 700, p: 0.5, py: 1 }}
               />
-              {activeUser?.role !== 'Store Keeper' && (
+              {activeUser?.role === 'Super Admin' && (
                 <Button
                   variant="outlined"
-                  color="secondary"
+                  color="warning"
                   size="small"
                   onClick={() => switchUserRole('Store Keeper')}
                   sx={{ fontWeight: 600, width: { xs: '100%', sm: 'auto' } }}
                 >
-                  Switch To Store Keeper
+                  Test As Store Keeper
                 </Button>
               )}
             </Stack>
@@ -248,7 +279,7 @@ export default function UserManagementPage() {
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2.5 }}>
           <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
             <Tab icon={<UserOutlined />} iconPosition="start" label={`Staff Users (${staffUsers.length})`} sx={{ fontWeight: 700 }} />
-            <Tab icon={<HistoryOutlined />} iconPosition="start" label={`User Audit Logs (${auditLogs.length})`} sx={{ fontWeight: 700 }} />
+            <Tab icon={<HistoryOutlined />} iconPosition="start" label={`Immutable Audit Logs (${auditLogs.length})`} sx={{ fontWeight: 700 }} />
           </Tabs>
         </Box>
 
@@ -295,21 +326,9 @@ export default function UserManagementPage() {
               ) : (
                 <Stack spacing={2}>
                   {filteredStaff.map((staff) => {
-                    const perms = staff.permissions || (staff.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions);
-                    const moduleKeys = [
-                      'stock-out',
-                      'stock-in',
-                      'items',
-                      'machine-sales',
-                      'machine-repairs',
-                      'customer-ledgers',
-                      'vendor-ledgers',
-                      'vendors',
-                      'ledger',
-                      'reports',
-                      'backup-restore'
-                    ];
-                    const enabledCount = moduleKeys.filter((k) => Boolean(perms[k])).length;
+                    const perms = staff.permissions || getRoleDefaultPermissions(staff.role);
+                    const enabledCount = MODULE_LIST.filter((m) => Boolean(perms[m.key])).length;
+                    const isProtected = staff.email?.toLowerCase() === 'admin@rehmat.com';
 
                     return (
                       <Paper
@@ -324,12 +343,7 @@ export default function UserManagementPage() {
                       >
                         <Stack spacing={1.5}>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Chip
-                              label={staff.role}
-                              color={staff.role === 'Super Admin' ? 'primary' : staff.role === 'Store Keeper' ? 'warning' : 'info'}
-                              size="small"
-                              sx={{ fontWeight: 700 }}
-                            />
+                            {getRoleBadge(staff.role)}
                             <Chip
                               icon={<CheckCircleOutlined />}
                               label={staff.status || 'Active'}
@@ -354,7 +368,7 @@ export default function UserManagementPage() {
                             </Typography>
                             <Chip
                               label={`${enabledCount} Modules ON`}
-                              color={enabledCount > 1 ? 'success' : 'secondary'}
+                              color={enabledCount > 5 ? 'success' : 'secondary'}
                               size="small"
                               sx={{ fontWeight: 700 }}
                             />
@@ -382,16 +396,26 @@ export default function UserManagementPage() {
                             >
                               <EditOutlined />
                             </IconButton>
-                            <IconButton
-                              color="error"
-                              size="small"
-                              onClick={() => {
-                                setStaffToDelete(staff);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <DeleteOutlined />
-                            </IconButton>
+                            {isProtected ? (
+                              <Tooltip title="Primary Super Admin is Protected">
+                                <span>
+                                  <IconButton size="small" disabled>
+                                    <LockOutlined />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            ) : (
+                              <IconButton
+                                color="error"
+                                size="small"
+                                onClick={() => {
+                                  setStaffToDelete(staff);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <DeleteOutlined />
+                              </IconButton>
+                            )}
                           </Stack>
                         </Stack>
                       </Paper>
@@ -425,21 +449,9 @@ export default function UserManagementPage() {
                       </TableRow>
                     ) : (
                       filteredStaff.map((staff) => {
-                        const perms = staff.permissions || (staff.role === 'Super Admin' ? defaultAdminPermissions : defaultStoreKeeperPermissions);
-                        const moduleKeys = [
-                          'stock-out',
-                          'stock-in',
-                          'items',
-                          'machine-sales',
-                          'machine-repairs',
-                          'customer-ledgers',
-                          'vendor-ledgers',
-                          'vendors',
-                          'ledger',
-                          'reports',
-                          'backup-restore'
-                        ];
-                        const enabledCount = moduleKeys.filter((k) => Boolean(perms[k])).length;
+                        const perms = staff.permissions || getRoleDefaultPermissions(staff.role);
+                        const enabledCount = MODULE_LIST.filter((m) => Boolean(perms[m.key])).length;
+                        const isProtected = staff.email?.toLowerCase() === 'admin@rehmat.com';
 
                         return (
                           <TableRow key={staff.id} hover>
@@ -452,25 +464,12 @@ export default function UserManagementPage() {
                               </Typography>
                             </TableCell>
 
-                            <TableCell>
-                              <Chip
-                                label={staff.role}
-                                color={
-                                  staff.role === 'Super Admin'
-                                    ? 'primary'
-                                    : staff.role === 'Store Keeper'
-                                    ? 'warning'
-                                    : 'info'
-                                }
-                                size="small"
-                                sx={{ fontWeight: 700 }}
-                              />
-                            </TableCell>
+                            <TableCell>{getRoleBadge(staff.role)}</TableCell>
 
                             <TableCell align="center">
                               <Chip
-                                label={`${enabledCount} Modules ON`}
-                                color={enabledCount > 1 ? 'success' : 'secondary'}
+                                label={`${enabledCount} Modules Active`}
+                                color={enabledCount > 5 ? 'success' : 'secondary'}
                                 size="small"
                                 sx={{ fontWeight: 600 }}
                               />
@@ -487,7 +486,7 @@ export default function UserManagementPage() {
                             </TableCell>
 
                             <TableCell align="center">
-                              <Stack direction="row" spacing={1} justifyContent="center">
+                              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
                                 <Button
                                   variant="contained"
                                   color="warning"
@@ -512,18 +511,28 @@ export default function UserManagementPage() {
                                   </IconButton>
                                 </Tooltip>
 
-                                <Tooltip title="Delete Account">
-                                  <IconButton
-                                    color="error"
-                                    size="small"
-                                    onClick={() => {
-                                      setStaffToDelete(staff);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <DeleteOutlined />
-                                  </IconButton>
-                                </Tooltip>
+                                {isProtected ? (
+                                  <Tooltip title="Primary Super Admin is Protected">
+                                    <span>
+                                      <IconButton size="small" disabled>
+                                        <LockOutlined />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                ) : (
+                                  <Tooltip title="Delete Account">
+                                    <IconButton
+                                      color="error"
+                                      size="small"
+                                      onClick={() => {
+                                        setStaffToDelete(staff);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <DeleteOutlined />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                               </Stack>
                             </TableCell>
                           </TableRow>
@@ -537,15 +546,15 @@ export default function UserManagementPage() {
           </Stack>
         )}
 
-        {/* TAB 1: ACTIVITY AUDIT LOGS */}
+        {/* TAB 1: ACTIVITY AUDIT LOGS (IMMUTABLE & TAMPER-PROOF) */}
         {activeTab === 1 && (
           <Stack spacing={2}>
             <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 8 }}>
+              <Grid size={{ xs: 12, sm: 7 }}>
                 <OutlinedInput
                   fullWidth
                   size="small"
-                  placeholder="Search Audit Logs by User, Action, or Item..."
+                  placeholder="Search Audit Logs by User, Action, or Details..."
                   value={logSearchTerm}
                   onChange={(e) => setLogSearchTerm(e.target.value)}
                   startAdornment={
@@ -555,17 +564,14 @@ export default function UserManagementPage() {
                   }
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }} textAlign={{ xs: 'left', sm: 'right' }}>
-                <Button
+              <Grid size={{ xs: 12, sm: 5 }} textAlign={{ xs: 'left', sm: 'right' }}>
+                <Chip
+                  icon={<LockOutlined />}
+                  label="🔒 Immutable Audit Trail (Tamper-Proof)"
+                  color="success"
                   variant="outlined"
-                  color="error"
-                  startIcon={<DeleteOutlined />}
-                  onClick={clearAuditLogs}
-                  size="small"
-                  sx={{ fontWeight: 600 }}
-                >
-                  Clear All Logs
-                </Button>
+                  sx={{ fontWeight: 700, p: 1 }}
+                />
               </Grid>
             </Grid>
 
@@ -577,7 +583,7 @@ export default function UserManagementPage() {
                     <TableCell>USER / ROLE</TableCell>
                     <TableCell>ACTION TYPE</TableCell>
                     <TableCell>DETAILS</TableCell>
-                    <TableCell align="center">ACTION</TableCell>
+                    <TableCell align="center">STATUS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -615,6 +621,8 @@ export default function UserManagementPage() {
                                 ? 'error'
                                 : log.actionType.includes('Stock In')
                                 ? 'success'
+                                : log.actionType.includes('Sale')
+                                ? 'primary'
                                 : 'info'
                             }
                             size="small"
@@ -627,9 +635,16 @@ export default function UserManagementPage() {
                         </TableCell>
 
                         <TableCell align="center">
-                          <IconButton color="error" size="small" onClick={() => deleteAuditLog(log.id)}>
-                            <DeleteOutlined />
-                          </IconButton>
+                          <Tooltip title="Activity audit logs are permanently locked and cannot be deleted or modified.">
+                            <Chip
+                              icon={<LockOutlined style={{ fontSize: '0.75rem' }} />}
+                              label="Locked"
+                              size="small"
+                              variant="outlined"
+                              color="default"
+                              sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                            />
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -643,12 +658,12 @@ export default function UserManagementPage() {
 
       {/* 🎛️ MANAGE PERMISSIONS TOGGLES DRAWER */}
       <Drawer anchor="right" open={permsDrawerOpen} onClose={() => setPermsDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 480 }, p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ width: { xs: '100vw', sm: 500 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 0.5 }}>
             🎛️ Customize Access Toggles
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Turn ON or OFF specific pages & actions for <strong>{targetStaffPerms?.name}</strong>.
+            Turn ON or OFF specific pages & actions for <strong>{targetStaffPerms?.name}</strong> ({targetStaffPerms?.role}).
           </Typography>
 
           {/* Preset Buttons */}
@@ -662,24 +677,27 @@ export default function UserManagementPage() {
             }}
           >
             <Typography variant="caption" fontWeight={700} color="textSecondary" sx={{ display: 'block', mb: 1 }}>
-              QUICK PRESETS:
+              QUICK ROLE PRESETS:
             </Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
               <Button size="small" variant="outlined" color="error" onClick={() => handlePresetPreset('strict')}>
-                Only Stock Out
+                Strict Keeper
               </Button>
               <Button size="small" variant="outlined" color="warning" onClick={() => handlePresetPreset('fullKeeper')}>
-                In + Out + Catalog
+                Standard Keeper
               </Button>
-              <Button size="small" variant="outlined" color="success" onClick={() => handlePresetPreset('allowAll')}>
-                Enable All
+              <Button size="small" variant="outlined" color="info" onClick={() => handlePresetPreset('admin')}>
+                Store Admin
+              </Button>
+              <Button size="small" variant="outlined" color="success" onClick={() => handlePresetPreset('superAdmin')}>
+                Super Admin
               </Button>
             </Stack>
           </Paper>
 
           <Divider sx={{ mb: 2 }} />
 
-          <Stack spacing={2} sx={{ maxHeight: 'calc(100vh - 240px)', overflowY: 'auto', pr: 1 }}>
+          <Stack spacing={1.5} sx={{ maxHeight: 'calc(100vh - 240px)', overflowY: 'auto', pr: 1 }}>
             {MODULE_LIST.map((mod) => {
               const isChecked = Boolean(tempPerms[mod.key]);
 
@@ -688,7 +706,7 @@ export default function UserManagementPage() {
                   key={mod.key}
                   variant="outlined"
                   sx={{
-                    p: 1.75,
+                    p: 1.5,
                     borderRadius: 1.5,
                     borderColor: (theme) => (isChecked ? 'primary.main' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'divider'),
                     bgcolor: (theme) =>
@@ -704,10 +722,10 @@ export default function UserManagementPage() {
                 >
                   <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                     <Box sx={{ flexGrow: 1, textAlign: 'left' }}>
-                      <Typography variant="subtitle2" fontWeight={700} align="left" sx={{ textAlign: 'left' }}>
+                      <Typography variant="subtitle2" fontWeight={700} align="left">
                         {mod.label}
                       </Typography>
-                      <Typography variant="caption" color="textSecondary" align="left" sx={{ textAlign: 'left', display: 'block', mt: 0.25 }}>
+                      <Typography variant="caption" color="textSecondary" align="left" sx={{ display: 'block', mt: 0.25 }}>
                         {mod.desc}
                       </Typography>
                     </Box>
@@ -736,7 +754,7 @@ export default function UserManagementPage() {
 
       {/* Add Staff Drawer */}
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 420 }, p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ width: { xs: '100vw', sm: 440 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
             👤 Add New Staff Member
           </Typography>
@@ -747,7 +765,7 @@ export default function UserManagementPage() {
                 label="Full Name *"
                 fullWidth
                 required
-                placeholder="e.g. Store Keeper Ali"
+                placeholder="e.g. Store Manager Tariq"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -756,7 +774,7 @@ export default function UserManagementPage() {
                 label="Username / Email *"
                 fullWidth
                 required
-                placeholder="e.g. storekeeper@rehmat.com"
+                placeholder="e.g. manager@rehmat.com"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
@@ -778,8 +796,9 @@ export default function UserManagementPage() {
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
-                <MenuItem value="Store Keeper">👷 Store Keeper (Customizable Toggles)</MenuItem>
-                <MenuItem value="Super Admin">👑 Super Admin (Full Access)</MenuItem>
+                <MenuItem value="Store Keeper">👷 Store Keeper (Stock In/Out & Catalog Only)</MenuItem>
+                <MenuItem value="Admin">🛡️ Admin (Store Manager - Operational Access)</MenuItem>
+                <MenuItem value="Super Admin">👑 Super Admin (Full Control & Users)</MenuItem>
                 <MenuItem value="Sales Manager">💼 Sales Manager (Sales Access)</MenuItem>
                 <MenuItem value="Technician">🔧 Workshop Technician (Repairs Access)</MenuItem>
               </TextField>
@@ -788,7 +807,7 @@ export default function UserManagementPage() {
                 <Button variant="outlined" color="secondary" onClick={() => setDrawerOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="contained" color="primary" type="submit">
+                <Button variant="contained" color="primary" type="submit" sx={{ fontWeight: 700 }}>
                   Save Staff User
                 </Button>
               </Stack>
@@ -799,7 +818,7 @@ export default function UserManagementPage() {
 
       {/* Edit Staff Drawer */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 420 }, p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ width: { xs: '100vw', sm: 440 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
             ✏️ Edit Staff Account
           </Typography>
@@ -839,17 +858,18 @@ export default function UserManagementPage() {
                   value={editingStaff.role}
                   onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
                 >
-                  <MenuItem value="Store Keeper">👷 Store Keeper</MenuItem>
-                  <MenuItem value="Super Admin">👑 Super Admin</MenuItem>
-                  <MenuItem value="Sales Manager">💼 Sales Manager</MenuItem>
-                  <MenuItem value="Technician">🔧 Workshop Technician</MenuItem>
+                  <MenuItem value="Store Keeper">👷 Store Keeper (Stock In/Out & Catalog)</MenuItem>
+                  <MenuItem value="Admin">🛡️ Admin (Store Manager - Operational Access)</MenuItem>
+                  <MenuItem value="Super Admin">👑 Super Admin (Full Control & Users)</MenuItem>
+                  <MenuItem value="Sales Manager">💼 Sales Manager (Sales Access)</MenuItem>
+                  <MenuItem value="Technician">🔧 Workshop Technician (Repairs Access)</MenuItem>
                 </TextField>
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                   <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
                     Cancel
                   </Button>
-                  <Button variant="contained" color="primary" type="submit">
+                  <Button variant="contained" color="primary" type="submit" sx={{ fontWeight: 700 }}>
                     Update Staff User
                   </Button>
                 </Stack>

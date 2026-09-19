@@ -15,6 +15,7 @@ import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 
 // project imports
 import ProfileTab from './ProfileTab';
@@ -29,6 +30,8 @@ import { useAuth } from 'context/AuthContext';
 import LogoutOutlined from '@ant-design/icons/LogoutOutlined';
 import SettingOutlined from '@ant-design/icons/SettingOutlined';
 import UserOutlined from '@ant-design/icons/UserOutlined';
+import CrownOutlined from '@ant-design/icons/CrownOutlined';
+import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
 import avatar1 from 'assets/images/users/avatar-1.png';
 
 // tab panel wrapper
@@ -60,7 +63,7 @@ export default function Profile() {
   };
 
   const handleClose = (event) => {
-    if (anchorRef.current && anchorRef.current.contains(event.target)) {
+    if (anchorRef.current && event?.target && anchorRef.current.contains(event.target)) {
       return;
     }
     setOpen(false);
@@ -72,8 +75,9 @@ export default function Profile() {
     setValue(newValue);
   };
 
-  const userEmail = user?.email || 'admin@factory.com';
+  const userEmail = user?.email || 'admin@rehmat.com';
   const userRole = user?.role || 'Super Admin';
+  const isSuperAdminUser = userRole === 'Super Admin' || userEmail.toLowerCase() === 'admin@rehmat.com' || user?.id === 'USR-1';
 
   return (
     <Box sx={{ flexShrink: 0, ml: 'auto' }}>
@@ -118,20 +122,25 @@ export default function Profile() {
       >
         {({ TransitionProps }) => (
           <Transitions type="grow" position="top-right" in={open} {...TransitionProps}>
-            <Paper sx={(theme) => ({ boxShadow: theme.vars.customShadows.z1, width: 290, minWidth: 240, maxWidth: { xs: 250, md: 290 } })}>
+            <Paper sx={(theme) => ({ boxShadow: theme.vars.customShadows.z1, width: 310, minWidth: 260, maxWidth: { xs: 280, md: 310 } })}>
               <ClickAwayListener onClickAway={handleClose}>
                 <MainCard elevation={0} border={false} content={false}>
-                  <CardContent sx={{ px: 2.5, pt: 3 }}>
+                  <CardContent sx={{ px: 2.5, pt: 3, pb: 2 }}>
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                       <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center' }}>
-                        <Avatar alt="profile user" src={avatar1} sx={{ width: 32, height: 32 }} />
+                        <Avatar alt="profile user" src={avatar1} sx={{ width: 36, height: 36 }} />
                         <Stack>
-                          <Typography variant="h6" sx={{ wordBreak: 'break-all' }}>
+                          <Typography variant="subtitle1" fontWeight={700} sx={{ wordBreak: 'break-all' }}>
                             {user?.name || userEmail}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                            {userRole}
-                          </Typography>
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Chip
+                              size="small"
+                              label={userRole}
+                              color={userRole === 'Super Admin' ? 'primary' : userRole === 'Admin' ? 'info' : 'warning'}
+                              sx={{ fontWeight: 700, height: 20, fontSize: '0.7rem' }}
+                            />
+                          </Stack>
                         </Stack>
                       </Stack>
                       <Tooltip title="Logout">
@@ -141,17 +150,61 @@ export default function Profile() {
                       </Tooltip>
                     </Stack>
 
-                    {userRole !== 'Store Keeper' && (
+                    {/* 👑 Role Switcher for Super Admin Testing */}
+                    {isSuperAdminUser && userRole === 'Super Admin' && (
+                      <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                        <Typography variant="caption" fontWeight={700} color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                          👑 PREVIEW ROLE DASHBOARD:
+                        </Typography>
+                        <Stack spacing={1}>
+                          <Button
+                            fullWidth
+                            size="small"
+                            variant="outlined"
+                            color="info"
+                            startIcon={<SafetyCertificateOutlined />}
+                            onClick={() => {
+                              switchUserRole('Admin');
+                              setOpen(false);
+                            }}
+                            sx={{ fontWeight: 700, justifyContent: 'flex-start', py: 0.5 }}
+                          >
+                            Preview As Store Admin
+                          </Button>
+                          <Button
+                            fullWidth
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            startIcon={<UserOutlined />}
+                            onClick={() => {
+                              switchUserRole('Store Keeper');
+                              setOpen(false);
+                            }}
+                            sx={{ fontWeight: 700, justifyContent: 'flex-start', py: 0.5 }}
+                          >
+                            Preview As Store Keeper
+                          </Button>
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* Return to Super Admin Button if owner switched roles */}
+                    {isSuperAdminUser && userRole !== 'Super Admin' && (
                       <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
                         <Button
                           fullWidth
                           size="small"
-                          variant="outlined"
-                          color="warning"
-                          onClick={() => switchUserRole('Store Keeper')}
-                          sx={{ fontWeight: 700 }}
+                          variant="contained"
+                          color="primary"
+                          startIcon={<CrownOutlined />}
+                          onClick={() => {
+                            switchUserRole('Super Admin');
+                            setOpen(false);
+                          }}
+                          sx={{ fontWeight: 700, py: 0.75 }}
                         >
-                          Switch To 👷 Store Keeper
+                          Restore Super Admin
                         </Button>
                       </Box>
                     )}
