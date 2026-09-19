@@ -60,12 +60,22 @@ export default function CategoriesPage() {
   // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const filteredCategories = categories.filter((c) => {
-    return (
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.description && c.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+  const filteredCategories = (categories || [])
+    .map((c) => {
+      if (typeof c === 'string') {
+        return { id: `CAT-${c.replace(/\s+/g, '-').toUpperCase()}`, name: c, description: '' };
+      }
+      return c;
+    })
+    .filter((c) => {
+      if (!c) return false;
+      const catName = c.name || '';
+      const catDesc = c.description || '';
+      return (
+        catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        catDesc.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
 
   // Checkbox Selection Handlers
   const handleSelectAllClick = (event) => {

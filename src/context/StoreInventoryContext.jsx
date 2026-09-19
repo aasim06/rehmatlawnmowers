@@ -70,11 +70,30 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_deleted_vendor_ids', JSON.stringify(deletedVendorIds));
   }, [deletedVendorIds]);
 
+  const [deletedCategoryIds, setDeletedCategoryIds] = useState(() => safeParseJSON('rehmat_deleted_category_ids', []));
+
+  useEffect(() => {
+    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(deletedCategoryIds));
+  }, [deletedCategoryIds]);
+
   // 3. Vendors / Suppliers State (Clean Zero Start)
   const [vendors, setVendors] = useState(() => safeParseJSON('rehmat_store_vendors_v2', []));
 
-  // 4. Categories State
-  const [categories, setCategories] = useState(() => safeParseJSON('rehmat_store_categories_v2', initialCategories));
+  // 4. Categories State (Persistent Start with fallback to initialCategories)
+  const [categories, setCategories] = useState(() => {
+    const saved = safeParseJSON('rehmat_store_categories_v2', null);
+    const deletedCatList = safeParseJSON('rehmat_deleted_category_ids', []);
+    const deletedCatSet = new Set(deletedCatList.map((x) => String(x).toLowerCase()));
+
+    if (Array.isArray(saved) && saved.length > 0) {
+      const clean = saved.filter((c) => !deletedCatSet.has(String(c.id).toLowerCase()) && !deletedCatSet.has(String(c.name || '').toLowerCase()));
+      if (clean.length > 0) return clean;
+    }
+    if (deletedCatList.length > 0) {
+      return [];
+    }
+    return initialCategories;
+  });
 
   // 7. Pre-saved Master Item Names List State (Clean Zero Start)
   const [masterItemNames, setMasterItemNames] = useState(() => {
@@ -301,6 +320,7 @@ export function StoreInventoryProvider({ children }) {
       const deletedLogSet = new Set(safeParseJSON('rehmat_deleted_log_ids', []).map(String));
       const deletedSaleSet = new Set(safeParseJSON('rehmat_deleted_sale_ids', []).map(String));
       const deletedVendorSet = new Set(safeParseJSON('rehmat_deleted_vendor_ids', []).map(String));
+      const deletedCategorySet = new Set(safeParseJSON('rehmat_deleted_category_ids', []).map((x) => String(x).toLowerCase()));
 
       const [
         itemsRes,
@@ -457,15 +477,47 @@ export function StoreInventoryProvider({ children }) {
       }
 
       if (catRes.status === 'fulfilled' && Array.isArray(catRes.value?.data)) {
-        setCategories(catRes.value.data.map((c) => ({
+        const cleanCatData = catRes.value.data.filter(
+          (c) => !deletedCategorySet.has(String(c.id).toLowerCase()) && !deletedCategorySet.has(String(c.name || '').toLowerCase())
+        );
+        const mappedCats = cleanCatData.map((c) => ({
           id: c.id,
           name: c.name,
-          description: c.description
-        })));
+          description: c.description || ''
+        }));
+        setCategories((prev) => {
+          const cleanLocal = (prev || []).filter((c) => !deletedCategorySet.has(String(c.id).toLowerCase()) && !deletedCategorySet.has(String(c.name || '').toLowerCase()));
+          const fetchedMap = new Map(mappedCats.map((c) => [String(c.id), c]));
+          const combined = [...mappedCats];
+          cleanLocal.forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id)) && !deletedCategorySet.has(String(loc.id).toLowerCase()) && !deletedCategorySet.has(String(loc.name || '').toLowerCase())) {
+              combined.push(loc);
+            }
+          });
+          if (combined.length > 0) {
+            localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(combined));
+            return combined;
+          }
+          if (deletedCategorySet.size === 0) {
+            localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(initialCategories));
+            return initialCategories;
+          }
+          return [];
+        });
       }
 
       if (masterItemsRes.status === 'fulfilled' && Array.isArray(masterItemsRes.value?.data)) {
-        setMasterItemNames(masterItemsRes.value.data);
+        setMasterItemNames((prev) => {
+          const fetchedMap = new Map((masterItemsRes.value.data || []).map((m) => [String(m.id), m]));
+          const combined = [...(masterItemsRes.value.data || [])];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id))) {
+              combined.push(loc);
+            }
+          });
+          localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(combined));
+          return combined;
+        });
       }
     } catch (err) {
       // Background sync notification
@@ -1105,69 +1157,105 @@ export function StoreInventoryProvider({ children }) {
     const categoryId = generateUUID();
     const newCategory = {
       id: categoryId,
-      name: categoryData.name,
-      description: categoryData.description || ''
+      name: (categoryData.name || '').trim(),
+      description: (categoryData.description || '').trim()
     };
-    setCategories((prev) => [newCategory, ...prev]);
+
+    // Remove from deleted categories blacklist if re-added
+    const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
+    const updatedDeleted = existingDeleted.filter((id) => id !== categoryId && id !== newCategory.name.toLowerCase());
+    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    setDeletedCategoryIds(updatedDeleted);
+
+    setCategories((prev) => {
+      const exists = (prev || []).some((c) => (c.name || '').toLowerCase() === newCategory.name.toLowerCase());
+      if (exists) return prev;
+      const updated = [newCategory, ...(prev || [])];
+      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      return updated;
+    });
+
+    logActivity('Category Added', `Added category "${newCategory.name}"`);
 
     try {
-      if (sql) {
-        await sql`INSERT INTO categories (id, name, description) VALUES (${categoryId}, ${categoryData.name}, ${categoryData.description || ''});`;
-      }
       await supabase.from('categories').insert([{
         id: categoryId,
-        name: categoryData.name,
-        description: categoryData.description || ''
+        name: newCategory.name,
+        description: newCategory.description
       }]);
     } catch (e) {
-      console.error('addCategory error:', e);
+      console.error('addCategory Supabase error:', e);
     }
   };
 
   const updateCategory = async (categoryId, updatedData) => {
-    setCategories((prev) =>
-      prev.map((c) => (c.id === categoryId ? { ...c, ...updatedData } : c))
-    );
+    setCategories((prev) => {
+      const updated = (prev || []).map((c) => (c.id === categoryId ? { ...c, ...updatedData } : c));
+      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      return updated;
+    });
+
+    logActivity('Category Updated', `Updated category "${updatedData.name}"`);
 
     try {
-      if (sql) {
-        await sql`UPDATE categories SET name = ${updatedData.name}, description = ${updatedData.description || ''} WHERE id = ${categoryId};`;
-      }
       await supabase.from('categories').update({
         name: updatedData.name,
         description: updatedData.description || ''
       }).eq('id', categoryId);
     } catch (e) {
-      console.error('updateCategory error:', e);
+      console.error('updateCategory Supabase error:', e);
     }
   };
 
   const deleteCategory = async (categoryId) => {
-    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+    const stringId = String(categoryId);
+    const target = categories.find((c) => String(c.id) === stringId);
+
+    const idsToAdd = [stringId];
+    if (target?.name) idsToAdd.push(target.name.toLowerCase());
+
+    const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
+    const updatedDeleted = Array.from(new Set([...existingDeleted, ...idsToAdd]));
+    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    setDeletedCategoryIds(updatedDeleted);
+
+    setCategories((prev) => {
+      const updated = (prev || []).filter((c) => String(c.id) !== stringId);
+      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      return updated;
+    });
+
+    logActivity('Category Deleted', `Deleted category "${target?.name || categoryId}"`);
 
     try {
-      if (sql) {
-        await sql`DELETE FROM categories WHERE id = ${categoryId};`;
-      }
       await supabase.from('categories').delete().eq('id', categoryId);
     } catch (e) {
-      console.error('deleteCategory error:', e);
+      console.error('deleteCategory Supabase error:', e);
     }
   };
 
   const deleteMultipleCategories = async (categoryIds) => {
-    const idsSet = new Set(categoryIds);
-    setCategories((prev) => prev.filter((c) => !idsSet.has(c.id)));
+    const idsSet = new Set(categoryIds.map(String));
+    const targets = categories.filter((c) => idsSet.has(String(c.id)));
+    const names = targets.map((c) => (c.name || '').toLowerCase());
+
+    const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
+    const updatedDeleted = Array.from(new Set([...existingDeleted, ...categoryIds.map(String), ...names]));
+    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    setDeletedCategoryIds(updatedDeleted);
+
+    setCategories((prev) => {
+      const updated = (prev || []).filter((c) => !idsSet.has(String(c.id)));
+      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      return updated;
+    });
+
+    logActivity('Bulk Categories Deleted', `Deleted ${categoryIds.length} categories`);
 
     try {
-      for (const id of categoryIds) {
-        if (sql) {
-          await sql`DELETE FROM categories WHERE id = ${id};`;
-        }
-      }
       await supabase.from('categories').delete().in('id', categoryIds);
     } catch (e) {
-      console.error('deleteMultipleCategories error:', e);
+      console.error('deleteMultipleCategories Supabase error:', e);
     }
   };
 
