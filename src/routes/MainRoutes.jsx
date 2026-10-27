@@ -22,9 +22,33 @@ import Shadow from 'pages/component-overview/shadows';
 import SamplePage from 'pages/extra-pages/sample-page';
 
 // layout, auth & RBAC guards
+import { Navigate } from 'react-router-dom';
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from 'components/ProtectedRoute';
 import RoleGuard from 'components/RoleGuard';
+import usePermission from 'hooks/usePermission';
+
+// Smart Home Index component: opens Dashboard if allowed, or gracefully forwards to first permitted staff module
+function RootIndexRoute() {
+  const { hasAccessToItem, isMasterAdmin, isSuperAdmin } = usePermission();
+
+  if (isMasterAdmin || isSuperAdmin || hasAccessToItem({ id: 'dashboard' })) {
+    return <DashboardDefault />;
+  }
+
+  if (hasAccessToItem({ id: 'stock-in' })) return <Navigate to="/inventory/stock-in" replace />;
+  if (hasAccessToItem({ id: 'stock-out' })) return <Navigate to="/inventory/stock-out" replace />;
+  if (hasAccessToItem({ id: 'items' })) return <Navigate to="/inventory/items" replace />;
+  if (hasAccessToItem({ id: 'machine-sales' })) return <Navigate to="/inventory/machine-sales" replace />;
+  if (hasAccessToItem({ id: 'machine-repairs' })) return <Navigate to="/inventory/machine-repairs" replace />;
+  if (hasAccessToItem({ id: 'expenses' })) return <Navigate to="/inventory/expenses" replace />;
+  if (hasAccessToItem({ id: 'vendors' })) return <Navigate to="/inventory/vendors" replace />;
+  if (hasAccessToItem({ id: 'categories' })) return <Navigate to="/inventory/categories" replace />;
+  if (hasAccessToItem({ id: 'ledger' })) return <Navigate to="/inventory/ledger" replace />;
+  if (hasAccessToItem({ id: 'reports' })) return <Navigate to="/inventory/reports" replace />;
+
+  return <DashboardDefault />;
+}
 
 // ==============================|| MAIN ROUTING (ZERO-LATENCY INSTANT NAVIGATION WITH RBAC ROLEGUARDS) ||============================== //
 
@@ -38,11 +62,7 @@ const MainRoutes = {
   children: [
     {
       path: '/',
-      element: (
-        <RoleGuard permission="dashboard">
-          <DashboardDefault />
-        </RoleGuard>
-      )
+      element: <RootIndexRoute />
     },
     {
       path: 'dashboard',

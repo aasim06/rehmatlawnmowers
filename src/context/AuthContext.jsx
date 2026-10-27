@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from 'api/supabase';
+import { sql } from 'api/neon';
 
 const AuthContext = createContext();
 
@@ -184,13 +185,12 @@ export function AuthProvider({ children }) {
       const saved = sessionStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
-        const roleDefaults = getRoleDefaultPermissions(parsedUser.role || 'Super Admin');
+        // Use user's own explicit permissions if present, else fallback to role defaults
         return {
           ...parsedUser,
-          permissions: {
-            ...roleDefaults,
-            ...(parsedUser.permissions || {})
-          }
+          permissions: (parsedUser.permissions && Object.keys(parsedUser.permissions).length > 0)
+            ? parsedUser.permissions
+            : getRoleDefaultPermissions(parsedUser.role || 'Store Keeper')
         };
       }
       return null;
@@ -218,11 +218,53 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
+  // Fetch staff users from Neon Cloud Database on mount for instant multi-device / multi-browser sync
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCloudUsers = async () => {
+      try {
+        const rows = await sql.query('SELECT * FROM users ORDER BY created_at ASC');
+        if (isMounted && Array.isArray(rows) && rows.length > 0) {
+          const mapped = rows.map((u) => ({
+            id: u.id || `USR-${u.email}`,
+            name: u.name,
+            email: u.email,
+            password: u.password,
+            role: u.role || 'Store Keeper',
+            status: u.status || 'Active',
+            permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+              ? u.permissions
+              : getRoleDefaultPermissions(u.role || 'Store Keeper')
+          }));
+
+          setStaffUsers((prev) => {
+            const remoteEmails = new Set(mapped.map((m) => (m.email || '').toLowerCase()));
+            const combined = [...mapped];
+            prev.forEach((p) => {
+              if (!remoteEmails.has((p.email || '').toLowerCase())) {
+                combined.push(p);
+              }
+            });
+            localStorage.setItem('rehmat_store_staff_users', JSON.stringify(combined));
+            return combined;
+          });
+        }
+      } catch (err) {
+        console.warn('Neon cloud user fetch failed, using local cache:', err);
+      }
+    };
+
+    fetchCloudUsers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     // 1. Get initial Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) {
+      if (session?.user && !user) {
         const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
         const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
         const userData = {
@@ -230,7 +272,9 @@ export function AuthProvider({ children }) {
           name: found?.name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email,
           role: resolvedRole,
-          permissions: found?.permissions || getRoleDefaultPermissions(resolvedRole)
+          permissions: (found?.permissions && Object.keys(found.permissions).length > 0)
+            ? found.permissions
+            : getRoleDefaultPermissions(resolvedRole)
         };
         setUser(userData);
       }
@@ -240,7 +284,7 @@ export function AuthProvider({ children }) {
     // 2. Listen to Supabase auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user) {
+      if (session?.user && !user) {
         const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
         const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
         const userData = {
@@ -248,7 +292,9 @@ export function AuthProvider({ children }) {
           name: found?.name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email,
           role: resolvedRole,
-          permissions: found?.permissions || getRoleDefaultPermissions(resolvedRole)
+          permissions: (found?.permissions && Object.keys(found.permissions).length > 0)
+            ? found.permissions
+            : getRoleDefaultPermissions(resolvedRole)
         };
         setUser(userData);
       }
@@ -256,144 +302,190 @@ export function AuthProvider({ children }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user, staffUsers]);
 
   // Login Action
   const login = async (email, password) => {
     setLoading(true);
     const cleanEmail = (email || '').trim().toLowerCase();
 
-    // Check in local staff users list first for demo/offline accounts
-    const localMatch = staffUsers.find(
+    // 1. Check in local staff users list first
+    let localMatch = staffUsers.find(
       (u) =>
         (u.email || '').toLowerCase() === cleanEmail ||
         (u.name || '').toLowerCase() === cleanEmail ||
         (u.email || '').toLowerCase().split('@')[0] === cleanEmail
     );
 
+    // 2. If not found in local memory, check Neon Cloud Database directly
+    if (!localMatch) {
+      try {
+        const rows = await sql.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
+        if (rows && rows.length > 0) {
+          const u = rows[0];
+          localMatch = {
+            id: u.id || `USR-${u.email}`,
+            name: u.name,
+            email: u.email,
+            password: u.password,
+            role: u.role || 'Store Keeper',
+            status: u.status || 'Active',
+            permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+              ? u.permissions
+              : getRoleDefaultPermissions(u.role || 'Store Keeper')
+          };
+          setStaffUsers((prev) => [localMatch, ...prev.filter((p) => (p.email || '').toLowerCase() !== cleanEmail)]);
+        }
+      } catch (err) {
+        console.warn('Neon query error during login:', err);
+      }
+    }
+
     if (localMatch) {
       if (localMatch.password && localMatch.password !== password) {
         setLoading(false);
         return { success: false, error: 'Incorrect password! Please check your credentials.' };
       }
+
+      if (localMatch.status === 'Suspended') {
+        setLoading(false);
+        return { success: false, error: 'This account has been suspended. Please contact Administrator.' };
+      }
+
       const matchWithPerms = {
         ...localMatch,
-        permissions: localMatch.permissions || getRoleDefaultPermissions(localMatch.role)
+        permissions: (localMatch.permissions && Object.keys(localMatch.permissions).length > 0)
+          ? localMatch.permissions
+          : getRoleDefaultPermissions(localMatch.role)
       };
+
       setUser(matchWithPerms);
       setLoading(false);
       return { success: true, user: matchWithPerms };
     }
 
-    // Try Supabase Auth
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-      if (error) {
-        // Fallback for offline demo login
-        if (cleanEmail && password.length >= 4) {
-          const isStore = cleanEmail.includes('store') || cleanEmail.includes('keeper');
-          const isManager = cleanEmail.includes('manager') || (cleanEmail.includes('admin') && !cleanEmail.includes('super'));
-          const resolvedRole = isStore ? 'Store Keeper' : isManager ? 'Admin' : 'Super Admin';
-          const mockUser = {
-            id: 'USR-' + Date.now(),
-            name: isStore ? 'Store Keeper Ali' : isManager ? 'Store Manager Tariq' : 'Sabeel (Super Admin)',
-            email: cleanEmail,
-            role: resolvedRole,
-            permissions: getRoleDefaultPermissions(resolvedRole)
-          };
-          setUser(mockUser);
-          setLoading(false);
-          return { success: true, user: mockUser };
-        }
-        setLoading(false);
-        return { success: false, error: error.message };
-      }
-
-      const userRole = data.user.user_metadata?.role || (cleanEmail === 'admin@rehmat.com' ? 'Super Admin' : 'Admin');
-      const userData = {
-        id: data.user.id,
-        name: data.user.email?.split('@')[0] || 'User',
-        email: data.user.email,
-        role: userRole,
-        permissions: getRoleDefaultPermissions(userRole)
+    // 3. Fallback exclusively for master admin if database is cold-starting
+    if (cleanEmail === 'admin@rehmat.com' && (password === '123456' || password === 'admin123')) {
+      const rootAdmin = {
+        id: 'USR-1',
+        name: 'Sabeel (Super Admin)',
+        email: 'admin@rehmat.com',
+        role: 'Super Admin',
+        status: 'Active',
+        permissions: defaultSuperAdminPermissions
       };
-      setUser(userData);
+      setUser(rootAdmin);
       setLoading(false);
-      return { success: true, user: userData };
-    } catch (err) {
-      if (cleanEmail && password.length >= 4) {
-        const isStore = cleanEmail.includes('store') || cleanEmail.includes('keeper');
-        const isManager = cleanEmail.includes('manager') || (cleanEmail.includes('admin') && !cleanEmail.includes('super'));
-        const resolvedRole = isStore ? 'Store Keeper' : isManager ? 'Admin' : 'Super Admin';
-        const mockUser = {
-          id: 'USR-' + Date.now(),
-          name: isStore ? 'Store Keeper Ali' : isManager ? 'Store Manager Tariq' : 'Sabeel (Super Admin)',
-          email: cleanEmail,
-          role: resolvedRole,
-          permissions: getRoleDefaultPermissions(resolvedRole)
-        };
-        setUser(mockUser);
-        setLoading(false);
-        return { success: true, user: mockUser };
-      }
-      setLoading(false);
-      return { success: false, error: err.message };
+      return { success: true, user: rootAdmin };
     }
+
+    setLoading(false);
+    return { success: false, error: 'Account not found! Please check your email or ask Admin to add your staff account.' };
   };
 
   // Staff CRUD Operations
-  const addStaffUser = (newUser) => {
+  const addStaffUser = async (newUser) => {
     const role = newUser.role || 'Store Keeper';
-    const rolePerms = getRoleDefaultPermissions(role);
+    const rolePerms = newUser.permissions || getRoleDefaultPermissions(role);
     const created = {
       id: 'USR-' + Date.now(),
       name: newUser.name,
-      email: newUser.email,
+      email: (newUser.email || '').trim().toLowerCase(),
       password: newUser.password || '123456',
       role: role,
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
       permissions: { ...rolePerms }
     };
-    setStaffUsers((prev) => [created, ...prev]);
+
+    setStaffUsers((prev) => [created, ...prev.filter((p) => p.email.toLowerCase() !== created.email)]);
+
+    // Sync to Neon Cloud Database
+    try {
+      await sql.query(
+        `INSERT INTO users (id, name, email, password, role, status, permissions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (email) DO UPDATE SET
+           name = EXCLUDED.name,
+           password = EXCLUDED.password,
+           role = EXCLUDED.role,
+           status = EXCLUDED.status,
+           permissions = EXCLUDED.permissions;`,
+        [created.id, created.name, created.email, created.password, created.role, created.status, JSON.stringify(created.permissions)]
+      );
+    } catch (e) {
+      console.error('Neon save staff error:', e);
+    }
+
     return created;
   };
 
-  const deleteStaffUser = (id) => {
+  const deleteStaffUser = async (id) => {
     const target = staffUsers.find((u) => u.id === id);
     if (target?.email?.toLowerCase() === 'admin@rehmat.com') {
       alert('The primary Super Admin account is permanently protected and cannot be deleted!');
       return false;
     }
+
     setStaffUsers((prev) => prev.filter((u) => u.id !== id));
+
+    try {
+      await sql.query('DELETE FROM users WHERE id = $1 OR LOWER(email) = $2', [String(id), (target?.email || '').toLowerCase()]);
+    } catch (err) {
+      console.error('Neon delete staff error:', err);
+    }
+
     return true;
   };
 
-  const updateStaffUser = (id, updatedFields) => {
+  const updateStaffUser = async (id, updatedFields) => {
+    let savedUser = null;
     setStaffUsers((prev) =>
       prev.map((u) => {
-        if (u.id === id) {
+        if (u.id === id || (u.email || '').toLowerCase() === String(id).toLowerCase()) {
           const updated = { ...u, ...updatedFields };
           // If role changed without explicit custom permissions, assign role defaults
           if (updatedFields.role && updatedFields.role !== u.role && !updatedFields.permissions) {
             updated.permissions = getRoleDefaultPermissions(updatedFields.role);
           }
-          if (user?.id === id) {
+          if (user?.id === u.id || (user?.email || '').toLowerCase() === (u.email || '').toLowerCase()) {
             setUser(updated);
           }
+          savedUser = updated;
           return updated;
         }
         return u;
       })
     );
+
+    if (savedUser) {
+      try {
+        await sql.query(
+          'UPDATE users SET name = $1, password = $2, role = $3, status = $4, permissions = $5 WHERE id = $6 OR LOWER(email) = $7',
+          [
+            savedUser.name,
+            savedUser.password,
+            savedUser.role,
+            savedUser.status || 'Active',
+            JSON.stringify(savedUser.permissions),
+            String(id),
+            (savedUser.email || '').toLowerCase()
+          ]
+        );
+      } catch (err) {
+        console.error('Neon update staff error:', err);
+      }
+    }
   };
 
-  const updateUserPermissions = (userId, newPermissions) => {
+  const updateUserPermissions = async (userId, newPermissions) => {
+    let targetEmail = '';
     setStaffUsers((prev) =>
       prev.map((u) => {
-        if (u.id === userId) {
+        if (u.id === userId || (u.email || '').toLowerCase() === String(userId).toLowerCase()) {
+          targetEmail = (u.email || '').toLowerCase();
           const updated = { ...u, permissions: newPermissions };
-          if (user?.id === userId) {
+          if (user?.id === u.id || (user?.email || '').toLowerCase() === targetEmail) {
             setUser(updated);
           }
           return updated;
@@ -401,6 +493,16 @@ export function AuthProvider({ children }) {
         return u;
       })
     );
+
+    try {
+      await sql.query('UPDATE users SET permissions = $1 WHERE id = $2 OR LOWER(email) = $3', [
+        JSON.stringify(newPermissions),
+        String(userId),
+        (targetEmail || String(userId)).toLowerCase()
+      ]);
+    } catch (err) {
+      console.error('Neon update permissions error:', err);
+    }
   };
 
   // Switch Active User / Role helper (Only Super Admin can invoke this)

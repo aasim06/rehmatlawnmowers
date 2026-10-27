@@ -34,23 +34,25 @@ import MainCard from 'components/MainCard';
  */
 export default function RoleGuard({ permission, allowedRoles, children, fallback }) {
   const navigate = useNavigate();
-  const { role, userPerms, isSuperAdmin } = usePermission();
+  const { role, userPerms, isMasterAdmin, isSuperAdmin } = usePermission();
 
-  // 1. Super Admin has unrestricted access everywhere
-  if (isSuperAdmin) {
+  // 1. Primary Root Super Admin has unrestricted access everywhere
+  if (isMasterAdmin || isSuperAdmin) {
     return children;
   }
 
-  // 2. Check Role-level whitelist if specified
+  // 2. Check Module Permission Flag if specified
+  if (permission) {
+    if (!userPerms || !userPerms[permission]) {
+      return fallback || <AccessDeniedView role={role} permissionKey={permission} navigate={navigate} />;
+    }
+  }
+
+  // 3. Check Role-level whitelist if specified
   if (allowedRoles && Array.isArray(allowedRoles) && allowedRoles.length > 0) {
     if (!allowedRoles.includes(role)) {
       return fallback || <AccessDeniedView role={role} reason={`Exclusive to [${allowedRoles.join(', ')}]`} navigate={navigate} />;
     }
-  }
-
-  // 3. Check Module Permission Flag if specified
-  if (permission && !userPerms?.[permission]) {
-    return fallback || <AccessDeniedView role={role} permissionKey={permission} navigate={navigate} />;
   }
 
   // Access granted
