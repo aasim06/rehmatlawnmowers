@@ -190,7 +190,7 @@ export default function AuthLogin() {
                   </Typography>
                 </Divider>
 
-                <Stack direction="row" spacing={1.5} sx={{ mt: 1 }}>
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                   <Button
                     fullWidth
                     variant="outlined"
@@ -198,9 +198,20 @@ export default function AuthLogin() {
                     size="small"
                     startIcon={<SafetyCertificateOutlined />}
                     onClick={() => handleQuickLogin('admin@rehmat.com', '123456')}
-                    sx={{ fontWeight: 700 }}
+                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
                   >
                     Super Admin
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="info"
+                    size="small"
+                    startIcon={<UserOutlined />}
+                    onClick={() => handleQuickLogin('arslan@rehmat.com', '123456')}
+                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+                  >
+                    Arslan (Stock Only)
                   </Button>
                   <Button
                     fullWidth
@@ -209,7 +220,7 @@ export default function AuthLogin() {
                     size="small"
                     startIcon={<UserOutlined />}
                     onClick={() => handleQuickLogin('storekeeper@rehmat.com', '123456')}
-                    sx={{ fontWeight: 700 }}
+                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
                   >
                     Store Keeper
                   </Button>

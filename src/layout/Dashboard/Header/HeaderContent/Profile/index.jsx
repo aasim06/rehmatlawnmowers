@@ -189,8 +189,8 @@ export default function Profile() {
                       </Box>
                     )}
 
-                    {/* Return to Super Admin Button if currently previewing another role */}
-                    {userRole !== 'Super Admin' && (
+                    {/* Return to Super Admin Button only if currently previewing another role as Master Admin */}
+                    {userRole !== 'Super Admin' && userEmail === 'admin@rehmat.com' && (
                       <Box sx={{ mt: 1.5 }}>
                         <Button
                           fullWidth
