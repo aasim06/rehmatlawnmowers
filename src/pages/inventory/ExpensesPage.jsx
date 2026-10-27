@@ -43,7 +43,7 @@ import PrinterOutlined from '@ant-design/icons/PrinterOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import ClearOutlined from '@ant-design/icons/ClearOutlined';
 
-const EXPENSE_CATEGORIES = [
+const DEFAULT_EXPENSE_CATEGORIES = [
   'Tea & Refreshment',
   'Fuel & Transport',
   'Utilities & Bills',
@@ -66,7 +66,14 @@ const QUICK_EXPENSE_SUGGESTIONS = [
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
 export default function ExpensesPage() {
-  const { expenses = [], addExpense, deleteExpense } = useStoreInventory();
+  const {
+    expenses = [],
+    addExpense,
+    deleteExpense,
+    expenseCategories = DEFAULT_EXPENSE_CATEGORIES,
+    addExpenseCategory,
+    deleteExpenseCategory
+  } = useStoreInventory();
 
   // Form State
   const [title, setTitle] = useState('');
@@ -76,6 +83,42 @@ export default function ExpensesPage() {
   const [paidTo, setPaidTo] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+
+  // Add Custom Category Modal State
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+
+  const handleSaveNewCategory = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      setCategoryError('Please enter a category name');
+      return;
+    }
+    if (expenseCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      setCategoryError('Category with this name already exists');
+      return;
+    }
+    if (addExpenseCategory) {
+      addExpenseCategory(trimmed);
+    }
+    setCategory(trimmed);
+    setNewCategoryName('');
+    setCategoryError('');
+    setAddCategoryOpen(false);
+  };
+
+  const handleDeleteCategory = (catToDelete) => {
+    if (window.confirm(`Are you sure you want to delete category "${catToDelete}"?`)) {
+      if (deleteExpenseCategory) {
+        deleteExpenseCategory(catToDelete);
+      }
+      if (category === catToDelete) {
+        setCategory(expenseCategories.find((c) => c !== catToDelete) || 'Miscellaneous & Others');
+      }
+    }
+  };
 
   // Table Selection & Filter State
   const [selected, setSelected] = useState([]);
@@ -316,25 +359,65 @@ export default function ExpensesPage() {
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <TextField
-                select
-                fullWidth
-                label="EXPENSE CATEGORY *"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
-              >
-                {EXPENSE_CATEGORIES.map((cat) => (
-                  <MenuItem key={cat} value={cat}>
-                    {cat}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  select
+                  fullWidth
+                  label="EXPENSE CATEGORY *"
+                  value={category}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new_cat__') {
+                      setAddCategoryOpen(true);
+                    } else {
+                      setCategory(e.target.value);
+                    }
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      height: '44px',
+                      minHeight: '44px'
+                    }
+                  }}
+                >
+                  {expenseCategories.map((cat) => (
+                    <MenuItem key={cat} value={cat}>
+                      {cat}
+                    </MenuItem>
+                  ))}
+                  <Divider sx={{ my: 0.5 }} />
+                  <MenuItem
+                    value="__add_new_cat__"
+                    sx={{
+                      color: 'primary.main',
+                      fontWeight: 700,
+                      bgcolor: 'primary.lighter',
+                      py: 1,
+                      '&:hover': { bgcolor: 'primary.light' }
+                    }}
+                  >
+                    <PlusOutlined style={{ marginRight: 8 }} /> + Add Custom Category...
                   </MenuItem>
-                ))}
-              </TextField>
+                </TextField>
+
+                <Tooltip title="Add New Category">
+                  <IconButton
+                    color="primary"
+                    onClick={() => setAddCategoryOpen(true)}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      borderRadius: 1.5,
+                      height: '44px',
+                      width: '44px',
+                      flexShrink: 0,
+                      bgcolor: 'primary.lighter',
+                      '&:hover': { bgcolor: 'primary.light' }
+                    }}
+                  >
+                    <PlusOutlined />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -575,7 +658,7 @@ export default function ExpensesPage() {
               }}
             >
               <MenuItem value="All">All Categories</MenuItem>
-              {EXPENSE_CATEGORIES.map((cat) => (
+              {expenseCategories.map((cat) => (
                 <MenuItem key={cat} value={cat}>
                   {cat}
                 </MenuItem>
@@ -977,6 +1060,87 @@ export default function ExpensesPage() {
           </Button>
           <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint} className="no-print" sx={{ fontWeight: 700 }}>
             Print Statement
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 5. ADD / MANAGE EXPENSE CATEGORY DIALOG */}
+      <Dialog open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <PlusOutlined style={{ color: '#1677ff' }} />
+            <Typography variant="h5" fontWeight={700}>
+              Add Expense Category
+            </Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2.5}>
+            <Typography variant="body2" color="textSecondary">
+              Create custom expense categories to categorize workshop, factory, and store spending.
+            </Typography>
+
+            <form onSubmit={handleSaveNewCategory}>
+              <Stack spacing={1.5}>
+                <TextField
+                  fullWidth
+                  autoFocus
+                  label="Category Name *"
+                  placeholder="e.g. Factory Rent, Packaging, Advertising"
+                  value={newCategoryName}
+                  onChange={(e) => {
+                    setNewCategoryName(e.target.value);
+                    if (categoryError) setCategoryError('');
+                  }}
+                  error={Boolean(categoryError)}
+                  helperText={categoryError}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  startIcon={<PlusOutlined />}
+                  sx={{ fontWeight: 700, py: 1 }}
+                >
+                  Save & Select Category
+                </Button>
+              </Stack>
+            </form>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Current Categories ({expenseCategories.length}):
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {expenseCategories.map((cat) => {
+                  const isDefault = DEFAULT_EXPENSE_CATEGORIES.includes(cat);
+
+                  return (
+                    <Chip
+                      key={cat}
+                      label={cat}
+                      size="small"
+                      color={category === cat ? 'primary' : 'default'}
+                      variant={category === cat ? 'filled' : 'outlined'}
+                      onDelete={!isDefault ? () => handleDeleteCategory(cat) : undefined}
+                      onClick={() => {
+                        setCategory(cat);
+                        setAddCategoryOpen(false);
+                      }}
+                      sx={{ fontWeight: 600, cursor: 'pointer' }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 1.5 }}>
+          <Button onClick={() => setAddCategoryOpen(false)} color="secondary" sx={{ fontWeight: 600 }}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

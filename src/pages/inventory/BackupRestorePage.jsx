@@ -85,7 +85,7 @@ export default function BackupRestorePage() {
 
   return (
     <Box sx={{ width: '100%', py: 1 }}>
-      <MainCard title="💾 Data Backup & System Restore">
+      <MainCard title=" Data Backup & System Restore">
         {/* Status Alert if Restored */}
         {restoreStatus && (
           <Alert

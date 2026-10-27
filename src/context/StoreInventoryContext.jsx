@@ -156,12 +156,32 @@ export function StoreInventoryProvider({ children }) {
   // 13. Machine Repairs & Job Cards State (Clean Zero Start)
   const [machineRepairs, setMachineRepairs] = useState(() => safeParseJSON('rehmat_store_machine_repairs_v1', []));
 
-  // 14. Expenses State
+  // 14. Expenses State & Categories
   const [expenses, setExpenses] = useState(() => safeParseJSON('rehmat_store_expenses_v1', []));
 
   useEffect(() => {
     localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(expenses));
   }, [expenses]);
+
+  const defaultExpenseCategories = [
+    'Tea & Refreshment',
+    'Fuel & Transport',
+    'Utilities & Bills',
+    'Staff Wages & Labor',
+    'Shop Maintenance & Tools',
+    'Stationery & Office',
+    'Miscellaneous & Others'
+  ];
+
+  const [expenseCategories, setExpenseCategories] = useState(() => {
+    const saved = safeParseJSON('rehmat_store_expense_categories_v1', null);
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    return defaultExpenseCategories;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rehmat_store_expense_categories_v1', JSON.stringify(expenseCategories));
+  }, [expenseCategories]);
 
   // 15. Audit Logs State
   const initialAuditLogs = [
@@ -1755,7 +1775,9 @@ export function StoreInventoryProvider({ children }) {
       machineModels,
       machineRecipes,
       customerPayments,
-      vendorPayments
+      vendorPayments,
+      expenses,
+      expenseCategories
     };
     return JSON.stringify(backupObj, null, 2);
   };
@@ -1819,6 +1841,8 @@ export function StoreInventoryProvider({ children }) {
       }
       if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
       if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
+      if (data.expenses && Array.isArray(data.expenses)) setExpenses(data.expenses);
+      if (data.expenseCategories && Array.isArray(data.expenseCategories)) setExpenseCategories(data.expenseCategories);
 
       await fetchSupabaseData();
       return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
@@ -1978,6 +2002,22 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
+  const addExpenseCategory = (categoryName) => {
+    if (!categoryName || !categoryName.trim()) return false;
+    const trimmed = categoryName.trim();
+    if (expenseCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      return false;
+    }
+    setExpenseCategories((prev) => [...prev, trimmed]);
+    logActivity('Expense Category Added', `Added new expense category: ${trimmed}`);
+    return true;
+  };
+
+  const deleteExpenseCategory = (categoryName) => {
+    setExpenseCategories((prev) => prev.filter((c) => c !== categoryName));
+    logActivity('Expense Category Deleted', `Removed expense category: ${categoryName}`);
+  };
+
   const resetAllDataToZero = async () => {
     try {
       // 1. Wipe store_items, usage_logs, and all operational tables from Supabase Database
@@ -2128,7 +2168,10 @@ export function StoreInventoryProvider({ children }) {
       clearNotifications,
       expenses,
       addExpense,
-      deleteExpense
+      deleteExpense,
+      expenseCategories,
+      addExpenseCategory,
+      deleteExpenseCategory
     }),
     [
       items,
@@ -2142,6 +2185,7 @@ export function StoreInventoryProvider({ children }) {
       customerPayments,
       vendorPayments,
       expenses,
+      expenseCategories,
       totalInventoryCount,
       totalValuation,
       todayStockInQty,
