@@ -16,6 +16,7 @@ import VendorLedgerPage from 'pages/inventory/VendorLedgerPage';
 import BackupRestorePage from 'pages/inventory/BackupRestorePage';
 import ExpensesPage from 'pages/inventory/ExpensesPage';
 import UserManagementPage from 'pages/admin/UserManagementPage';
+import AppSecurityPage from 'pages/admin/AppSecurityPage';
 import Color from 'pages/component-overview/color';
 import Typography from 'pages/component-overview/typography';
 import Shadow from 'pages/component-overview/shadows';
@@ -226,6 +227,14 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="user-management" allowedRoles={['Super Admin']}>
               <UserManagementPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'security',
+          element: (
+            <RoleGuard permission="user-management" allowedRoles={['Super Admin']}>
+              <AppSecurityPage />
             </RoleGuard>
           )
         }

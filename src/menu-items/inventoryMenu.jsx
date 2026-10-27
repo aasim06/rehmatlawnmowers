@@ -19,8 +19,10 @@ import {
   PayCircleOutlined,
   ShopOutlined,
   CloudSyncOutlined,
-  WalletOutlined
+  WalletOutlined,
+  LockOutlined
 } from '@ant-design/icons';
+import { isTauriApp } from 'utils/platform';
 
 const icons = {
   DashboardOutlined,
@@ -42,7 +44,8 @@ const icons = {
   PayCircleOutlined,
   ShopOutlined,
   CloudSyncOutlined,
-  WalletOutlined
+  WalletOutlined,
+  LockOutlined
 };
 
 // ==============================|| MENU ITEMS - FACTORY STORE INVENTORY ||============================== //
@@ -158,7 +161,18 @@ const inventoryMenu = {
       type: 'item',
       url: '/admin/users',
       icon: icons.SafetyCertificateOutlined
-    }
+    },
+    ...(!isTauriApp()
+      ? [
+          {
+            id: 'app-security',
+            title: 'Remote App Control',
+            type: 'item',
+            url: '/admin/security',
+            icon: icons.LockOutlined
+          }
+        ]
+      : [])
   ]
 };
 

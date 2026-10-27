@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { isTauriApp } from 'utils/platform';
 import {
   useAuth,
   defaultSuperAdminPermissions,
@@ -299,6 +301,25 @@ export default function UserManagementPage() {
               </Typography>
             </Box>
           </Box>
+
+          {!isTauriApp() && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<LockOutlined />}
+              component={Link}
+              to="/admin/security"
+              sx={{
+                fontWeight: 700,
+                px: 2,
+                py: 1.1,
+                borderRadius: 1.5,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Remote App Control
+            </Button>
+          )}
 
           {/* Add Staff Button */}
           <Button

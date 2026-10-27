@@ -164,8 +164,13 @@ export function StoreInventoryProvider({ children }) {
   const [machineRecipes, setMachineRecipes] = useState(() => {
     const parsed = safeParseJSON('store_machine_recipes', null);
     if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-      // Filter out test entries like 'Emmami' if user wants real lawn mower recipe
-      const clean = parsed.filter(r => !(r.modelName || '').toLowerCase().includes('emmami'));
+      // Filter out test entries like 'Emmami' and system security control records
+      const clean = parsed.filter(
+        (r) =>
+          !(r.modelName || '').toLowerCase().includes('emmami') &&
+          r.id !== '__APP_SECURITY__' &&
+          !r.modelName?.startsWith('__APP_')
+      );
       if (clean.length > 0) return clean;
     }
     return [
@@ -641,7 +646,10 @@ export function StoreInventoryProvider({ children }) {
       }
 
       if (recipesRes?.status === 'fulfilled' && Array.isArray(recipesRes.value?.data)) {
-        const mappedRecipes = recipesRes.value.data.map((r) => ({
+        const cleanRecipeData = recipesRes.value.data.filter(
+          (r) => r.id !== '__APP_SECURITY__' && !r.model_name?.startsWith('__APP_')
+        );
+        const mappedRecipes = cleanRecipeData.map((r) => ({
           id: r.id,
           modelName: r.model_name || r.modelName,
           description: r.description || '',
