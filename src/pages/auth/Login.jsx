@@ -23,17 +23,25 @@ export default function Login() {
 
   return (
     <AuthWrapper>
-      <AuthCard>
-        <Stack spacing={2.5} alignItems="center">
-          {/* Centered Logo on top of Form */}
+      <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Centered Logo Outside Card */}
+        <Box
+          sx={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            mb: 3
+          }}
+        >
           <Box
             sx={{
-              width: 84,
-              height: 84,
-              minWidth: 84,
-              minHeight: 84,
-              maxWidth: 84,
-              maxHeight: 84,
+              width: 90,
+              height: 90,
+              minWidth: 90,
+              minHeight: 90,
+              maxWidth: 90,
+              maxHeight: 90,
               borderRadius: '50%',
               p: '4px',
               bgcolor: '#ffffff',
@@ -59,16 +67,19 @@ export default function Login() {
               }}
             />
           </Box>
+        </Box>
 
-          <Typography variant="h3" sx={{ fontWeight: 700, fontSize: '1.45rem', textAlign: 'center' }}>
-            Sign In
-          </Typography>
+        {/* Login Card */}
+        <AuthCard>
+          <Stack spacing={2.5}>
+            <Typography variant="h3" sx={{ fontWeight: 700, fontSize: '1.45rem' }}>
+              Sign In
+            </Typography>
 
-          <Box sx={{ width: '100%' }}>
             <AuthLogin />
-          </Box>
-        </Stack>
-      </AuthCard>
+          </Stack>
+        </AuthCard>
+      </Box>
     </AuthWrapper>
   );
 }
