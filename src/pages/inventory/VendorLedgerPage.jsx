@@ -30,11 +30,8 @@ import TeamOutlined from '@ant-design/icons/TeamOutlined';
 
 import MainCard from 'components/MainCard';
 import { useStoreInventory } from 'context/StoreInventoryContext';
-import rehmatLogo from 'assets/images/rehmat-logo.jpg';
-import { useTransparentLogo } from 'components/logo/LogoMain';
 
 export default function VendorLedgerPage() {
-  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { vendors, usageLogs, vendorPayments, addVendorPayment } = useStoreInventory();
 
   // Search State
@@ -376,7 +373,7 @@ export default function VendorLedgerPage() {
             @media print {
               @page {
                 size: A4 portrait;
-                margin: 6mm;
+                margin: 4mm 5mm;
               }
               body * {
                 visibility: hidden !important;
@@ -389,16 +386,21 @@ export default function VendorLedgerPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
-                padding: 10px !important;
+                padding: 60px 4px 6px 4px !important;
+                margin: 0 !important;
+                box-shadow: none !important;
               }
-              #printable-vendor-statement .watermark-logo {
-                top: 58% !important;
-                left: 50% !important;
-                transform: translate(-50%, -50%) !important;
-                width: 390px !important;
-                max-width: 70% !important;
-                opacity: 0.15 !important;
+              .MuiDialog-root,
+              .MuiDialog-container,
+              .MuiDialog-paper,
+              .MuiDialogContent-root {
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                overflow: visible !important;
+                box-shadow: none !important;
               }
+              .MuiBackdrop-root,
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
               .no-print,
@@ -414,92 +416,58 @@ export default function VendorLedgerPage() {
           <Chip label="Vendor Statement" color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
           {printVendorData && (
             <Box
               id="printable-vendor-statement"
               sx={{
                 position: 'relative',
                 overflow: 'hidden',
-                p: { xs: 2, sm: 3 },
+                pt: { xs: 5, sm: 7 },
+                px: { xs: 1, sm: 1.5 },
+                pb: { xs: 1, sm: 1.5 },
                 bgcolor: '#ffffff',
                 color: '#111827',
                 borderRadius: 1
               }}
             >
-              {/* 🏢 Watermark Background Logo */}
-              <Box
-                component="img"
-                className="watermark-logo"
-                src={transparentLogo || rehmatLogo}
-                alt="Watermark Logo"
-                sx={{
-                  position: 'absolute',
-                  top: '58%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: '390px',
-                  maxWidth: '70%',
-                  opacity: 0.15,
-                  pointerEvents: 'none',
-                  zIndex: 0
-                }}
-              />
-
               <Box sx={{ position: 'relative', zIndex: 1 }}>
-                {/* Brand Header with Emblem Logo */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
-                    <Box
-                      component="img"
-                      src={transparentLogo || rehmatLogo}
-                      alt="Rehmat Logo Emblem"
-                      sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
-                    />
-                    <Box sx={{ textAlign: 'left' }}>
-                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
-                        REHMAT LAWN MOWERS
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  {/* Structured Professional Vendor Account Details Card */}
+                {/* Structured Professional Vendor Account Details Card */}
                   <div style={{
                     border: '1.5px solid #111827',
                     borderRadius: '4px',
-                    marginBottom: '16px',
+                    marginBottom: '10px',
                     backgroundColor: 'rgba(255, 255, 255, 0.45)',
                     overflow: 'hidden'
                   }}>
                     <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
                       {/* Left Column: Vendor Details */}
-                      <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                      <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                           Vendor Account Details
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
                           {printVendorData.vendorName}
                         </div>
-                        <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                        <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
                           <div><strong>Phone:</strong> {printVendorData.phone || 'N/A'}</div>
                           {printVendorData.category && <div><strong>Category:</strong> {printVendorData.category}</div>}
                         </div>
                       </div>
 
                       {/* Right Column: Statement Meta */}
-                      <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                      <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 700 }}>Statement Type:</span>
-                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>Payable Ledger</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>Payable Ledger</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 600 }}>Statement Date:</span>
                           <span style={{ fontWeight: 700, color: '#374151' }}>
                             {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 600 }}>Total Shipments:</span>
                           <span style={{ fontWeight: 800, color: '#16a34a' }}>{printVendorData.totalShipmentsCount || 1} Entries</span>
                         </div>
@@ -508,55 +476,55 @@ export default function VendorLedgerPage() {
                   </div>
 
                   {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
                     <thead>
                       <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Sr</strong>
                         </th>
-                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Specification / Description</strong>
                         </th>
-                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>QTY / Count</strong>
                         </th>
-                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Amount Paid</strong>
                         </th>
-                        <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Total Purchases</strong>
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                           01
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
                           Vendor Cumulative Supply Invoices & Material Deliveries
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                           {String(printVendorData.totalShipmentsCount || 1).padStart(2, '0')}
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                           {(printVendorData.totalPaidVal || 0).toLocaleString()}
                         </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                           {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
                         </td>
                       </tr>
 
                       {/* Total Amount Bottom Row */}
                       <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
                           Total amount
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px', textAlign: 'right', fontWeight: 800 }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px', textAlign: 'right', fontWeight: 800, fontSize: '0.88rem' }}>
                           {(printVendorData.totalPaidVal || 0).toLocaleString()}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
                           {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
                         </td>
                       </tr>
@@ -564,18 +532,18 @@ export default function VendorLedgerPage() {
                   </table>
 
                   {/* Financial Summary Box */}
-                  <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                  <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
                     <Grid container spacing={1} alignItems="center">
                       <Grid item xs={6}>
-                        <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                        <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
                           TOTAL PAID TO VENDOR: Rs. {(printVendorData.totalPaidVal || 0).toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                        <Typography variant="h6" fontWeight={800} color="success.dark">
+                        <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                           NET PURCHASES: Rs. {(printVendorData.totalPurchasesVal || 0).toLocaleString()}
                         </Typography>
-                        <Typography variant="subtitle2" fontWeight={800} color={(printVendorData.balanceVal || 0) > 0 ? 'error.main' : 'success.main'}>
+                        <Typography variant="caption" fontWeight={800} color={(printVendorData.balanceVal || 0) > 0 ? 'error.main' : 'success.main'} display="block">
                           {(printVendorData.balanceVal || 0) > 0 ? `OUTSTANDING PAYABLE BALANCE: Rs. ${(printVendorData.balanceVal || 0).toLocaleString()}` : 'FULL CLEARED (NO BALANCE DUE)'}
                         </Typography>
                       </Grid>
@@ -583,9 +551,9 @@ export default function VendorLedgerPage() {
                   </Box>
 
                   {/* Signatures Footer */}
-                  <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                  <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <Grid item xs={6}>
-                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                         Vendor Signature
                       </Typography>
                     </Grid>

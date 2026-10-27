@@ -50,8 +50,6 @@ import {
 
 // project imports
 import MainCard from 'components/MainCard';
-import rehmatLogo from 'assets/images/rehmat-logo.jpg';
-import { useTransparentLogo } from 'components/logo/LogoMain';
 
 const defaultMachineModels = [
   'Rehmat 20" Lawn Mower (Petrol Engine)',
@@ -90,7 +88,6 @@ const formatInvoiceNo = (sale) => {
 };
 
 export default function MachineSalesPage() {
-  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { canDelete, canEditPrice } = usePermission();
   const {
     machineSales = [],
@@ -299,31 +296,31 @@ export default function MachineSalesPage() {
 
     const itemsList = (editingSale.items && editingSale.items.length > 0)
       ? editingSale.items.map((i) => {
-          const q = parseInt(i.qty) || 1;
-          const p = parseFloat(i.unitPrice) || 0;
-          const discPercent = parseFloat(i.discount) || 0;
-          const gross = q * p;
-          const discAmount = (gross * discPercent) / 100;
-          const lineTotal = Math.max(0, gross - discAmount);
-          return {
-            machineName: i.machineName || 'Machine',
-            serialNo: i.serialNo || '',
-            qty: q,
-            unitPrice: p,
-            discount: discPercent,
-            discountAmount: discAmount,
-            lineTotal
-          };
-        })
+        const q = parseInt(i.qty) || 1;
+        const p = parseFloat(i.unitPrice) || 0;
+        const discPercent = parseFloat(i.discount) || 0;
+        const gross = q * p;
+        const discAmount = (gross * discPercent) / 100;
+        const lineTotal = Math.max(0, gross - discAmount);
+        return {
+          machineName: i.machineName || 'Machine',
+          serialNo: i.serialNo || '',
+          qty: q,
+          unitPrice: p,
+          discount: discPercent,
+          discountAmount: discAmount,
+          lineTotal
+        };
+      })
       : [{
-          machineName: editingSale.machineName,
-          serialNo: editingSale.serialNo,
-          qty: parseInt(editingSale.qty) || 1,
-          unitPrice: parseFloat(editingSale.unitPrice) || 0,
-          discount: parseFloat(editingSale.discount) || 0,
-          discountAmount: (((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100,
-          lineTotal: Math.max(0, ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) - ((((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100))
-        }];
+        machineName: editingSale.machineName,
+        serialNo: editingSale.serialNo,
+        qty: parseInt(editingSale.qty) || 1,
+        unitPrice: parseFloat(editingSale.unitPrice) || 0,
+        discount: parseFloat(editingSale.discount) || 0,
+        discountAmount: (((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100,
+        lineTotal: Math.max(0, ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) - ((((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100))
+      }];
 
     const subTotal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
     const discSum = itemsList.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
@@ -470,7 +467,7 @@ export default function MachineSalesPage() {
 
             {/* ROW 2: Multi-Item Machine Rows Section */}
             <Grid size={{ xs: 12 }}>
-              <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc'), borderRadius: 1.5, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'), borderRadius: 1.5, border: '1px solid', borderColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : '#e2e8f0') }}>
                 <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, color: 'primary.main' }}>
                   Machines Purchased ({form.items.length} Items)
                 </Typography>
@@ -1151,7 +1148,7 @@ export default function MachineSalesPage() {
             @media print {
               @page {
                 size: A4 portrait;
-                margin: 6mm;
+                margin: 4mm 5mm;
               }
               body * {
                 visibility: hidden !important;
@@ -1164,18 +1161,21 @@ export default function MachineSalesPage() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
-                padding: 10px !important;
+                padding: 150px 4px 6px 4px !important;
                 margin: 0 !important;
                 box-shadow: none !important;
               }
-              #printable-machine-invoice .watermark-logo {
-                top: 58% !important;
-                left: 50% !important;
-                transform: translate(-50%, -50%) !important;
-                width: 390px !important;
-                max-width: 70% !important;
-                opacity: 0.15 !important;
+              .MuiDialog-root,
+              .MuiDialog-container,
+              .MuiDialog-paper,
+              .MuiDialogContent-root {
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                overflow: visible !important;
+                box-shadow: none !important;
               }
+              .MuiBackdrop-root,
               .MuiDialogActions-root,
               .MuiDialogTitle-root,
               .no-print,
@@ -1191,7 +1191,7 @@ export default function MachineSalesPage() {
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
+        <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
           {printData && (() => {
             const displayItems = (printData.items && printData.items.length > 0) ? printData.items : [
               {
@@ -1209,83 +1209,49 @@ export default function MachineSalesPage() {
                 sx={{
                   position: 'relative',
                   overflow: 'hidden',
-                  p: { xs: 2, sm: 3 },
+                  pt: { xs: 5, sm: 7 },
+                  px: { xs: 1, sm: 1.5 },
+                  pb: { xs: 1, sm: 1.5 },
                   bgcolor: '#ffffff',
                   color: '#111827',
                   borderRadius: 1
                 }}
               >
-                {/* 🏢 Watermark Background Logo */}
-                <Box
-                  component="img"
-                  className="watermark-logo"
-                  src={transparentLogo || rehmatLogo}
-                  alt="Watermark Logo"
-                  sx={{
-                    position: 'absolute',
-                    top: '58%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '390px',
-                    maxWidth: '70%',
-                    opacity: 0.15,
-                    pointerEvents: 'none',
-                    zIndex: 0
-                  }}
-                />
-
                 <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  {/* Brand Header with Emblem Logo */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
-                    <Box
-                      component="img"
-                      src={transparentLogo || rehmatLogo}
-                      alt="Rehmat Logo Emblem"
-                      sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
-                    />
-                    <Box sx={{ textAlign: 'left' }}>
-                      <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
-                        REHMAT LAWN MOWERS
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Divider sx={{ my: 1.5 }} />
-
                   {/* Structured Professional Customer & Invoice Metadata Card */}
                   <div style={{
                     border: '1.5px solid #111827',
                     borderRadius: '4px',
-                    marginBottom: '16px',
+                    marginBottom: '10px',
                     backgroundColor: 'rgba(255, 255, 255, 0.45)',
                     overflow: 'hidden'
                   }}>
                     <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
                       {/* Left Column: Customer Details */}
-                      <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                      <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                           Customer Details
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
                           {printData.customerName}
                         </div>
-                        <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+                        <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
                           {printData.customerPhone && <div><strong>Phone:</strong> {printData.customerPhone}</div>}
                           {printData.cityAddress && <div><strong>City / Address:</strong> {printData.cityAddress}</div>}
                         </div>
                       </div>
 
                       {/* Right Column: Invoice Meta */}
-                      <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                      <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
-                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.95rem' }}>{formatInvoiceNo(printData)}</span>
+                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{formatInvoiceNo(printData)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
                           <span style={{ fontWeight: 700, color: '#374151' }}>{printData.time}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
                           <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
                           <span style={{ fontWeight: 800, color: printData.paymentStatus === 'Paid' ? '#16a34a' : '#d97706' }}>
                             {printData.paymentStatus || 'Paid'}
@@ -1296,7 +1262,7 @@ export default function MachineSalesPage() {
 
                     {/* Machine Model Highlight Strip */}
                     {printData.machineName && (
-                      <div style={{ padding: '7px 14px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.88rem' }}>
+                      <div style={{ padding: '4px 10px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.82rem' }}>
                         <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Sales Category:</span>
                         <span style={{ fontWeight: 800, color: '#111827' }}>{printData.machineName}</span>
                       </div>
@@ -1304,22 +1270,22 @@ export default function MachineSalesPage() {
                   </div>
 
                   {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
                     <thead>
                       <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Sr</strong>
                         </th>
-                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Specification / Model</strong>
                         </th>
-                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>QTY</strong>
                         </th>
-                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Rate</strong>
                         </th>
-                        <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                           <strong>Total Amount</strong>
                         </th>
                       </tr>
@@ -1334,19 +1300,19 @@ export default function MachineSalesPage() {
 
                         return (
                           <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                               {String(idx + 1).padStart(2, '0')}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
                               {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                               {String(q).padStart(2, '0')}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                               {p.toLocaleString()}
                             </td>
-                            <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                            <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                               {lineAmt.toLocaleString()}
                             </td>
                           </tr>
@@ -1355,12 +1321,12 @@ export default function MachineSalesPage() {
 
                       {/* Total Amount Bottom Row */}
                       <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
                           Total amount
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
                           {(printData.lineTotal || 0).toLocaleString()}
                         </td>
                       </tr>
@@ -1368,18 +1334,18 @@ export default function MachineSalesPage() {
                   </table>
 
                   {/* Financial Summary Box */}
-                  <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+                  <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
                     <Grid container spacing={1} alignItems="center">
                       <Grid size={{ xs: 6 }}>
-                        <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                        <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
                           PAID AMOUNT: Rs. {(printData.paidAmount || 0).toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                        <Typography variant="h6" fontWeight={800} color="success.dark">
+                        <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                           NET TOTAL: Rs. {(printData.lineTotal || 0).toLocaleString()}
                         </Typography>
-                        <Typography variant="subtitle2" fontWeight={800} color={(printData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}>
+                        <Typography variant="caption" fontWeight={800} color={(printData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'} display="block">
                           {(printData.balanceAmount || 0) > 0 ? `REMAINING DUE: Rs. ${(printData.balanceAmount || 0).toLocaleString()}` : 'FULL PAID (NO DUES)'}
                         </Typography>
                       </Grid>
@@ -1387,9 +1353,9 @@ export default function MachineSalesPage() {
                   </Box>
 
                   {/* Signatures Footer */}
-                  <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+                  <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <Grid size={{ xs: 6 }}>
-                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                         Customer Signature
                       </Typography>
                     </Grid>

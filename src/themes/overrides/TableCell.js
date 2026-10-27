@@ -1,18 +1,8 @@
 // ==============================|| OVERRIDES - TABLE CELL ||============================== //
 
 export default function TableCell(theme) {
-  const commonCell = {
-    fontSize: '0.75rem',
-    textTransform: 'uppercase',
-    '&:not(:last-of-type)': {
-      backgroundImage: `linear-gradient(${theme.vars.palette.divider}, ${theme.vars.palette.divider})`,
-      backgroundRepeat: 'no-repeat',
-      /* 1px wide, shorter than full height */
-      backgroundSize: '1px calc(100% - 30px)',
-      /* 16px from top */
-      backgroundPosition: 'right 16px'
-    }
-  };
+  const isDark = theme.palette.mode === 'dark';
+  const dividerColor = isDark ? '#1e293b' : theme.vars.palette.divider;
 
   return {
     MuiTableCell: {
@@ -20,8 +10,10 @@ export default function TableCell(theme) {
         root: ({ ownerState }) => {
           const baseStyle = {
             fontSize: '0.875rem',
-            padding: 12,
-            borderColor: theme.vars.palette.divider
+            padding: '12px 16px',
+            borderColor: dividerColor,
+            borderBottom: `1px solid ${dividerColor}`,
+            color: isDark ? '#f8fafc' : 'inherit'
           };
 
           const align = ownerState.align;
@@ -55,9 +47,18 @@ export default function TableCell(theme) {
 
           return baseStyle;
         },
-        sizeSmall: { padding: 8 },
-        head: { fontWeight: 700, ...commonCell },
-        footer: { ...commonCell }
+        sizeSmall: { padding: '8px 12px' },
+        head: {
+          fontWeight: 600,
+          fontSize: '0.75rem',
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: isDark ? '#94a3b8' : theme.vars.palette.text.secondary
+        },
+        footer: {
+          fontSize: '0.75rem',
+          color: isDark ? '#94a3b8' : theme.vars.palette.text.secondary
+        }
       }
     }
   };

@@ -49,7 +49,8 @@ export default function MainDrawer({ window }) {
                 boxSizing: 'border-box',
                 width: DRAWER_WIDTH,
                 borderRight: '1px solid',
-                borderRightColor: 'divider',
+                borderRightColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : 'divider'),
+                bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0f172a' : 'background.paper'),
                 boxShadow: 'inherit'
               }
             }

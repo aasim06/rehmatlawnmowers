@@ -13,9 +13,11 @@ import Paper from '@mui/material/Paper';
 import LockOutlined from '@ant-design/icons/LockOutlined';
 import DashboardOutlined from '@ant-design/icons/DashboardOutlined';
 import RollbackOutlined from '@ant-design/icons/RollbackOutlined';
+import CrownOutlined from '@ant-design/icons/CrownOutlined';
 
 // hooks & components
 import usePermission from 'hooks/usePermission';
+import { useAuth } from 'context/AuthContext';
 import MainCard from 'components/MainCard';
 
 /**
@@ -66,6 +68,7 @@ RoleGuard.propTypes = {
  * Polished, user-friendly fallback view when access is prohibited.
  */
 function AccessDeniedView({ role, permissionKey, reason, navigate }) {
+  const { switchUserRole } = useAuth();
   const readableTitle = permissionKey
     ? permissionKey.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : reason || 'Restricted Section';
@@ -107,8 +110,8 @@ function AccessDeniedView({ role, permissionKey, reason, navigate }) {
             <Typography variant="h3" fontWeight={800} color="error.main" gutterBottom>
               Access Restricted
             </Typography>
-            <Typography variant="h6" fontWeight={600} color="textSecondary">
-              رسائی محدود ہے — اجازت درکار ہے
+            <Typography variant="body1" fontWeight={600} color="textSecondary">
+              Authorization Required
             </Typography>
           </Box>
 
@@ -145,31 +148,48 @@ function AccessDeniedView({ role, permissionKey, reason, navigate }) {
           </Paper>
 
           <Typography variant="body2" color="textSecondary">
-            Your current user account does not have authorization to view this module. If you require access, please contact the <strong>Super Admin</strong>.
+            Your current account role is <strong>{role}</strong>, which does not have access to this section. You can restore Super Admin access with one click below.
           </Typography>
 
-          {/* Navigation Action Buttons */}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: '100%', pt: 1 }}>
+          {/* Action Buttons */}
+          <Stack spacing={1.5} sx={{ width: '100%', pt: 1 }}>
             <Button
               fullWidth
-              variant="outlined"
-              color="secondary"
-              startIcon={<RollbackOutlined />}
-              onClick={() => navigate(-1)}
-              sx={{ fontWeight: 700, borderRadius: 2 }}
-            >
-              Go Back
-            </Button>
-            <Button
-              fullWidth
+              size="large"
               variant="contained"
               color="primary"
-              startIcon={<DashboardOutlined />}
-              onClick={() => navigate('/dashboard/default')}
-              sx={{ fontWeight: 700, borderRadius: 2 }}
+              startIcon={<CrownOutlined />}
+              onClick={() => {
+                switchUserRole('Super Admin');
+                navigate('/dashboard/default');
+              }}
+              sx={{ fontWeight: 700, borderRadius: 2, py: 1.2 }}
             >
-              Go to Dashboard
+              Restore Super Admin Access
             </Button>
+
+            <Stack direction="row" spacing={1.5}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="secondary"
+                startIcon={<RollbackOutlined />}
+                onClick={() => navigate(-1)}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                Go Back
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="info"
+                startIcon={<DashboardOutlined />}
+                onClick={() => navigate(role === 'Store Keeper' ? '/inventory/items' : '/dashboard/default')}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                {role === 'Store Keeper' ? 'Go to Store Items' : 'Go to Dashboard'}
+              </Button>
+            </Stack>
           </Stack>
         </Stack>
       </MainCard>

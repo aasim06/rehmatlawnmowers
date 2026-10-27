@@ -1,5 +1,5 @@
-import PropTypes from 'prop-types';
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -10,16 +10,17 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Paper from '@mui/material/Paper';
 import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 
 // project imports
-import ProfileTab from './ProfileTab';
-import SettingTab from './SettingTab';
 import Avatar from 'components/@extended/Avatar';
 import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
@@ -28,32 +29,19 @@ import { useAuth } from 'context/AuthContext';
 
 // assets
 import LogoutOutlined from '@ant-design/icons/LogoutOutlined';
-import SettingOutlined from '@ant-design/icons/SettingOutlined';
 import UserOutlined from '@ant-design/icons/UserOutlined';
 import CrownOutlined from '@ant-design/icons/CrownOutlined';
 import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
+import TeamOutlined from '@ant-design/icons/TeamOutlined';
+import CloudSyncOutlined from '@ant-design/icons/CloudSyncOutlined';
+import DashboardOutlined from '@ant-design/icons/DashboardOutlined';
 import avatar1 from 'assets/images/users/avatar-1.png';
 
-// tab panel wrapper
-function TabPanel({ children, value, index, ...other }) {
-  return (
-    <div role="tabpanel" hidden={value !== index} id={`profile-tabpanel-${index}`} aria-labelledby={`profile-tab-${index}`} {...other}>
-      {value === index && children}
-    </div>
-  );
-}
-
-function a11yProps(index) {
-  return {
-    id: `profile-tab-${index}`,
-    'aria-controls': `profile-tabpanel-${index}`
-  };
-}
-
-// ==============================|| HEADER CONTENT - PROFILE ||============================== //
+// ==============================|| HEADER CONTENT - CLEAN ERP PROFILE ||============================== //
 
 export default function Profile() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { user, logout, switchUserRole } = useAuth();
 
   const anchorRef = useRef(null);
@@ -69,23 +57,21 @@ export default function Profile() {
     setOpen(false);
   };
 
-  const [value, setValue] = useState(0);
-
-  const handleChange = (event, newValue) => {
-    setValue(newValue);
-  };
-
   const userEmail = user?.email || 'admin@rehmat.com';
   const userRole = user?.role || 'Super Admin';
-  const isSuperAdminUser = userRole === 'Super Admin' || userEmail.toLowerCase() === 'admin@rehmat.com' || user?.id === 'USR-1';
 
   return (
     <Box sx={{ flexShrink: 0, ml: 'auto' }}>
-      <Tooltip title="Profile" disableInteractive>
+      <Tooltip title="Profile & Account" disableInteractive>
         <ButtonBase
           sx={(theme) => ({
-            p: 0.25,
-            borderRadius: 1,
+            p: 0.5,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: open ? 'primary.main' : 'divider',
+            bgcolor: open ? 'action.hover' : 'transparent',
+            transition: 'all 0.2s ease',
+            '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
             '&:focus-visible': { outline: `2px solid ${theme.vars.palette.secondary.dark}`, outlineOffset: 2 }
           })}
           aria-label="open profile"
@@ -94,9 +80,9 @@ export default function Profile() {
           aria-haspopup="true"
           onClick={handleToggle}
         >
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ p: 0.5 }}>
-            <Avatar alt="profile user" src={avatar1} size="sm" sx={{ '&:hover': { outline: '1px solid', outlineColor: 'primary.main' } }} />
-            <Typography variant="subtitle1" sx={{ textTransform: 'capitalize' }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 0.5 }}>
+            <Avatar alt="profile user" src={avatar1} size="sm" sx={{ width: 30, height: 30 }} />
+            <Typography variant="subtitle2" fontWeight={700} sx={{ textTransform: 'capitalize', color: 'text.primary' }}>
               {userRole}
             </Typography>
           </Stack>
@@ -114,7 +100,7 @@ export default function Profile() {
             {
               name: 'offset',
               options: {
-                offset: [0, 9]
+                offset: [0, 8]
               }
             }
           ]
@@ -122,41 +108,55 @@ export default function Profile() {
       >
         {({ TransitionProps }) => (
           <Transitions type="grow" position="top-right" in={open} {...TransitionProps}>
-            <Paper sx={(theme) => ({ boxShadow: theme.vars.customShadows.z1, width: 310, minWidth: 260, maxWidth: { xs: 280, md: 310 } })}>
+            <Paper
+              sx={(theme) => ({
+                boxShadow: theme.vars.customShadows.z1,
+                width: 300,
+                borderRadius: 2.5,
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'divider'
+              })}
+            >
               <ClickAwayListener onClickAway={handleClose}>
                 <MainCard elevation={0} border={false} content={false}>
-                  <CardContent sx={{ px: 2.5, pt: 3, pb: 2 }}>
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center' }}>
-                        <Avatar alt="profile user" src={avatar1} sx={{ width: 36, height: 36 }} />
-                        <Stack>
-                          <Typography variant="subtitle1" fontWeight={700} sx={{ wordBreak: 'break-all' }}>
-                            {user?.name || userEmail}
-                          </Typography>
-                          <Stack direction="row" spacing={0.5} alignItems="center">
-                            <Chip
-                              size="small"
-                              label={userRole}
-                              color={userRole === 'Super Admin' ? 'primary' : userRole === 'Admin' ? 'info' : 'warning'}
-                              sx={{ fontWeight: 700, height: 20, fontSize: '0.7rem' }}
-                            />
-                          </Stack>
-                        </Stack>
-                      </Stack>
-                      <Tooltip title="Logout">
-                        <IconButton size="large" sx={{ color: 'text.primary' }} onClick={logout}>
+                  {/* User Profile Header Card */}
+                  <CardContent sx={{ p: 2, pb: 1.5 }}>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar alt="profile user" src={avatar1} sx={{ width: 44, height: 44, border: '2px solid', borderColor: 'primary.lighter' }} />
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography variant="subtitle1" fontWeight={700} noWrap>
+                          {user?.name || 'Sabeel (Super Admin)'}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" noWrap display="block" sx={{ mb: 0.5 }}>
+                          {userEmail}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={userRole}
+                          color={userRole === 'Super Admin' ? 'primary' : userRole === 'Admin' ? 'info' : 'warning'}
+                          sx={{ fontWeight: 700, height: 20, fontSize: '0.7rem' }}
+                        />
+                      </Box>
+                      <Tooltip title="Sign Out">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            setOpen(false);
+                            logout();
+                          }}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}
+                        >
                           <LogoutOutlined />
                         </IconButton>
                       </Tooltip>
                     </Stack>
 
-                    {/* 👑 Role Switcher for Super Admin Testing */}
-                    {isSuperAdminUser && userRole === 'Super Admin' && (
-                      <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
-                        <Typography variant="caption" fontWeight={700} color="textSecondary" sx={{ display: 'block', mb: 1 }}>
-                          👑 PREVIEW ROLE DASHBOARD:
-                        </Typography>
-                        <Stack spacing={1}>
+                    {/* Role Preview Switcher for Super Admin Testing */}
+                    {userRole === 'Super Admin' && (
+                      <Box sx={{ mt: 1.5, p: 1.25, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" spacing={1}>
                           <Button
                             fullWidth
                             size="small"
@@ -167,9 +167,9 @@ export default function Profile() {
                               switchUserRole('Admin');
                               setOpen(false);
                             }}
-                            sx={{ fontWeight: 700, justifyContent: 'flex-start', py: 0.5 }}
+                            sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.4, borderRadius: 1.5 }}
                           >
-                            Preview As Store Admin
+                            Admin
                           </Button>
                           <Button
                             fullWidth
@@ -181,17 +181,17 @@ export default function Profile() {
                               switchUserRole('Store Keeper');
                               setOpen(false);
                             }}
-                            sx={{ fontWeight: 700, justifyContent: 'flex-start', py: 0.5 }}
+                            sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.4, borderRadius: 1.5 }}
                           >
-                            Preview As Store Keeper
+                            Store Keeper
                           </Button>
                         </Stack>
                       </Box>
                     )}
 
-                    {/* Return to Super Admin Button if owner switched roles */}
-                    {isSuperAdminUser && userRole !== 'Super Admin' && (
-                      <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                    {/* Return to Super Admin Button if currently previewing another role */}
+                    {userRole !== 'Super Admin' && (
+                      <Box sx={{ mt: 1.5 }}>
                         <Button
                           fullWidth
                           size="small"
@@ -202,7 +202,7 @@ export default function Profile() {
                             switchUserRole('Super Admin');
                             setOpen(false);
                           }}
-                          sx={{ fontWeight: 700, py: 0.75 }}
+                          sx={{ fontWeight: 700, py: 0.75, borderRadius: 1.5 }}
                         >
                           Restore Super Admin
                         </Button>
@@ -210,48 +210,74 @@ export default function Profile() {
                     )}
                   </CardContent>
 
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tabs variant="fullWidth" value={value} onChange={handleChange} aria-label="profile tabs">
-                      <Tab
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          textTransform: 'capitalize',
-                          gap: 1.25,
-                          '& .MuiTab-icon': {
-                            marginBottom: 0
-                          }
+                  <Divider />
+
+                  {/* Clean ERP Navigation Quick Links */}
+                  <List component="nav" sx={{ p: 0.75, '& .MuiListItemIcon-root': { minWidth: 32 } }}>
+                    <ListItemButton
+                      sx={{ borderRadius: 1.5, py: 0.75 }}
+                      onClick={() => {
+                        navigate('/dashboard/default');
+                        setOpen(false);
+                      }}
+                    >
+                      <ListItemIcon>
+                        <DashboardOutlined style={{ fontSize: 16 }} />
+                      </ListItemIcon>
+                      <ListItemText primary={<Typography variant="body2" fontWeight={600}>Main Dashboard</Typography>} />
+                    </ListItemButton>
+
+                    {userRole === 'Super Admin' && (
+                      <ListItemButton
+                        sx={{ borderRadius: 1.5, py: 0.75 }}
+                        onClick={() => {
+                          navigate('/inventory/user-management');
+                          setOpen(false);
                         }}
-                        icon={<UserOutlined />}
-                        label="Profile"
-                        {...a11yProps(0)}
-                      />
-                      <Tab
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          textTransform: 'capitalize',
-                          gap: 1.25,
-                          '& .MuiTab-icon': {
-                            marginBottom: 0
-                          }
-                        }}
-                        icon={<SettingOutlined />}
-                        label="Setting"
-                        {...a11yProps(1)}
-                      />
-                    </Tabs>
+                      >
+                        <ListItemIcon>
+                          <TeamOutlined style={{ fontSize: 16 }} />
+                        </ListItemIcon>
+                        <ListItemText primary={<Typography variant="body2" fontWeight={600}>Staff & Access Control</Typography>} />
+                      </ListItemButton>
+                    )}
+
+                    <ListItemButton
+                      sx={{ borderRadius: 1.5, py: 0.75 }}
+                      onClick={() => {
+                        navigate('/inventory/backup-restore');
+                        setOpen(false);
+                      }}
+                    >
+                      <ListItemIcon>
+                        <CloudSyncOutlined style={{ fontSize: 16 }} />
+                      </ListItemIcon>
+                      <ListItemText primary={<Typography variant="body2" fontWeight={600}>Data Backup & Cloud</Typography>} />
+                    </ListItemButton>
+                  </List>
+
+                  <Divider />
+
+                  {/* Sign Out Action Button */}
+                  <Box sx={{ p: 0.75 }}>
+                    <ListItemButton
+                      sx={{
+                        borderRadius: 1.5,
+                        py: 0.75,
+                        color: 'error.main',
+                        '&:hover': { bgcolor: 'error.lighter' }
+                      }}
+                      onClick={() => {
+                        setOpen(false);
+                        logout();
+                      }}
+                    >
+                      <ListItemIcon sx={{ color: 'inherit' }}>
+                        <LogoutOutlined style={{ fontSize: 16 }} />
+                      </ListItemIcon>
+                      <ListItemText primary={<Typography variant="body2" fontWeight={700}>Sign Out</Typography>} />
+                    </ListItemButton>
                   </Box>
-                  <TabPanel value={value} index={0} dir={theme.direction}>
-                    <ProfileTab />
-                  </TabPanel>
-                  <TabPanel value={value} index={1} dir={theme.direction}>
-                    <SettingTab />
-                  </TabPanel>
                 </MainCard>
               </ClickAwayListener>
             </Paper>
@@ -261,5 +287,3 @@ export default function Profile() {
     </Box>
   );
 }
-
-TabPanel.propTypes = { children: PropTypes.node, value: PropTypes.number, index: PropTypes.number, other: PropTypes.any };

@@ -102,7 +102,8 @@ export default function IncomeAreaChart({ view }) {
   const stockInData = view === 'monthly' ? stockInMonthly : stockInWeekly;
   const stockOutData = view === 'monthly' ? stockOutMonthly : stockOutWeekly;
 
-  const line = theme.vars.palette.divider;
+  const isDark = theme.palette.mode === 'dark';
+  const gridLineColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
   const toggleVisibility = (label) => {
     setVisibility((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -115,7 +116,7 @@ export default function IncomeAreaChart({ view }) {
       showMark: false,
       area: true,
       id: 'stock-in',
-      color: theme.vars.palette.primary.main || '#0096D6',
+      color: '#0ea5e9',
       visible: visibility['Stock In (Receiving)']
     },
     {
@@ -124,7 +125,7 @@ export default function IncomeAreaChart({ view }) {
       showMark: false,
       area: true,
       id: 'stock-out',
-      color: theme.vars.palette.primary[700] || '#00578A',
+      color: '#6366f1',
       visible: visibility['Stock Out (Issuance)']
     }
   ];
@@ -152,24 +153,24 @@ export default function IncomeAreaChart({ view }) {
             strokeWidth: 2
           }))}
         sx={{
-          [`& .${chartsGridClasses.line}`]: { strokeDasharray: '4 4', stroke: line },
+          [`& .${chartsGridClasses.line}`]: { strokeDasharray: '4 4', stroke: `${gridLineColor} !important` },
           [`& .${lineClasses.area}`]: {
-            '&[data-series-id="stock-in"]': { fill: "url('#myGradient1')", strokeWidth: 2, opacity: 0.8 },
-            '&[data-series-id="stock-out"]': { fill: "url('#myGradient2')", strokeWidth: 2, opacity: 0.8 }
+            '&[data-series-id="stock-in"]': { fill: "url('#myGradient1')", strokeWidth: 2 },
+            '&[data-series-id="stock-out"]': { fill: "url('#myGradient2')", strokeWidth: 2 }
           },
           [`& .${axisClasses.root}.${axisClasses.directionX} .${axisClasses.tick}`]: { stroke: 'transparent' },
           [`& .${axisClasses.root}.${axisClasses.directionY} .${axisClasses.tick}`]: { stroke: 'transparent' },
-          [`& .${axisClasses.root} .${axisClasses.tickLabel}`]: { fill: `${theme.palette.text.secondary} !important` }
+          [`& .${axisClasses.root} .${axisClasses.tickLabel}`]: { fill: `${isDark ? '#94a3b8' : theme.palette.text.secondary} !important` }
         }}
       >
         <defs>
-          <linearGradient id="myGradient1" gradientTransform="rotate(90)">
-            <stop offset="10%" stopColor={withAlpha(theme.vars.palette.primary.main, 0.4)} />
-            <stop offset="90%" stopColor={withAlpha(theme.vars.palette.background.default, 0.4)} />
+          <linearGradient id="myGradient1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.22} />
+            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
           </linearGradient>
-          <linearGradient id="myGradient2" gradientTransform="rotate(90)">
-            <stop offset="10%" stopColor={withAlpha(theme.vars.palette.primary.main, 0.4)} />
-            <stop offset="90%" stopColor={withAlpha(theme.vars.palette.background.default, 0.4)} />
+          <linearGradient id="myGradient2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.22} />
+            <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
           </linearGradient>
         </defs>
       </LineChart>

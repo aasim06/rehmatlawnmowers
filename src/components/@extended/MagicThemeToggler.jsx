@@ -30,12 +30,12 @@ export default function MagicThemeToggler() {
           cursor: 'pointer',
           userSelect: 'none',
           background: isDark
-            ? 'linear-gradient(135deg, #18181b 0%, #27272a 100%)'
+            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
             : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
           border: '1px solid',
-          borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(203, 213, 225, 0.8)',
+          borderColor: isDark ? '#1e293b' : 'rgba(203, 213, 225, 0.8)',
           boxShadow: isDark
-            ? '0 2px 10px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+            ? '0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
             : '0 2px 10px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.8)',
           transition: 'all 0.3s ease'
         }}
@@ -59,7 +59,7 @@ export default function MagicThemeToggler() {
             height: 26,
             borderRadius: '50%',
             background: isDark
-              ? 'linear-gradient(135deg, #3f3f46 0%, #18181b 100%)'
+              ? 'linear-gradient(135deg, #334155 0%, #1e293b 100%)'
               : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
             boxShadow: isDark
               ? '0 2px 8px rgba(0, 0, 0, 0.6)'

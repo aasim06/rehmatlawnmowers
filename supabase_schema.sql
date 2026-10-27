@@ -147,6 +147,28 @@ CREATE TABLE IF NOT EXISTS public.categories (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 11. Workshop Expenses Table
+CREATE TABLE IF NOT EXISTS public.expenses (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  category TEXT DEFAULT 'General',
+  amount NUMERIC DEFAULT 0,
+  payment_method TEXT DEFAULT 'Cash',
+  paid_to TEXT,
+  expense_date TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 12. Machine BOM Recipes Table
+CREATE TABLE IF NOT EXISTS public.machine_recipes (
+  id TEXT PRIMARY KEY,
+  model_name TEXT NOT NULL,
+  description TEXT,
+  ingredients JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ====================================================================
@@ -160,6 +182,8 @@ ALTER TABLE public.machine_models ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.machine_recipes ENABLE ROW LEVEL SECURITY;
 
 -- Allow anonymous public read/write access for seamless sync
 DROP POLICY IF EXISTS "Public Read/Write Store Items" ON public.store_items;
@@ -192,6 +216,12 @@ CREATE POLICY "Public Read/Write Vendor Payments" ON public.vendor_payments FOR 
 DROP POLICY IF EXISTS "Public Read/Write Categories" ON public.categories;
 CREATE POLICY "Public Read/Write Categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public Read/Write Expenses" ON public.expenses;
+CREATE POLICY "Public Read/Write Expenses" ON public.expenses FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Read/Write Machine Recipes" ON public.machine_recipes;
+CREATE POLICY "Public Read/Write Machine Recipes" ON public.machine_recipes FOR ALL USING (true) WITH CHECK (true);
+
 -- ====================================================================
 -- REALTIME REPLICATION (For instant sync across devices)
 -- ====================================================================
@@ -205,3 +235,5 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.machine_models;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.customer_payments;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.vendor_payments;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.expenses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.machine_recipes;

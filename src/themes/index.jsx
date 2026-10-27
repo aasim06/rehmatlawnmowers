@@ -40,6 +40,7 @@ export default function ThemeCustomization({ children }) {
       typography: themeTypography,
       palette: currentPalette,
       customShadows: CustomShadows(currentPalette),
+      defaultColorScheme: mode,
       colorSchemes: {
         light: { palette: palettes.light },
         dark: { palette: palettes.dark }
@@ -49,7 +50,7 @@ export default function ThemeCustomization({ children }) {
         colorSchemeSelector: 'data-color-scheme'
       }
     }),
-    [themeTypography, palettes, currentPalette]
+    [themeTypography, palettes, currentPalette, mode]
   );
 
   const themes = createTheme(themeOptions);
@@ -57,7 +58,7 @@ export default function ThemeCustomization({ children }) {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider disableTransitionOnChange theme={themes}>
+      <ThemeProvider disableTransitionOnChange theme={themes} defaultColorScheme={mode}>
         <CssBaseline enableColorScheme />
         {children}
       </ThemeProvider>

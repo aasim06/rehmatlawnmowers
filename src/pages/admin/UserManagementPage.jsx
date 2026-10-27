@@ -10,6 +10,7 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
 import {
+  Avatar,
   Box,
   Button,
   Chip,
@@ -85,8 +86,7 @@ export default function UserManagementPage() {
     deleteStaffUser,
     updateStaffUser,
     updateUserPermissions,
-    user: activeUser,
-    switchUserRole
+    user: activeUser
   } = useAuth();
   const { auditLogs = [] } = useStoreInventory();
 
@@ -250,25 +250,57 @@ export default function UserManagementPage() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 5 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} alignItems={{ xs: 'stretch', sm: 'center' }}>
-              <Chip
-                avatar={<UserOutlined />}
-                label={`Logged as: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'Super Admin'})`}
-                color={activeUser?.role === 'Super Admin' ? 'primary' : activeUser?.role === 'Admin' ? 'info' : 'warning'}
-                variant="outlined"
-                sx={{ fontWeight: 700, p: 0.5, py: 1 }}
-              />
-              {activeUser?.role === 'Super Admin' && (
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  size="small"
-                  onClick={() => switchUserRole('Store Keeper')}
-                  sx={{ fontWeight: 600, width: { xs: '100%', sm: 'auto' } }}
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+              alignItems="center"
+            >
+              {/* Professional Active User Badge */}
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  px: 1.75,
+                  py: 0.85,
+                  borderRadius: 2.5,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'),
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  width: { xs: '100%', sm: 'auto' }
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: activeUser?.role === 'Super Admin' ? 'primary.main' : activeUser?.role === 'Admin' ? 'info.main' : 'warning.main',
+                    color: '#fff',
+                    fontSize: '0.85rem'
+                  }}
                 >
-                  Test As Store Keeper
-                </Button>
-              )}
+                  {activeUser?.role === 'Super Admin' ? <CrownOutlined /> : <UserOutlined />}
+                </Avatar>
+                <Box sx={{ textAlign: 'left', minWidth: 0 }}>
+                  <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ lineHeight: 1.2 }}>
+                    {(activeUser?.name || 'Sabeel').replace(/\s*\([^)]*\)/g, '').trim()}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
+                    <Chip
+                      size="small"
+                      label={activeUser?.role || 'Super Admin'}
+                      color={activeUser?.role === 'Super Admin' ? 'primary' : activeUser?.role === 'Admin' ? 'info' : 'warning'}
+                      sx={{
+                        fontWeight: 700,
+                        height: 18,
+                        fontSize: '0.65rem',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </Stack>
+                </Box>
+              </Box>
             </Stack>
           </Grid>
         </Grid>

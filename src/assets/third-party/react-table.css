@@ -33,3 +33,34 @@
 .MuiTableContainer-root {
   border-radius: 0px !important;
 }
+
+/* Enterprise Slate Dark Mode Global Styles */
+html[data-color-scheme='dark'],
+html[data-color-scheme='dark'] body,
+[data-color-scheme='dark'] #root {
+  background-color: #090d16 !important;
+  color: #f8fafc;
+}
+
+[data-color-scheme='dark'] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-color-scheme='dark'] ::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+[data-color-scheme='dark'] ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+[data-color-scheme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+[data-color-scheme='dark'] ::selection {
+  background: rgba(99, 102, 241, 0.3);
+  color: #f8fafc;
+}

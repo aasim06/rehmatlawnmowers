@@ -30,12 +30,29 @@ export default function DashboardLayout() {
   if (menuMasterLoading) return <Loader />;
 
   return (
-    <Box sx={{ display: 'flex', width: '100%' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        width: '100%',
+        minHeight: '100vh',
+        bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#090d16' : 'rgb(247, 246, 242)')
+      }}
+    >
       <ScrollTop />
       <Header />
       <Drawer />
 
-      <Box component="main" sx={{ width: 'calc(100% - 260px)', flexGrow: 1, p: { xs: 1.5, sm: 3 }, pb: { xs: 9, md: 3 } }}>
+      <Box
+        component="main"
+        sx={{
+          width: 'calc(100% - 260px)',
+          flexGrow: 1,
+          p: { xs: 1.5, sm: 3 },
+          pb: { xs: 9, md: 3 },
+          minHeight: '100vh',
+          bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#090d16' : 'rgb(247, 246, 242)')
+        }}
+      >
         <Toolbar sx={{ mt: 'inherit' }} />
         <Box
           sx={{

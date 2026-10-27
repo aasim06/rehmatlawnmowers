@@ -39,7 +39,7 @@ export default function Header() {
         variant="light"
         sx={(theme) => ({
           color: 'text.primary',
-          bgcolor: drawerOpen ? 'transparent' : 'grey.100',
+          bgcolor: drawerOpen ? 'transparent' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.100',
           ml: { xs: 0, lg: -2 }
         })}
       >
@@ -56,7 +56,9 @@ export default function Header() {
     elevation: 0,
     sx: {
       borderBottom: '1px solid',
-      borderBottomColor: 'divider',
+      borderBottomColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : 'divider'),
+      bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)'),
+      backdropFilter: 'blur(8px)',
       zIndex: 1200,
       width: { xs: '100%', lg: drawerOpen ? `calc(100% - ${DRAWER_WIDTH}px)` : `calc(100% - ${MINI_DRAWER_WIDTH}px)` }
     }

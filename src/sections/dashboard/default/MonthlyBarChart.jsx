@@ -34,6 +34,8 @@ export default function MonthlyBarChart() {
     weekData[dayIdx] += qty;
   });
 
+  const isDark = theme.palette.mode === 'dark';
+
   return (
     <BarChart
       hideLegend
@@ -41,14 +43,14 @@ export default function MonthlyBarChart() {
       series={[{ data: weekData, label: 'Units Issued' }]}
       xAxis={[{ data: xLabels, scaleType: 'band', tickSize: 7, disableLine: true, categoryGapRatio: 0.4 }]}
       yAxis={[{ position: 'none' }]}
-      slotProps={{ bar: { rx: 5, ry: 5 } }}
+      slotProps={{ bar: { rx: 6, ry: 6 } }}
       axisHighlight={{ x: 'none' }}
       margin={{ left: 20, right: 20 }}
-      colors={[theme.palette.primary.main || theme.vars.palette.info.light]}
+      colors={[isDark ? '#6366f1' : (theme.palette.primary.main || '#0096D6')]}
       sx={{
-        [`& .${barClasses.element}:hover`]: { opacity: 0.6 },
+        [`& .${barClasses.element}:hover`]: { opacity: 0.85 },
         [`& .${axisClasses.root}.${axisClasses.directionX} .${axisClasses.tick}`]: { stroke: 'transparent' },
-        [`& .${axisClasses.root} .${axisClasses.tickLabel}`]: { fill: `${theme.palette.text.secondary} !important` }
+        [`& .${axisClasses.root} .${axisClasses.tickLabel}`]: { fill: `${isDark ? '#94a3b8' : theme.palette.text.secondary} !important` }
       }}
     />
   );

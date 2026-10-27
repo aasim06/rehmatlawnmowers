@@ -328,14 +328,24 @@ export function StoreInventoryProvider({ children }) {
         vendorsRes,
         salesRes,
         catRes,
-        masterItemsRes
+        masterItemsRes,
+        custPayRes,
+        vendPayRes,
+        repairsRes,
+        expensesRes,
+        recipesRes
       ] = await Promise.allSettled([
         supabase.from('store_items').select('*').order('name', { ascending: true }),
         supabase.from('usage_logs').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('vendors').select('*').order('name', { ascending: true }),
         supabase.from('machine_sales').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('categories').select('*').order('name', { ascending: true }),
-        supabase.from('master_item_names').select('*').order('name', { ascending: true })
+        supabase.from('master_item_names').select('*').order('name', { ascending: true }),
+        supabase.from('customer_payments').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('vendor_payments').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('machine_repairs').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('machine_recipes').select('*').order('created_at', { ascending: false })
       ]);
 
       if (itemsRes.status === 'fulfilled' && Array.isArray(itemsRes.value?.data)) {
@@ -356,18 +366,8 @@ export function StoreInventoryProvider({ children }) {
           rackLocation: i.location || i.rack_location || 'Main Store',
           status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= (parseFloat(i.min_threshold || i.min_level) || 10) ? 0 : 1
         }));
-        setItems((prev) => {
-          const cleanLocal = prev.filter((i) => !deletedItemSet.has(String(i.id)) && !deletedItemSet.has(String(i.itemCode)));
-          const fetchedMap = new Map(mappedItems.map((i) => [String(i.id), i]));
-          const combined = [...mappedItems];
-          cleanLocal.forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id)) && !fetchedMap.has(String(loc.itemCode)) && !deletedItemSet.has(String(loc.id)) && !deletedItemSet.has(String(loc.itemCode))) {
-              combined.push(loc);
-            }
-          });
-          localStorage.setItem('rehmat_store_items_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setItems(mappedItems);
+        localStorage.setItem('rehmat_store_items_v2', JSON.stringify(mappedItems));
       }
 
       if (logsRes.status === 'fulfilled' && Array.isArray(logsRes.value?.data)) {
@@ -389,18 +389,8 @@ export function StoreInventoryProvider({ children }) {
           time: l.time || new Date(l.created_at).toLocaleString(),
           dateISO: l.created_at || new Date().toISOString()
         }));
-        setUsageLogs((prev) => {
-          const cleanLocal = prev.filter((l) => !deletedLogSet.has(String(l.id)));
-          const fetchedMap = new Map(mappedLogs.map((l) => [String(l.id), l]));
-          const combined = [...mappedLogs];
-          cleanLocal.forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id)) && !deletedLogSet.has(String(loc.id))) {
-              combined.push(loc);
-            }
-          });
-          localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setUsageLogs(mappedLogs);
+        localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
       }
 
       if (vendorsRes.status === 'fulfilled' && Array.isArray(vendorsRes.value?.data)) {
@@ -419,18 +409,8 @@ export function StoreInventoryProvider({ children }) {
           openingBalance: parseFloat(v.opening_balance) || 0,
           currentBalance: parseFloat(v.current_balance) || 0
         }));
-        setVendors((prev) => {
-          const cleanLocal = prev.filter((v) => !deletedVendorSet.has(String(v.id)));
-          const fetchedMap = new Map(mappedVendors.map((v) => [String(v.id), v]));
-          const combined = [...mappedVendors];
-          cleanLocal.forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id)) && !deletedVendorSet.has(String(loc.id))) {
-              combined.push(loc);
-            }
-          });
-          localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setVendors(mappedVendors);
+        localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
       }
 
       if (salesRes.status === 'fulfilled' && Array.isArray(salesRes.value?.data)) {
@@ -462,18 +442,8 @@ export function StoreInventoryProvider({ children }) {
             items: s.items || []
           };
         });
-        setMachineSales((prev) => {
-          const cleanLocal = prev.filter((s) => !deletedSaleSet.has(String(s.id)));
-          const fetchedMap = new Map(mappedSales.map((s) => [String(s.id), s]));
-          const combined = [...mappedSales];
-          cleanLocal.forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id)) && !deletedSaleSet.has(String(loc.id))) {
-              combined.push(loc);
-            }
-          });
-          localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setMachineSales(mappedSales);
+        localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
       }
 
       if (catRes.status === 'fulfilled' && Array.isArray(catRes.value?.data)) {
@@ -485,25 +455,10 @@ export function StoreInventoryProvider({ children }) {
           name: c.name,
           description: c.description || ''
         }));
-        setCategories((prev) => {
-          const cleanLocal = (prev || []).filter((c) => !deletedCategorySet.has(String(c.id).toLowerCase()) && !deletedCategorySet.has(String(c.name || '').toLowerCase()));
-          const fetchedMap = new Map(mappedCats.map((c) => [String(c.id), c]));
-          const combined = [...mappedCats];
-          cleanLocal.forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id)) && !deletedCategorySet.has(String(loc.id).toLowerCase()) && !deletedCategorySet.has(String(loc.name || '').toLowerCase())) {
-              combined.push(loc);
-            }
-          });
-          if (combined.length > 0) {
-            localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(combined));
-            return combined;
-          }
-          if (deletedCategorySet.size === 0) {
-            localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(initialCategories));
-            return initialCategories;
-          }
-          return [];
-        });
+        if (mappedCats.length > 0) {
+          setCategories(mappedCats);
+          localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(mappedCats));
+        }
       }
 
       if (masterItemsRes.status === 'fulfilled' && Array.isArray(masterItemsRes.value?.data)) {
@@ -516,6 +471,124 @@ export function StoreInventoryProvider({ children }) {
             }
           });
           localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(combined));
+          return combined;
+        });
+      }
+
+      if (custPayRes?.status === 'fulfilled' && Array.isArray(custPayRes.value?.data)) {
+        const mappedCustPay = custPayRes.value.data.map((p) => ({
+          id: p.id,
+          customerName: p.customer_name,
+          amountPaid: parseFloat(p.amount_paid) || 0,
+          paymentMethod: p.payment_method || 'Cash',
+          referenceNo: p.reference_no || '',
+          notes: p.notes || '',
+          time: p.payment_date || new Date(p.created_at).toLocaleString(),
+          createdAt: p.created_at
+        }));
+        setCustomerPayments((prev) => {
+          const fetchedMap = new Map(mappedCustPay.map((c) => [String(c.id), c]));
+          const combined = [...mappedCustPay];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
+          });
+          localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(combined));
+          return combined;
+        });
+      }
+
+      if (vendPayRes?.status === 'fulfilled' && Array.isArray(vendPayRes.value?.data)) {
+        const mappedVendPay = vendPayRes.value.data.map((p) => ({
+          id: p.id,
+          vendorName: p.vendor_name,
+          amountPaid: parseFloat(p.amount_paid) || 0,
+          paymentMethod: p.payment_method || 'Cash',
+          referenceNo: p.reference_no || '',
+          notes: p.notes || '',
+          time: p.payment_date || new Date(p.created_at).toLocaleString(),
+          createdAt: p.created_at
+        }));
+        setVendorPayments((prev) => {
+          const fetchedMap = new Map(mappedVendPay.map((v) => [String(v.id), v]));
+          const combined = [...mappedVendPay];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
+          });
+          localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(combined));
+          return combined;
+        });
+      }
+
+      if (repairsRes?.status === 'fulfilled' && Array.isArray(repairsRes.value?.data)) {
+        const mappedRepairs = repairsRes.value.data.map((r) => ({
+          id: r.id,
+          repairNo: r.repair_no || `REP-${String(r.id).slice(0, 4)}`,
+          customerName: r.customer_name,
+          customerPhone: r.customer_phone || 'N/A',
+          cityAddress: r.city_address || 'Lahore',
+          machineName: r.machine_name,
+          serialNo: r.serial_no || 'N/A',
+          faultDescription: r.fault_description || 'General Service',
+          partsCost: parseFloat(r.parts_cost) || 0,
+          laborCost: parseFloat(r.labor_cost) || 0,
+          discountAmount: parseFloat(r.discount_amount) || 0,
+          totalCost: parseFloat(r.total_cost) || 0,
+          paidAmount: parseFloat(r.paid_amount) || 0,
+          balanceAmount: parseFloat(r.balance_amount) || 0,
+          repairStatus: r.repair_status || 'Received',
+          paymentStatus: (parseFloat(r.balance_amount) || 0) <= 0 ? 'Paid' : (parseFloat(r.paid_amount) || 0) > 0 ? 'Partial' : 'Pending',
+          receivedDate: r.received_date || new Date(r.created_at).toLocaleDateString(),
+          promisedDate: r.promised_date || '1-2 Days',
+          repairItems: r.repair_items || []
+        }));
+        setMachineRepairs((prev) => {
+          const fetchedMap = new Map(mappedRepairs.map((r) => [String(r.id), r]));
+          const combined = [...mappedRepairs];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
+          });
+          localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(combined));
+          return combined;
+        });
+      }
+
+      if (expensesRes?.status === 'fulfilled' && Array.isArray(expensesRes.value?.data)) {
+        const mappedExpenses = expensesRes.value.data.map((e) => ({
+          id: e.id,
+          title: e.title,
+          category: e.category || 'General',
+          amount: parseFloat(e.amount) || 0,
+          paymentMethod: e.payment_method || 'Cash',
+          paidTo: e.paid_to || 'N/A',
+          expenseDate: e.expense_date || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+          notes: e.notes || '',
+          createdAt: e.created_at || new Date().toISOString()
+        }));
+        setExpenses((prev) => {
+          const fetchedMap = new Map(mappedExpenses.map((e) => [String(e.id), e]));
+          const combined = [...mappedExpenses];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
+          });
+          localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(combined));
+          return combined;
+        });
+      }
+
+      if (recipesRes?.status === 'fulfilled' && Array.isArray(recipesRes.value?.data)) {
+        const mappedRecipes = recipesRes.value.data.map((r) => ({
+          id: r.id,
+          modelName: r.model_name || r.modelName,
+          description: r.description || '',
+          ingredients: r.ingredients || []
+        }));
+        setMachineRecipes((prev) => {
+          const fetchedMap = new Map(mappedRecipes.map((r) => [String(r.modelName).toLowerCase(), r]));
+          const combined = [...mappedRecipes];
+          (prev || []).forEach((loc) => {
+            if (!fetchedMap.has(String(loc.modelName).toLowerCase())) combined.push(loc);
+          });
+          localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(combined));
           return combined;
         });
       }
@@ -1468,7 +1541,9 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
-  const saveMachineRecipe = (recipeObj) => {
+  const saveMachineRecipe = async (recipeObj) => {
+    const id = recipeObj.id || generateUUID();
+    const recipeToSave = { id, ...recipeObj };
     setMachineRecipes((prev) => {
       const existingIdx = prev.findIndex((r) => r.modelName.toLowerCase() === recipeObj.modelName.toLowerCase());
       if (existingIdx >= 0) {
@@ -1476,12 +1551,28 @@ export function StoreInventoryProvider({ children }) {
         copy[existingIdx] = { ...copy[existingIdx], ...recipeObj };
         return copy;
       }
-      return [{ id: generateUUID(), ...recipeObj }, ...prev];
+      return [recipeToSave, ...prev];
     });
+
+    try {
+      await supabase.from('machine_recipes').upsert([{
+        id: recipeToSave.id,
+        model_name: recipeToSave.modelName,
+        description: recipeToSave.description || '',
+        ingredients: recipeToSave.ingredients || []
+      }]);
+    } catch (e) {
+      console.warn('Machine recipes cloud sync optional fallback:', e);
+    }
   };
 
-  const deleteMachineRecipe = (id) => {
+  const deleteMachineRecipe = async (id) => {
     setMachineRecipes((prev) => prev.filter((r) => r.id !== id));
+    try {
+      await supabase.from('machine_recipes').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Machine recipes cloud delete fallback:', e);
+    }
   };
 
   const deleteMachineSale = async (id) => {
@@ -1771,34 +1862,28 @@ export function StoreInventoryProvider({ children }) {
     setMachineRepairs((prev) => [newRepair, ...prev]);
 
     try {
-      await sql`
-        INSERT INTO machine_repairs (
-          id, repair_no, customer_name, customer_phone, city_address,
-          machine_name, serial_no, fault_description, parts_cost,
-          labor_cost, discount_amount, total_cost, paid_amount,
-          balance_amount, repair_status, received_date, promised_date,
-          repair_items, created_at
-        ) VALUES (
-          ${repairId}, ${repairNo}, ${repairData.customerName || 'Walk-in Customer'},
-          ${repairData.customerPhone || 'N/A'}, ${repairData.cityAddress || 'Lahore'},
-          ${repairData.machineName || 'Lawn Mower Machine'}, ${repairData.serialNo || 'N/A'},
-          ${repairData.faultDescription || 'General Service & Repair'},
-          ${partsCost}, ${laborCost}, ${parseFloat(repairData.discountAmount) || 0},
-          ${totalCost}, ${paidAmount}, ${balanceAmount},
-          ${repairData.repairStatus || 'Received'}, ${formattedDate},
-          ${repairData.promisedDate || '1-2 Days'},
-          ${JSON.stringify(repairData.repairItems || [])}, NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          customer_name = EXCLUDED.customer_name,
-          customer_phone = EXCLUDED.customer_phone,
-          city_address = EXCLUDED.city_address,
-          repair_status = EXCLUDED.repair_status,
-          paid_amount = EXCLUDED.paid_amount,
-          balance_amount = EXCLUDED.balance_amount;
-      `;
+      await supabase.from('machine_repairs').upsert([{
+        id: repairId,
+        repair_no: repairNo,
+        customer_name: repairData.customerName || 'Walk-in Customer',
+        customer_phone: repairData.customerPhone || 'N/A',
+        city_address: repairData.cityAddress || 'Lahore',
+        machine_name: repairData.machineName || 'Lawn Mower Machine',
+        serial_no: repairData.serialNo || 'N/A',
+        fault_description: repairData.faultDescription || 'General Service & Repair',
+        parts_cost: partsCost,
+        labor_cost: laborCost,
+        discount_amount: parseFloat(repairData.discountAmount) || 0,
+        total_cost: totalCost,
+        paid_amount: paidAmount,
+        balance_amount: balanceAmount,
+        repair_status: repairData.repairStatus || 'Received',
+        received_date: formattedDate,
+        promised_date: repairData.promisedDate || '1-2 Days',
+        repair_items: repairData.repairItems || []
+      }]);
     } catch (e) {
-      console.error('Neon addMachineRepair Exception:', e);
+      console.error('Supabase addMachineRepair Exception:', e);
     }
     return newRepair;
   };
@@ -1830,37 +1915,22 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      if (updatedFields.repairStatus && updatedFields.paidAmount !== undefined) {
-        await sql`
-          UPDATE machine_repairs
-          SET repair_status = ${updatedFields.repairStatus},
-              paid_amount = ${parseFloat(updatedFields.paidAmount) || 0}
-          WHERE id = ${repairId};
-        `;
-      } else if (updatedFields.repairStatus) {
-        await sql`
-          UPDATE machine_repairs
-          SET repair_status = ${updatedFields.repairStatus}
-          WHERE id = ${repairId};
-        `;
-      } else if (updatedFields.paidAmount !== undefined) {
-        await sql`
-          UPDATE machine_repairs
-          SET paid_amount = ${parseFloat(updatedFields.paidAmount) || 0}
-          WHERE id = ${repairId};
-        `;
-      }
+      const updatePayload = {};
+      if (updatedFields.repairStatus) updatePayload.repair_status = updatedFields.repairStatus;
+      if (updatedFields.paidAmount !== undefined) updatePayload.paid_amount = parseFloat(updatedFields.paidAmount) || 0;
+      if (updatedFields.balanceAmount !== undefined) updatePayload.balance_amount = parseFloat(updatedFields.balanceAmount) || 0;
+      await supabase.from('machine_repairs').update(updatePayload).eq('id', repairId);
     } catch (e) {
-      console.error('Neon updateMachineRepair Exception:', e);
+      console.error('Supabase updateMachineRepair Exception:', e);
     }
   };
 
   const deleteMachineRepair = async (repairId) => {
     setMachineRepairs((prev) => prev.filter((r) => r.id !== repairId));
     try {
-      await sql`DELETE FROM machine_repairs WHERE id = ${repairId};`;
+      await supabase.from('machine_repairs').delete().eq('id', repairId);
     } catch (e) {
-      console.error('Neon deleteMachineRepair Exception:', e);
+      console.error('Supabase deleteMachineRepair Exception:', e);
     }
   };
 
@@ -1882,26 +1952,18 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Expense Added', `Added expense: PKR ${newExpense.amount} for ${newExpense.title}`);
 
     try {
-      await sql`
-        INSERT INTO expenses (
-          id, title, category, amount, payment_method,
-          paid_to, expense_date, notes, created_at
-        ) VALUES (
-          ${newExpense.id}, ${newExpense.title}, ${newExpense.category},
-          ${newExpense.amount}, ${newExpense.paymentMethod},
-          ${newExpense.paidTo}, ${newExpense.expenseDate}, ${newExpense.notes}, NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          title = EXCLUDED.title,
-          category = EXCLUDED.category,
-          amount = EXCLUDED.amount,
-          payment_method = EXCLUDED.payment_method,
-          paid_to = EXCLUDED.paid_to,
-          expense_date = EXCLUDED.expense_date,
-          notes = EXCLUDED.notes;
-      `;
+      await supabase.from('expenses').upsert([{
+        id: newExpense.id,
+        title: newExpense.title,
+        category: newExpense.category,
+        amount: newExpense.amount,
+        payment_method: newExpense.paymentMethod,
+        paid_to: newExpense.paidTo,
+        expense_date: newExpense.expenseDate,
+        notes: newExpense.notes
+      }]);
     } catch (e) {
-      console.error('Neon addExpense error:', e);
+      console.error('Supabase addExpense error:', e);
     }
     return newExpense;
   };
@@ -1910,9 +1972,9 @@ export function StoreInventoryProvider({ children }) {
     setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
     logActivity('Expense Deleted', `Deleted expense ID ${expenseId}`);
     try {
-      await sql`DELETE FROM expenses WHERE id = ${expenseId};`;
+      await supabase.from('expenses').delete().eq('id', expenseId);
     } catch (e) {
-      console.error('Neon deleteExpense error:', e);
+      console.error('Supabase deleteExpense error:', e);
     }
   };
 

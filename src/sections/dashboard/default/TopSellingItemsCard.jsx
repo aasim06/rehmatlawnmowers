@@ -92,9 +92,9 @@ export default function TopSellingItemsCard() {
               sx={{
                 p: 1.75,
                 borderRadius: '12px',
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc',
+                bgcolor: theme.palette.mode === 'dark' ? '#162033' : '#f8fafc',
                 border: '1px solid',
-                borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+                borderColor: theme.palette.mode === 'dark' ? '#1e293b' : '#f1f5f9',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                   borderColor: rankColor,
@@ -146,7 +146,7 @@ export default function TopSellingItemsCard() {
               </Stack>
 
               {/* Bottom Colored Progress Bar */}
-              <Box sx={{ mt: 1.25, width: '100%', bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#e2e8f0', borderRadius: 4, height: 6, overflow: 'hidden' }}>
+              <Box sx={{ mt: 1.25, width: '100%', bgcolor: theme.palette.mode === 'dark' ? '#1e293b' : '#e2e8f0', borderRadius: 4, height: 6, overflow: 'hidden' }}>
                 <Box
                   sx={{
                     width: `${percentage}%`,

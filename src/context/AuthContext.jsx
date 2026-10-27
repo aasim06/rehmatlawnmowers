@@ -69,7 +69,7 @@ export const defaultAdminPermissions = {
  * Cannot edit unit prices, cannot delete records, no access to financial ledgers, reports, backup, or users.
  */
 export const defaultStoreKeeperPermissions = {
-  'dashboard': false,
+  'dashboard': true,
   'stock-out': true,
   'stock-in': true,
   'items': true,
@@ -184,9 +184,13 @@ export function AuthProvider({ children }) {
       const saved = sessionStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
+        const roleDefaults = getRoleDefaultPermissions(parsedUser.role || 'Super Admin');
         return {
           ...parsedUser,
-          permissions: parsedUser.permissions || getRoleDefaultPermissions(parsedUser.role)
+          permissions: {
+            ...roleDefaults,
+            ...(parsedUser.permissions || {})
+          }
         };
       }
       return null;

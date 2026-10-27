@@ -30,9 +30,14 @@ export default function MainCard({
       elevation={elevation || 0}
       sx={(theme) => ({
         position: 'relative',
-        ...(border && { border: `1px solid ${theme.vars.palette.divider}` }),
-        borderRadius: 1,
-        boxShadow: boxShadow && !border ? shadow || theme.vars.customShadows?.z1 : 'inherit',
+        ...(border && {
+          border: '1px solid',
+          borderColor: theme.palette.mode === 'dark' ? '#1e293b' : theme.vars.palette.divider
+        }),
+        borderRadius: 2,
+        backgroundImage: 'none',
+        bgcolor: theme.palette.mode === 'dark' ? '#131b2e' : theme.vars.palette.background.paper,
+        boxShadow: theme.palette.mode === 'dark' ? '0 1px 3px 0 rgba(0, 0, 0, 0.35)' : (boxShadow && !border ? shadow || theme.vars.customShadows?.z1 : 'none'),
         ':hover': { boxShadow: boxShadow ? shadow || theme.vars.customShadows?.z1 : 'inherit' },
         ...(codeHighlight && {
           '& pre': { margin: 0, padding: '12px !important', fontFamily: theme.typography.fontFamily, fontSize: '0.75rem' }

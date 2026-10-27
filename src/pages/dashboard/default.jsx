@@ -179,7 +179,13 @@ export default function DashboardDefault() {
         <Grid size={12}>
           <Alert
             severity="warning"
-            sx={{ border: '1px solid #fde047', bgcolor: '#fefce8', fontWeight: 700 }}
+            sx={{
+              border: '1px solid',
+              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.3)' : '#fde047'),
+              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.08)' : '#fefce8'),
+              color: (theme) => (theme.palette.mode === 'dark' ? '#fcd34d' : 'inherit'),
+              fontWeight: 600
+            }}
             action={
               <Button color="inherit" size="small" component={Link} to="/inventory/items" sx={{ fontWeight: 800 }}>
                 View {lowStockAlerts.length} Low Stock Items →
@@ -198,8 +204,8 @@ export default function DashboardDefault() {
           title="Total Items"
           count={items.length.toString()}
           extra="Total Active SKUs"
-          accentColor="#f97316"
-          bgGradient="radial-gradient(circle at 10% 20%, rgba(249, 115, 22, 0.18) 0%, #16171e 75%)"
+          pillColor="indigo"
+          icon={<DatabaseOutlined style={{ fontSize: '0.9rem' }} />}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
@@ -207,8 +213,8 @@ export default function DashboardDefault() {
           title="Total Stock"
           count={totalInventoryCount.toString()}
           extra="Total Store Units"
-          accentColor="#3b82f6"
-          bgGradient="radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.18) 0%, #16171e 75%)"
+          pillColor="sky"
+          icon={<InboxOutlined style={{ fontSize: '0.9rem' }} />}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
@@ -217,8 +223,8 @@ export default function DashboardDefault() {
           count={`+${todayStockInQty || 0}`}
           color="success"
           extra="Received Today"
-          accentColor="#10b981"
-          bgGradient="radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.18) 0%, #16171e 75%)"
+          pillColor="emerald"
+          icon={<ImportOutlined style={{ fontSize: '0.9rem' }} />}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
@@ -228,8 +234,8 @@ export default function DashboardDefault() {
           isLoss={todayStockOutQty > 0}
           color={todayStockOutQty > 0 ? 'warning' : 'primary'}
           extra="Issued Today"
-          accentColor="#a855f7"
-          bgGradient="radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.18) 0%, #16171e 75%)"
+          pillColor="rose"
+          icon={<ExportOutlined style={{ fontSize: '0.9rem' }} />}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
@@ -238,8 +244,8 @@ export default function DashboardDefault() {
           count={`Rs. ${totalMachineRevenue.toLocaleString()}`}
           color="success"
           extra={`${machineSales.length} Total Invoices`}
-          accentColor="#52c41a"
-          bgGradient="radial-gradient(circle at 10% 20%, rgba(82, 196, 26, 0.18) 0%, #16171e 75%)"
+          pillColor="emerald"
+          icon={<RiseOutlined style={{ fontSize: '0.9rem' }} />}
         />
       </Grid>
 
@@ -353,7 +359,7 @@ export default function DashboardDefault() {
 
         <MainCard content={false}>
           {/* Summary Metric Stats Bar */}
-          <Box sx={{ p: 2.5, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f9fafb'), borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ p: 2.5, bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#162033' : '#f9fafb'), borderBottom: '1px solid', borderColor: 'divider' }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="textSecondary" display="block">TOTAL MACHINE SALES REVENUE:</Typography>
@@ -379,7 +385,7 @@ export default function DashboardDefault() {
           {/* Recent Customer Machine Invoices Table */}
           <TableContainer>
             <Table size="small">
-              <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
+              <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#162033' : '#fafafa') }}>
                 <TableRow>
                   <TableCell>INVOICE NO</TableCell>
                   <TableCell>CUSTOMER NAME</TableCell>

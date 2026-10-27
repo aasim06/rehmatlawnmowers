@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import ilyasSignatureImg from 'assets/images/ilyas-signature-clean.png';
 
-const CeoSignature = ({ width = 220 }) => {
+const CeoSignature = ({ width = 165 }) => {
   return (
     <Box sx={{ width, textAlign: 'left', display: 'inline-block' }}>
       {/* Top Company Title */}
@@ -13,8 +13,8 @@ const CeoSignature = ({ width = 220 }) => {
           fontWeight: 900,
           fontStyle: 'italic',
           color: '#000000',
-          fontSize: '0.98rem',
-          mb: 0.2,
+          fontSize: '0.80rem',
+          mb: 0.1,
           lineHeight: 1.1
         }}
       >
@@ -22,14 +22,14 @@ const CeoSignature = ({ width = 220 }) => {
       </Typography>
 
       {/* Clean Handwritten Signature Image & Proprietor Label */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, my: 0.2 }}>
         <Box
           component="img"
           src={ilyasSignatureImg}
           alt="Ilyas Signature"
           sx={{
-            height: 42,
-            maxWidth: 130,
+            height: 28,
+            maxWidth: 90,
             objectFit: 'contain',
             mixBlendMode: 'multiply'
           }}
@@ -41,7 +41,7 @@ const CeoSignature = ({ width = 220 }) => {
             fontWeight: 800,
             fontStyle: 'italic',
             color: '#000000',
-            fontSize: '1rem'
+            fontSize: '0.80rem'
           }}
         >
           Proprietor
@@ -49,7 +49,7 @@ const CeoSignature = ({ width = 220 }) => {
       </Box>
 
       {/* Solid Underline */}
-      <Box sx={{ borderBottom: '2px solid #000000', width: '100%', mb: 0.6 }} />
+      <Box sx={{ borderBottom: '1.5px solid #000000', width: '100%', mb: 0.4 }} />
 
       {/* CEO Name & Title */}
       <Typography
@@ -58,7 +58,7 @@ const CeoSignature = ({ width = 220 }) => {
           fontFamily: 'Arial, sans-serif',
           fontWeight: 800,
           color: '#000000',
-          fontSize: '0.92rem',
+          fontSize: '0.78rem',
           lineHeight: 1.2
         }}
       >
@@ -70,7 +70,7 @@ const CeoSignature = ({ width = 220 }) => {
           fontFamily: 'Arial, sans-serif',
           fontWeight: 800,
           color: '#000000',
-          fontSize: '0.85rem',
+          fontSize: '0.70rem',
           lineHeight: 1.2
         }}
       >

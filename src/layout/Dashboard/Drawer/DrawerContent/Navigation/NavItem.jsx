@@ -48,68 +48,71 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           disabled={item.disabled}
           selected={isSelected}
           onClick={() => itemHandler()}
-          sx={(theme) => ({
-            zIndex: 1201,
-            pl: drawerOpen ? `${level * 28}px` : 1.5,
-            py: !drawerOpen && level === 1 ? 1.25 : 1,
-            borderRadius: 1.5,
-            mx: 1,
-            mb: 0.5,
+          sx={(theme) => {
+            const isDark = theme.palette.mode === 'dark';
+            return {
+              zIndex: 1201,
+              pl: drawerOpen ? `${level * 28}px` : 1.5,
+              py: !drawerOpen && level === 1 ? 1.25 : 1,
+              borderRadius: 1.5,
+              mx: 1,
+              mb: 0.5,
 
-            // Light mode
-            color: theme.palette.text.secondary,
-            '&:hover': { bgcolor: theme.vars.palette.primary.lighter, color: theme.vars.palette.primary.main },
-            '&.Mui-selected': {
-              bgcolor: theme.vars.palette.primary.lighter,
-              borderRight: `2px solid ${theme.vars.palette.primary.main}`,
-              color: theme.vars.palette.primary.main,
-              '& .MuiListItemIcon-root': { color: theme.vars.palette.primary.main },
-              '&:hover': { color: theme.vars.palette.primary.main, bgcolor: theme.vars.palette.primary.lighter }
-            },
-
-            // Dark mode overrides via applyStyles - Magic UI Pure Neutral Black / Zinc
-            ...theme.applyStyles('dark', {
-              color: '#a1a1aa',
+              color: isDark ? '#94a3b8' : theme.palette.text.secondary,
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.06)',
-                color: '#f4f4f5'
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : theme.vars.palette.primary.lighter,
+                color: isDark ? '#f8fafc' : theme.vars.palette.primary.main,
+                '& .MuiListItemIcon-root': {
+                  color: isDark ? '#f8fafc' : theme.vars.palette.primary.main
+                }
               },
               '&.Mui-selected': {
-                bgcolor: '#27272a',
-                borderRight: '2px solid #ffffff',
-                color: '#ffffff',
-                '& .MuiListItemIcon-root': { color: '#ffffff' },
-                '&:hover': { bgcolor: '#3f3f46', color: '#ffffff' }
-              }
-            }),
+                bgcolor: isDark ? 'rgba(99, 102, 241, 0.15)' : theme.vars.palette.primary.lighter,
+                borderLeft: isDark ? '3px solid #6366f1' : 'none',
+                borderRight: isDark ? 'none' : `2px solid ${theme.vars.palette.primary.main}`,
+                color: isDark ? '#818cf8' : theme.vars.palette.primary.main,
+                '& .MuiListItemIcon-root': {
+                  color: isDark ? '#818cf8' : theme.vars.palette.primary.main
+                },
+                '&:hover': {
+                  bgcolor: isDark ? 'rgba(99, 102, 241, 0.22)' : theme.vars.palette.primary.lighter,
+                  color: isDark ? '#a5b4fc' : theme.vars.palette.primary.main,
+                  '& .MuiListItemIcon-root': {
+                    color: isDark ? '#a5b4fc' : theme.vars.palette.primary.main
+                  }
+                }
+              },
 
-            ...(!drawerOpen && {
-              '&:hover': { bgcolor: 'transparent' },
-              '&.Mui-selected': { '&:hover': { bgcolor: 'transparent' }, bgcolor: 'transparent' }
-            })
-          })}
+              ...(!drawerOpen && {
+                '&:hover': { bgcolor: 'transparent' },
+                '&.Mui-selected': { '&:hover': { bgcolor: 'transparent' }, bgcolor: 'transparent' }
+              })
+            };
+          }}
         >
           {itemIcon && (
             <ListItemIcon
-              sx={(theme) => ({
-                minWidth: 28,
-                color: isSelected ? theme.vars.palette.primary.main : theme.vars.palette.text.secondary,
-                ...(!drawerOpen && {
-                  borderRadius: 1.5,
-                  width: 36,
-                  height: 36,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  '&:hover': { bgcolor: theme.vars.palette.secondary.lighter }
-                }),
-                ...(!drawerOpen && isSelected && {
-                  bgcolor: theme.vars.palette.primary.lighter,
-                  '&:hover': { bgcolor: theme.vars.palette.primary.lighter }
-                }),
-                ...theme.applyStyles('dark', {
-                  color: isSelected ? '#ffffff' : '#a1a1aa'
-                })
-              })}
+              sx={(theme) => {
+                const isDark = theme.palette.mode === 'dark';
+                return {
+                  minWidth: 28,
+                  color: isDark
+                    ? isSelected ? '#818cf8' : '#94a3b8'
+                    : isSelected ? theme.vars.palette.primary.main : theme.vars.palette.text.secondary,
+                  ...(!drawerOpen && {
+                    borderRadius: 1.5,
+                    width: 36,
+                    height: 36,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : theme.vars.palette.secondary.lighter }
+                  }),
+                  ...(!drawerOpen && isSelected && {
+                    bgcolor: isDark ? 'rgba(99, 102, 241, 0.15)' : theme.vars.palette.primary.lighter,
+                    '&:hover': { bgcolor: isDark ? 'rgba(99, 102, 241, 0.22)' : theme.vars.palette.primary.lighter }
+                  })
+                };
+              }}
             >
               {itemIcon}
             </ListItemIcon>
@@ -119,13 +122,15 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
               primary={
                 <Typography
                   variant="h6"
-                  sx={(theme) => ({
-                    color: isSelected ? theme.vars.palette.primary.main : theme.vars.palette.text.primary,
-                    fontWeight: isSelected ? 600 : 400,
-                    ...theme.applyStyles('dark', {
-                      color: isSelected ? '#ffffff' : '#f4f4f5'
-                    })
-                  })}
+                  sx={(theme) => {
+                    const isDark = theme.palette.mode === 'dark';
+                    return {
+                      color: isDark
+                        ? isSelected ? '#818cf8' : '#cbd5e1'
+                        : isSelected ? theme.vars.palette.primary.main : theme.vars.palette.text.primary,
+                      fontWeight: isSelected ? 600 : 400
+                    };
+                  }}
                 >
                   {item.title}
                 </Typography>

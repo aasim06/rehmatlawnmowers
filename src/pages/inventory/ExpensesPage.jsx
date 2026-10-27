@@ -34,8 +34,6 @@ import {
 import MainCard from 'components/MainCard';
 import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
 import { useStoreInventory } from 'context/StoreInventoryContext';
-import rehmatLogo from 'assets/images/rehmat-logo.jpg';
-import { useTransparentLogo } from 'components/logo/LogoMain';
 import CeoSignature from 'components/CeoSignature';
 
 // assets
@@ -68,7 +66,6 @@ const QUICK_EXPENSE_SUGGESTIONS = [
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
 export default function ExpensesPage() {
-  const transparentLogo = useTransparentLogo(rehmatLogo);
   const { expenses = [], addExpense, deleteExpense } = useStoreInventory();
 
   // Form State
@@ -786,7 +783,7 @@ export default function ExpensesPage() {
             @media print {
               @page {
                 size: A4 portrait;
-                margin: 8mm 10mm;
+                margin: 4mm 5mm;
               }
               body * {
                 visibility: hidden !important;
@@ -800,7 +797,7 @@ export default function ExpensesPage() {
                 top: 0 !important;
                 width: 100% !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 60px 4px 6px 4px !important;
                 background: #ffffff !important;
                 color: #000000 !important;
               }
@@ -827,71 +824,35 @@ export default function ExpensesPage() {
           </Button>
         </DialogTitle>
 
-        <DialogContent sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#ffffff' }}>
-          <Box id="printable-expense-sheet" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
-            {/* Watermark Logo */}
-            <Box
-              component="img"
-              className="watermark-logo"
-              src={transparentLogo || rehmatLogo}
-              alt="Watermark Logo"
-              sx={{
-                position: 'absolute',
-                top: '58%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '390px',
-                maxWidth: '70%',
-                opacity: 0.15,
-                pointerEvents: 'none',
-                zIndex: 0
-              }}
-            />
-
+        <DialogContent sx={{ p: { xs: 1, sm: 1.5 }, bgcolor: '#ffffff' }}>
+          <Box id="printable-expense-sheet" sx={{ position: 'relative', overflow: 'hidden', pt: { xs: 5, sm: 7 }, px: { xs: 1, sm: 1.5 }, pb: { xs: 1, sm: 1.5 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
             <Box sx={{ position: 'relative', zIndex: 1 }}>
-              {/* Brand Header with Emblem Logo */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
-                <Box
-                  component="img"
-                  src={transparentLogo || rehmatLogo}
-                  alt="Rehmat Logo Emblem"
-                  sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }}
-                />
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant="h3" fontWeight={800} sx={{ color: '#10b981', lineHeight: 1.1, letterSpacing: '0.5px' }}>
-                    REHMAT LAWN MOWERS
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Divider sx={{ my: 1.5 }} />
-
               {/* Structured Metadata Card */}
               <div style={{
                 border: '1.5px solid #111827',
                 borderRadius: '4px',
-                marginBottom: '16px',
+                marginBottom: '10px',
                 backgroundColor: 'rgba(255, 255, 255, 0.45)',
                 overflow: 'hidden'
               }}>
                 <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-                  <div style={{ flex: '1.2', padding: '10px 14px', borderRight: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+                  <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                       Statement Type
                     </div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
                       {selectedExpenseForPrint ? 'Expense Voucher' : 'Daily Expenses Statement'}
                     </div>
                   </div>
 
-                  <div style={{ flex: '1', padding: '10px 14px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                  <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                       <span style={{ color: '#6b7280', fontWeight: 600 }}>Statement Date:</span>
                       <span style={{ fontWeight: 700, color: '#374151' }}>
                         {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Records'}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
                       <span style={{ color: '#6b7280', fontWeight: 600 }}>Total Count:</span>
                       <span style={{ fontWeight: 800, color: '#16a34a' }}>
                         {selectedExpenseForPrint ? '01 Entry' : `${filteredExpenses.length} Entries`}
@@ -902,22 +863,22 @@ export default function ExpensesPage() {
               </div>
 
               {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '16px', backgroundColor: 'transparent' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
                 <thead>
                   <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                    <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '8px 4px', textAlign: 'center', fontSize: '0.95rem' }}>
+                    <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                       <strong>Sr</strong>
                     </th>
-                    <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontSize: '0.95rem' }}>
+                    <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                       <strong>Expense Title / Description</strong>
                     </th>
-                    <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '8px 6px', textAlign: 'center', fontSize: '0.95rem' }}>
+                    <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
                       <strong>Category</strong>
                     </th>
-                    <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                    <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                       <strong>Paid To</strong>
                     </th>
-                    <th style={{ width: '14%', padding: '8px 8px', textAlign: 'center', fontSize: '0.95rem' }}>
+                    <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
                       <strong>Amount (PKR)</strong>
                     </th>
                   </tr>
@@ -925,38 +886,38 @@ export default function ExpensesPage() {
                 <tbody>
                   {selectedExpenseForPrint ? (
                     <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                         01
                       </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
                         {selectedExpenseForPrint.title} {selectedExpenseForPrint.notes ? `(${selectedExpenseForPrint.notes})` : ''}
                       </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                         {selectedExpenseForPrint.category}
                       </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                         {selectedExpenseForPrint.paidTo || 'N/A'}
                       </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                      <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                         {parseFloat(selectedExpenseForPrint.amount).toLocaleString()}
                       </td>
                     </tr>
                   ) : (
                     filteredExpenses.map((exp, idx) => (
                       <tr key={exp.id || idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                           {String(idx + 1).padStart(2, '0')}
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
                           {exp.title} {exp.notes ? `(${exp.notes})` : ''}
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                           {exp.category}
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                           {exp.paidTo || 'N/A'}
                         </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
                           {parseFloat(exp.amount).toLocaleString()}
                         </td>
                       </tr>
@@ -965,12 +926,12 @@ export default function ExpensesPage() {
 
                   {/* Total Amount Bottom Row */}
                   <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                    <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '8px 12px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                    <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
                       Total amount
                     </td>
-                    <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
-                    <td style={{ borderRight: '1.5px solid #111827', padding: '8px' }}></td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#111827' }}>
+                    <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                    <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
                       {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
                     </td>
                   </tr>
@@ -978,15 +939,15 @@ export default function ExpensesPage() {
               </table>
 
               {/* Financial Summary Box */}
-              <Box sx={{ bgcolor: 'transparent', p: 1.5, borderRadius: 1, border: '1px solid #86efac', mb: 2 }}>
+              <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
                 <Grid container spacing={1} alignItems="center">
                   <Grid item xs={6}>
-                    <Typography variant="subtitle2" fontWeight={700} color="textSecondary" display="block">
+                    <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
                       TOTAL EXPENSE VOUCHERS: {selectedExpenseForPrint ? 1 : filteredExpenses.length}
                     </Typography>
                   </Grid>
                   <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                    <Typography variant="h6" fontWeight={800} color="success.dark">
+                    <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                       NET TOTAL EXPENSES: Rs. {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
                     </Typography>
                   </Grid>
@@ -994,9 +955,9 @@ export default function ExpensesPage() {
               </Box>
 
               {/* Signatures Footer */}
-              <Grid container spacing={2} sx={{ mt: 3, pt: 2 }}>
+              <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
                 <Grid item xs={6}>
-                  <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 1, width: 180 }}>
+                  <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                     Cashier / Manager Signature
                   </Typography>
                 </Grid>
