@@ -17,7 +17,7 @@
     "tauri": "tauri",
     "tauri:dev": "powershell -Command \"$env:PATH += ';C:\\Users\\Asif Computer\\.cargo\\bin'; npx tauri dev\"",
     "tauri:build": "powershell -Command \"$env:PATH += ';C:\\Users\\Asif Computer\\.cargo\\bin'; npx tauri build\"",
-    "build:exe": "powershell -Command \"$env:PATH += ';C:\\Users\\Asif Computer\\.cargo\\bin'; npx tauri build\"",
+    "build:exe": "powershell -Command \"$env:PATH += ';C:\\Users\\Asif Computer\\.cargo\\bin'; npx tauri build; Copy-Item 'src-tauri\\target\\release\\bundle\\nsis\\RehmatLawnMowers_1.0.0_x64-setup.exe' -Destination 'RehmatLawnMowers_Installer_Setup.exe' -Force; Copy-Item 'src-tauri\\target\\release\\app.exe' -Destination 'RehmatLawnMowers.exe' -Force\"",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
     "prettier": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
