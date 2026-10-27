@@ -10,7 +10,7 @@ import Chip from '@mui/material/Chip';
 import AuthWrapper from 'sections/auth/AuthWrapper';
 import AuthCard from 'sections/auth/AuthCard';
 import AuthLogin from 'sections/auth/AuthLogin';
-import LogoMain from 'components/logo/LogoMain';
+import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 import { useAuth } from 'context/AuthContext';
 
 // assets
@@ -31,16 +31,36 @@ export default function Login() {
       <Stack alignItems="center" spacing={1.5} sx={{ mb: 3.5, textAlign: 'center' }}>
         <Box
           sx={{
-            p: 0.5,
-            bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#131b2e' : '#ffffff'),
+            width: 88,
+            height: 88,
+            minWidth: 88,
+            minHeight: 88,
+            maxWidth: 88,
+            maxHeight: 88,
             borderRadius: '50%',
-            boxShadow: '0 10px 25px rgba(16, 185, 129, 0.2)',
-            border: '2.5px solid',
-            borderColor: '#10b981',
-            display: 'inline-flex'
+            p: '4px',
+            bgcolor: '#ffffff',
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.22)',
+            border: '2.5px solid #10b981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            flexShrink: 0
           }}
         >
-          <LogoMain />
+          <Box
+            component="img"
+            src={rehmatLogo}
+            alt="Rehmat Lawn Mowers Logo"
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              borderRadius: '50%',
+              display: 'block'
+            }}
+          />
         </Box>
         <Box>
           <Typography

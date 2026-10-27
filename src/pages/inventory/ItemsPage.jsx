@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -50,7 +51,16 @@ export default function ItemsPage() {
   const { items, masterItemNames = [], categories = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems, cleanDuplicateItems } = useStoreInventory();
 
   // Search & Category filter
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  const [searchTerm, setSearchTerm] = useState(urlSearch);
+
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchTerm(urlSearch);
+    }
+  }, [urlSearch]);
+
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
