@@ -56,11 +56,14 @@ import {
   ControlOutlined,
   LockOutlined,
   CrownOutlined,
-  TeamOutlined
+  TeamOutlined,
+  KeyOutlined,
+  CopyOutlined
 } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
+import { generateLicenseKey } from 'utils/licenseManager';
 
 const MODULE_LIST = [
   { key: 'dashboard', label: 'Main Store Dashboard', desc: 'Allows viewing executive dashboard analytics & alerts' },
@@ -119,6 +122,20 @@ export default function UserManagementPage() {
   // Delete Staff Dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState(null);
+
+  // License Generator State (Super Admin Tool)
+  const [licenseModalOpen, setLicenseModalOpen] = useState(false);
+  const [clientMachineIdInput, setClientMachineIdInput] = useState('');
+  const [clientStoreNameInput, setClientStoreNameInput] = useState('');
+  const [generatedKeyOutput, setGeneratedKeyOutput] = useState('');
+  const [keyCopied, setKeyCopied] = useState(false);
+
+  const handleGenerateKey = async (e) => {
+    if (e) e.preventDefault();
+    if (!clientMachineIdInput.trim()) return;
+    const key = await generateLicenseKey(clientMachineIdInput.trim(), clientStoreNameInput.trim());
+    setGeneratedKeyOutput(key);
+  };
 
   // Key metrics for executive stats
   const totalStaff = staffUsers.length;
@@ -299,6 +316,23 @@ export default function UserManagementPage() {
               </Typography>
             </Box>
           </Box>
+
+          {/* License Key Generator Button (Super Admin) */}
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<KeyOutlined />}
+            onClick={() => setLicenseModalOpen(true)}
+            sx={{
+              fontWeight: 700,
+              px: 2,
+              py: 1.1,
+              borderRadius: 1.5,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            License Keys
+          </Button>
 
           {/* Add Staff Button */}
           <Button
@@ -1214,6 +1248,110 @@ export default function UserManagementPage() {
           </Button>
           <Button onClick={handleConfirmDeleteStaff} color="error" variant="contained">
             Delete Staff
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* LICENSE GENERATOR MODAL FOR SUPER ADMIN */}
+      <Dialog open={licenseModalOpen} onClose={() => setLicenseModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <KeyOutlined style={{ color: '#1677ff' }} />
+            <Typography variant="h4" fontWeight={800}>
+              Device License Key Generator
+            </Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2.5}>
+            <Alert severity="info" sx={{ borderRadius: 1.5, fontWeight: 600 }}>
+              Each license key is cryptographically bound to the client&apos;s physical Machine ID. A client cannot run the software on any other computer using this key.
+            </Alert>
+
+            <Box component="form" onSubmit={handleGenerateKey}>
+              <Stack spacing={2}>
+                <TextField
+                  fullWidth
+                  required
+                  label="CLIENT MACHINE ID *"
+                  placeholder="e.g. RLM-9949-E216-7671"
+                  value={clientMachineIdInput}
+                  onChange={(e) => setClientMachineIdInput(e.target.value.toUpperCase())}
+                  helperText="Ask the client for the Machine ID shown on their activation screen."
+                />
+
+                <TextField
+                  fullWidth
+                  label="CLIENT / STORE NAME (OPTIONAL)"
+                  placeholder="e.g. Rehmat Store Factory Counter 1"
+                  value={clientStoreNameInput}
+                  onChange={(e) => setClientStoreNameInput(e.target.value)}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  startIcon={<KeyOutlined />}
+                  sx={{ py: 1.1, fontWeight: 800 }}
+                >
+                  Generate Activation Key
+                </Button>
+              </Stack>
+            </Box>
+
+            {generatedKeyOutput && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(82, 196, 26, 0.08)' : '#f6ffed'),
+                  borderColor: 'success.light'
+                }}
+              >
+                <Typography variant="caption" fontWeight={700} color="success.dark" textTransform="uppercase">
+                  GENERATED ACTIVATION KEY (LOCKED TO MACHINE):
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                  <Typography
+                    variant="h3"
+                    fontWeight={800}
+                    sx={{
+                      fontFamily: 'Consolas, monospace',
+                      letterSpacing: '1px',
+                      color: 'success.dark',
+                      userSelect: 'all'
+                    }}
+                  >
+                    {generatedKeyOutput}
+                  </Typography>
+
+                  <Button
+                    variant={keyCopied ? 'contained' : 'outlined'}
+                    color="success"
+                    startIcon={keyCopied ? <CheckCircleOutlined /> : <CopyOutlined />}
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedKeyOutput);
+                      setKeyCopied(true);
+                      setTimeout(() => setKeyCopied(false), 2500);
+                    }}
+                    sx={{ fontWeight: 700 }}
+                  >
+                    {keyCopied ? 'Copied' : 'Copy Key'}
+                  </Button>
+                </Stack>
+                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                  Send this key to the client. It will activate the software on their machine only.
+                </Typography>
+              </Paper>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 1.5 }}>
+          <Button onClick={() => setLicenseModalOpen(false)} color="secondary" sx={{ fontWeight: 600 }}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
