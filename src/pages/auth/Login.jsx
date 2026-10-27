@@ -23,53 +23,52 @@ export default function Login() {
 
   return (
     <AuthWrapper>
-      <Stack alignItems="center" spacing={3} sx={{ width: '100%' }}>
-        {/* Centered Logo */}
-        <Box
-          sx={{
-            width: 88,
-            height: 88,
-            minWidth: 88,
-            minHeight: 88,
-            maxWidth: 88,
-            maxHeight: 88,
-            borderRadius: '50%',
-            p: '4px',
-            bgcolor: '#ffffff',
-            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.22)',
-            border: '2.5px solid #10b981',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            flexShrink: 0
-          }}
-        >
+      <AuthCard>
+        <Stack spacing={2.5} alignItems="center">
+          {/* Centered Logo on top of Form */}
           <Box
-            component="img"
-            src={rehmatLogo}
-            alt="Rehmat Lawn Mowers Logo"
             sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
+              width: 84,
+              height: 84,
+              minWidth: 84,
+              minHeight: 84,
+              maxWidth: 84,
+              maxHeight: 84,
               borderRadius: '50%',
-              display: 'block'
+              p: '4px',
+              bgcolor: '#ffffff',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.22)',
+              border: '2.5px solid #10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              flexShrink: 0
             }}
-          />
-        </Box>
+          >
+            <Box
+              component="img"
+              src={rehmatLogo}
+              alt="Rehmat Lawn Mowers Logo"
+              sx={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                borderRadius: '50%',
+                display: 'block'
+              }}
+            />
+          </Box>
 
-        {/* Login Card */}
-        <AuthCard>
-          <Stack spacing={2.5}>
-            <Typography variant="h3" sx={{ fontWeight: 700, fontSize: '1.45rem' }}>
-              Sign In
-            </Typography>
+          <Typography variant="h3" sx={{ fontWeight: 700, fontSize: '1.45rem', textAlign: 'center' }}>
+            Sign In
+          </Typography>
 
+          <Box sx={{ width: '100%' }}>
             <AuthLogin />
-          </Stack>
-        </AuthCard>
-      </Stack>
+          </Box>
+        </Stack>
+      </AuthCard>
     </AuthWrapper>
   );
 }
