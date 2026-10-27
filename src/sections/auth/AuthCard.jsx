@@ -14,14 +14,26 @@ export default function AuthCard({ children, ...other }) {
 
   return (
     <MainCard
-      sx={{ maxWidth: { xs: 400, sm: 475 }, margin: { xs: 2.5, md: 3 }, '& > *': { flexGrow: 1, flexBasis: '50%' } }}
+      sx={{
+        width: '100%',
+        maxWidth: 460,
+        margin: '0 auto',
+        borderRadius: { xs: 3, sm: 4 },
+        border: '1px solid',
+        borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)'),
+        boxShadow: (theme) =>
+          theme.palette.mode === 'dark'
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.65)'
+            : '0 20px 40px -15px rgba(0, 0, 0, 0.08)',
+        bgcolor: 'background.paper',
+        '& > *': { flexGrow: 1, flexBasis: '100%' }
+      }}
       content={false}
       {...other}
       border={false}
       boxShadow
-      shadow={theme.vars.customShadows.z1}
     >
-      <Box sx={{ p: { xs: 2, sm: 3, md: 4, xl: 5 } }}>{children}</Box>
+      <Box sx={{ p: { xs: 2.75, sm: 4 } }}>{children}</Box>
     </MainCard>
   );
 }

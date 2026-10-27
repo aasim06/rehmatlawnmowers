@@ -1,5 +1,5 @@
+import { Navigate } from 'react-router-dom';
 import LoginPage from 'pages/auth/Login';
-import RegisterPage from 'pages/auth/Register';
 
 // ==============================|| AUTH ROUTING (INSTANT) ||============================== //
 
@@ -15,7 +15,7 @@ const LoginRoutes = {
         },
         {
           path: '/register',
-          element: <RegisterPage />
+          element: <Navigate to="/login" replace />
         }
       ]
     }

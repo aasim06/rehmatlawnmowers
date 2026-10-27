@@ -1,14 +1,10 @@
 import PropTypes from 'prop-types';
 
 // material-ui
-import Grid from '@mui/material/Grid';
-import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 
 // project imports
 import AuthFooter from 'components/cards/AuthFooter';
-import Logo from 'components/logo';
-import AuthCard from './AuthCard';
 
 // assets
 import AuthBackground from './AuthBackground';
@@ -17,32 +13,29 @@ import AuthBackground from './AuthBackground';
 
 export default function AuthWrapper({ children }) {
   return (
-    <Box sx={{ minHeight: '100vh' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative'
+      }}
+    >
       <AuthBackground />
-      <Stack sx={{ minHeight: '100vh', justifyContent: 'flex-end' }}>
-        <Box sx={{ px: 3, mt: 3 }} size={12}>
-          <Logo to="/" />
-        </Box>
-        <Box size={12}>
-          <Grid
-            container
-            sx={{
-              minHeight: {
-                xs: 'calc(100vh - 210px)',
-                sm: 'calc(100vh - 134px)',
-                md: 'calc(100vh - 132px)',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }
-            }}
-          >
-            <Grid>
-              <AuthCard>{children}</AuthCard>
-            </Grid>
-          </Grid>
-        </Box>
-        <AuthFooter />
-      </Stack>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          px: { xs: 2, sm: 3 },
+          py: { xs: 4, sm: 6 }
+        }}
+      >
+        <Box sx={{ width: '100%', maxWidth: 460 }}>{children}</Box>
+      </Box>
+      <AuthFooter />
     </Box>
   );
 }

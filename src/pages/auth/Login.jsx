@@ -1,16 +1,22 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 
 // material-ui
-import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 
 // project imports
 import AuthWrapper from 'sections/auth/AuthWrapper';
+import AuthCard from 'sections/auth/AuthCard';
 import AuthLogin from 'sections/auth/AuthLogin';
+import LogoMain from 'components/logo/LogoMain';
 import { useAuth } from 'context/AuthContext';
 
-// ================================|| JWT - LOGIN ||================================ //
+// assets
+import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
+
+// ================================|| STORE PORTAL - LOGIN ||================================ //
 
 export default function Login() {
   const { user } = useAuth();
@@ -21,19 +27,70 @@ export default function Login() {
 
   return (
     <AuthWrapper>
-      <Grid container spacing={3}>
-        <Grid size={12}>
-          <Stack direction="row" sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: { xs: -0.5, sm: 0.5 } }}>
-            <Typography variant="h3">Login</Typography>
-            <Typography component={Link} to={'/register'} variant="body1" sx={{ textDecoration: 'none', color: 'primary.main' }}>
-              Don&apos;t have an account?
+      {/* Brand Hero Header */}
+      <Stack alignItems="center" spacing={1.5} sx={{ mb: 3.5, textAlign: 'center' }}>
+        <Box
+          sx={{
+            p: 0.5,
+            bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#131b2e' : '#ffffff'),
+            borderRadius: '50%',
+            boxShadow: '0 10px 25px rgba(16, 185, 129, 0.2)',
+            border: '2.5px solid',
+            borderColor: '#10b981',
+            display: 'inline-flex'
+          }}
+        >
+          <LogoMain />
+        </Box>
+        <Box>
+          <Typography
+            variant="h3"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              color: 'text.primary',
+              fontSize: { xs: '1.45rem', sm: '1.75rem' }
+            }}
+          >
+            Rehmat Lawn Mowers
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: 'text.secondary',
+              mt: 0.5,
+              fontWeight: 500,
+              fontSize: { xs: '0.85rem', sm: '0.9rem' }
+            }}
+          >
+            Factory Store, Inventory & Billing System
+          </Typography>
+        </Box>
+      </Stack>
+
+      {/* Login Card */}
+      <AuthCard>
+        <Stack spacing={2.5}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="h4" sx={{ fontWeight: 700, fontSize: '1.35rem' }}>
+              Sign In
             </Typography>
+            <Chip
+              icon={<SafetyCertificateOutlined style={{ fontSize: 13 }} />}
+              label="Staff Portal"
+              size="small"
+              color="success"
+              variant="outlined"
+              sx={{ fontWeight: 600, fontSize: '0.72rem', height: 24 }}
+            />
           </Stack>
-        </Grid>
-        <Grid size={12}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: -1.5, fontSize: '0.85rem' }}>
+            Enter your authorized account credentials to continue.
+          </Typography>
+
           <AuthLogin />
-        </Grid>
-      </Grid>
+        </Stack>
+      </AuthCard>
     </AuthWrapper>
   );
 }

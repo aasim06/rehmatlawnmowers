@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
-import React from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // material-ui
 import Button from '@mui/material/Button';
@@ -8,15 +8,13 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormHelperText from '@mui/material/FormHelperText';
 import Grid from '@mui/material/Grid';
-import Link from '@mui/material/Link';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
+import CircularProgress from '@mui/material/CircularProgress';
 
 // third-party
 import * as Yup from 'yup';
@@ -30,16 +28,32 @@ import { useAuth } from 'context/AuthContext';
 // assets
 import EyeOutlined from '@ant-design/icons/EyeOutlined';
 import EyeInvisibleOutlined from '@ant-design/icons/EyeInvisibleOutlined';
+import UserOutlined from '@ant-design/icons/UserOutlined';
+import LockOutlined from '@ant-design/icons/LockOutlined';
 
 // ============================|| JWT - LOGIN ||============================ //
 
 export default function AuthLogin() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [checked, setChecked] = React.useState(false);
-  const [authError, setAuthError] = React.useState('');
+  const [checked, setChecked] = useState(() => {
+    try {
+      return localStorage.getItem('rehmat_remember_login') === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [authError, setAuthError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [showPassword, setShowPassword] = React.useState(false);
+  const savedEmail = (() => {
+    try {
+      return localStorage.getItem('rehmat_saved_email') || 'admin@rehmat.com';
+    } catch {
+      return 'admin@rehmat.com';
+    }
+  })();
+
   const handleClickShowPassword = () => {
     setShowPassword(!showPassword);
   };
@@ -51,13 +65,13 @@ export default function AuthLogin() {
   return (
     <>
       {authError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
           {authError}
         </Alert>
       )}
       <Formik
         initialValues={{
-          email: 'admin@rehmat.com',
+          email: savedEmail,
           password: '123456',
           submit: null
         }}
@@ -67,6 +81,18 @@ export default function AuthLogin() {
         })}
         onSubmit={async (values, { setSubmitting }) => {
           setAuthError('');
+          try {
+            if (checked) {
+              localStorage.setItem('rehmat_remember_login', 'true');
+              localStorage.setItem('rehmat_saved_email', values.email);
+            } else {
+              localStorage.removeItem('rehmat_remember_login');
+              localStorage.removeItem('rehmat_saved_email');
+            }
+          } catch {
+            // Ignore localStorage errors
+          }
+
           const result = await login(values.email, values.password);
           if (result.success) {
             navigate('/');
@@ -76,12 +102,14 @@ export default function AuthLogin() {
           setSubmitting(false);
         }}
       >
-        {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values, setFieldValue }) => (
+        {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values }) => (
           <form noValidate onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
+            <Grid container spacing={2.5}>
               <Grid size={12}>
                 <Stack sx={{ gap: 1 }}>
-                  <InputLabel htmlFor="email-login">Username or Email Address</InputLabel>
+                  <InputLabel htmlFor="email-login" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                    Username or Email Address
+                  </InputLabel>
                   <OutlinedInput
                     id="email-login"
                     type="text"
@@ -89,9 +117,15 @@ export default function AuthLogin() {
                     name="email"
                     onBlur={handleBlur}
                     onChange={handleChange}
-                    placeholder="Enter Username or Email"
+                    placeholder="e.g. admin@rehmat.com"
                     fullWidth
+                    startAdornment={
+                      <InputAdornment position="start">
+                        <UserOutlined style={{ color: '#94a3b8' }} />
+                      </InputAdornment>
+                    }
                     error={Boolean(touched.email && errors.email)}
+                    sx={{ borderRadius: 2 }}
                   />
                 </Stack>
                 {touched.email && errors.email && (
@@ -103,16 +137,23 @@ export default function AuthLogin() {
 
               <Grid size={12}>
                 <Stack sx={{ gap: 1 }}>
-                  <InputLabel htmlFor="password-login">Password</InputLabel>
+                  <InputLabel htmlFor="password-login" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                    Password
+                  </InputLabel>
                   <OutlinedInput
                     fullWidth
                     error={Boolean(touched.password && errors.password)}
-                    id="-password-login"
+                    id="password-login"
                     type={showPassword ? 'text' : 'password'}
                     value={values.password}
                     name="password"
                     onBlur={handleBlur}
                     onChange={handleChange}
+                    startAdornment={
+                      <InputAdornment position="start">
+                        <LockOutlined style={{ color: '#94a3b8' }} />
+                      </InputAdornment>
+                    }
                     endAdornment={
                       <InputAdornment position="end">
                         <IconButton
@@ -127,6 +168,7 @@ export default function AuthLogin() {
                       </InputAdornment>
                     }
                     placeholder="Enter password"
+                    sx={{ borderRadius: 2 }}
                   />
                 </Stack>
                 {touched.password && errors.password && (
@@ -136,19 +178,23 @@ export default function AuthLogin() {
                 )}
               </Grid>
 
-              <Grid sx={{ mt: -1 }} size={12}>
-                <Stack direction="row" sx={{ gap: 2, alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <Grid size={12} sx={{ mt: -0.5 }}>
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
                   <FormControlLabel
                     control={
                       <Checkbox
                         checked={checked}
                         onChange={(event) => setChecked(event.target.checked)}
                         name="checked"
-                        color="primary"
+                        color="success"
                         size="small"
                       />
                     }
-                    label={<Typography variant="h6">Keep me signed in</Typography>}
+                    label={
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}>
+                        Keep me signed in
+                      </Typography>
+                    }
                   />
                 </Stack>
               </Grid>
@@ -163,9 +209,21 @@ export default function AuthLogin() {
                     type="submit"
                     variant="contained"
                     color="primary"
-                    sx={{ fontWeight: 700 }}
+                    sx={{
+                      fontWeight: 700,
+                      height: 48,
+                      fontSize: '0.98rem',
+                      borderRadius: 2
+                    }}
                   >
-                    Sign In to Store
+                    {isSubmitting ? (
+                      <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center">
+                        <CircularProgress size={18} color="inherit" thickness={4} />
+                        <span>Signing In...</span>
+                      </Stack>
+                    ) : (
+                      'Sign In to Store'
+                    )}
                   </Button>
                 </AnimateButton>
               </Grid>

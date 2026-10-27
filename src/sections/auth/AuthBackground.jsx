@@ -2,37 +2,33 @@
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 
-// ==============================|| AUTH BLUR BACK SVG ||============================== //
+// ==============================|| AUTH BACKGROUND - MODERN ERP ||============================== //
 
 export default function AuthBackground() {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   return (
     <Box
       sx={{
-        position: 'absolute',
-        filter: 'blur(18px)',
+        position: 'fixed',
+        inset: 0,
         zIndex: -1,
-        bottom: 0,
-        transform: 'inherit'
+        pointerEvents: 'none',
+        overflow: 'hidden',
+        background: isDark
+          ? 'radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.12) 0%, transparent 50%), radial-gradient(circle at 90% 90%, rgba(99, 102, 241, 0.08) 0%, transparent 45%), #090d16'
+          : 'radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.10) 0%, transparent 55%), radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.07) 0%, transparent 45%), #f8fafc',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: isDark
+            ? 'radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)'
+            : 'radial-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px)',
+          backgroundSize: '24px 24px'
+        }
       }}
-    >
-      <svg width="100%" height="calc(100vh - 175px)" viewBox="0 0 405 809" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M-358.39 358.707L-293.914 294.23L-293.846 294.163H-172.545L-220.81 342.428L-233.272 354.889L-282.697 404.314L-276.575 410.453L0.316589 687.328L283.33 404.314L233.888 354.889L230.407 351.391L173.178 294.163H294.48L294.547 294.23L345.082 344.765L404.631 404.314L0.316589 808.629L-403.998 404.314L-358.39 358.707ZM0.316589 0L233.938 233.622H112.637L0.316589 121.301L-112.004 233.622H-233.305L0.316589 0Z"
-          fill={theme.vars.palette.primary.light}
-        />
-        <path
-          d="M-516.39 358.707L-451.914 294.23L-451.846 294.163H-330.545L-378.81 342.428L-391.272 354.889L-440.697 404.314L-434.575 410.453L-157.683 687.328L125.33 404.314L75.8879 354.889L72.4068 351.391L15.1785 294.163H136.48L136.547 294.23L187.082 344.765L246.631 404.314L-157.683 808.629L-561.998 404.314L-516.39 358.707ZM-157.683 0L75.9383 233.622H-45.3627L-157.683 121.301L-270.004 233.622H-391.305L-157.683 0Z"
-          fill={theme.vars.palette.success.light}
-          opacity="0.6"
-        />
-        <path
-          d="M-647.386 358.707L-582.91 294.23L-582.842 294.163H-461.541L-509.806 342.428L-522.268 354.889L-571.693 404.314L-565.571 410.453L-288.68 687.328L-5.66624 404.314L-55.1082 354.889L-58.5893 351.391L-115.818 294.163H5.48342L5.5507 294.23L56.0858 344.765L115.635 404.314L-288.68 808.629L-692.994 404.314L-647.386 358.707ZM-288.68 0L-55.0578 233.622H-176.359L-288.68 121.301L-401 233.622H-522.301L-288.68 0Z"
-          fill={theme.vars.palette.error.lighter}
-          opacity="1"
-        />
-      </svg>
-    </Box>
+    />
   );
 }
