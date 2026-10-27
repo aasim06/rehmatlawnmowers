@@ -332,6 +332,8 @@ export default function UserManagementPage() {
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              width: '100%',
+              height: '100%',
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
@@ -339,8 +341,8 @@ export default function UserManagementPage() {
               }
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
                 <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
                   Total Staff Accounts
                 </Typography>
@@ -353,6 +355,7 @@ export default function UserManagementPage() {
               </Box>
               <Box
                 sx={{
+                  flexShrink: 0,
                   width: 44,
                   height: 44,
                   borderRadius: 2,
@@ -366,7 +369,7 @@ export default function UserManagementPage() {
               >
                 <TeamOutlined />
               </Box>
-            </Stack>
+            </Box>
           </Paper>
         </Grid>
 
@@ -379,6 +382,8 @@ export default function UserManagementPage() {
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              width: '100%',
+              height: '100%',
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
@@ -386,8 +391,8 @@ export default function UserManagementPage() {
               }
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
                 <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
                   Admins & Managers
                 </Typography>
@@ -400,6 +405,7 @@ export default function UserManagementPage() {
               </Box>
               <Box
                 sx={{
+                  flexShrink: 0,
                   width: 44,
                   height: 44,
                   borderRadius: 2,
@@ -413,7 +419,7 @@ export default function UserManagementPage() {
               >
                 <CrownOutlined />
               </Box>
-            </Stack>
+            </Box>
           </Paper>
         </Grid>
 
@@ -426,6 +432,8 @@ export default function UserManagementPage() {
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              width: '100%',
+              height: '100%',
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
@@ -433,8 +441,8 @@ export default function UserManagementPage() {
               }
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
                 <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
                   Store Keepers
                 </Typography>
@@ -447,6 +455,7 @@ export default function UserManagementPage() {
               </Box>
               <Box
                 sx={{
+                  flexShrink: 0,
                   width: 44,
                   height: 44,
                   borderRadius: 2,
@@ -460,7 +469,7 @@ export default function UserManagementPage() {
               >
                 <UserOutlined />
               </Box>
-            </Stack>
+            </Box>
           </Paper>
         </Grid>
 
@@ -473,6 +482,8 @@ export default function UserManagementPage() {
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              width: '100%',
+              height: '100%',
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
@@ -480,8 +491,8 @@ export default function UserManagementPage() {
               }
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
                 <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
                   Security Audit Logs
                 </Typography>
@@ -494,6 +505,7 @@ export default function UserManagementPage() {
               </Box>
               <Box
                 sx={{
+                  flexShrink: 0,
                   width: 44,
                   height: 44,
                   borderRadius: 2,
@@ -507,7 +519,7 @@ export default function UserManagementPage() {
               >
                 <HistoryOutlined />
               </Box>
-            </Stack>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
