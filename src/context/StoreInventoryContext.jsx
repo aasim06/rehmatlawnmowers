@@ -26,6 +26,47 @@ const generateUUID = () => {
   });
 };
 
+const getNextCategoryId = (existingCategories = []) => {
+  const nums = (existingCategories || [])
+    .map((c) => {
+      const idStr = String(c?.id || '');
+      const match = idStr.match(/^CAT-(\d+)$/i);
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter((n) => n > 0);
+  const max = nums.length > 0 ? Math.max(...nums) : 0;
+  return `CAT-${max + 1}`;
+};
+
+const normalizeCategories = (cats = []) => {
+  if (!Array.isArray(cats)) return [];
+  let nextNum = 1;
+  const existingNums = cats
+    .map((c) => {
+      const match = String(c?.id || '').match(/^CAT-(\d+)$/i);
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter((n) => n > 0);
+  if (existingNums.length > 0) {
+    nextNum = Math.max(...existingNums) + 1;
+  }
+
+  return cats.map((c) => {
+    if (!c) return c;
+    if (typeof c === 'string') {
+      return { id: `CAT-${nextNum++}`, name: c, description: '' };
+    }
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(c.id));
+    if (!c.id || isUUID || !String(c.id).toUpperCase().startsWith('CAT-')) {
+      return {
+        ...c,
+        id: `CAT-${nextNum++}`
+      };
+    }
+    return c;
+  });
+};
+
 const initialMasterItemNames = [];
 
 export function StoreInventoryProvider({ children }) {
@@ -87,7 +128,11 @@ export function StoreInventoryProvider({ children }) {
 
     if (Array.isArray(saved) && saved.length > 0) {
       const clean = saved.filter((c) => !deletedCatSet.has(String(c.id).toLowerCase()) && !deletedCatSet.has(String(c.name || '').toLowerCase()));
-      if (clean.length > 0) return clean;
+      if (clean.length > 0) {
+        const normalized = normalizeCategories(clean);
+        localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(normalized));
+        return normalized;
+      }
     }
     if (deletedCatList.length > 0) {
       return [];
@@ -1247,7 +1292,10 @@ export function StoreInventoryProvider({ children }) {
 
   // 8. Category Actions
   const addCategory = async (categoryData) => {
-    const categoryId = generateUUID();
+    let categoryId = categoryData.id;
+    if (!categoryId || !String(categoryId).toUpperCase().startsWith('CAT-')) {
+      categoryId = getNextCategoryId(categories);
+    }
     const newCategory = {
       id: categoryId,
       name: (categoryData.name || '').trim(),
@@ -1263,12 +1311,13 @@ export function StoreInventoryProvider({ children }) {
     setCategories((prev) => {
       const exists = (prev || []).some((c) => (c.name || '').toLowerCase() === newCategory.name.toLowerCase());
       if (exists) return prev;
-      const updated = [newCategory, ...(prev || [])];
-      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
-      return updated;
+      const updated = [...(prev || []), newCategory];
+      const normalized = normalizeCategories(updated);
+      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(normalized));
+      return normalized;
     });
 
-    logActivity('Category Added', `Added category "${newCategory.name}"`);
+    logActivity('Category Added', `Added category "${newCategory.name}" (${categoryId})`);
 
     try {
       await supabase.from('categories').insert([{

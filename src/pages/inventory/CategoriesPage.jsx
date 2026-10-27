@@ -60,22 +60,47 @@ export default function CategoriesPage() {
   // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const filteredCategories = (categories || [])
+  // Normalize and clean category IDs so UUIDs never appear in UI
+  let nextCatNum = 1;
+  const existingNums = (categories || [])
     .map((c) => {
-      if (typeof c === 'string') {
-        return { id: `CAT-${c.replace(/\s+/g, '-').toUpperCase()}`, name: c, description: '' };
-      }
-      return c;
+      const match = String(c?.id || '').match(/^CAT-(\d+)$/i);
+      return match ? parseInt(match[1], 10) : 0;
     })
-    .filter((c) => {
-      if (!c) return false;
-      const catName = c.name || '';
-      const catDesc = c.description || '';
-      return (
-        catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        catDesc.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    });
+    .filter((n) => n > 0);
+  if (existingNums.length > 0) {
+    nextCatNum = Math.max(...existingNums) + 1;
+  }
+
+  const normalizedCategoryList = (categories || []).map((c) => {
+    if (!c) return c;
+    if (typeof c === 'string') {
+      return { id: `CAT-${nextCatNum++}`, name: c, description: '' };
+    }
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(c.id));
+    if (!c.id || isUUID || !String(c.id).toUpperCase().startsWith('CAT-')) {
+      return { ...c, id: `CAT-${nextCatNum++}` };
+    }
+    return c;
+  });
+
+  // Sort by CAT number
+  const sortedCategories = [...normalizedCategoryList].sort((a, b) => {
+    const numA = parseInt(String(a.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(String(b.id || '').replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
+  const filteredCategories = sortedCategories.filter((c) => {
+    if (!c) return false;
+    const catName = c.name || '';
+    const catDesc = c.description || '';
+    return (
+      catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      catDesc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(c.id).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   // Checkbox Selection Handlers
   const handleSelectAllClick = (event) => {
