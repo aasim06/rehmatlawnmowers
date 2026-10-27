@@ -30,8 +30,6 @@ import { useAuth } from 'context/AuthContext';
 // assets
 import EyeOutlined from '@ant-design/icons/EyeOutlined';
 import EyeInvisibleOutlined from '@ant-design/icons/EyeInvisibleOutlined';
-import UserOutlined from '@ant-design/icons/UserOutlined';
-import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
 
 // ============================|| JWT - LOGIN ||============================ //
 
@@ -48,16 +46,6 @@ export default function AuthLogin() {
 
   const handleMouseDownPassword = (event) => {
     event.preventDefault();
-  };
-
-  const handleQuickLogin = async (email, password) => {
-    setAuthError('');
-    const result = await login(email, password);
-    if (result.success) {
-      navigate('/');
-    } else {
-      setAuthError(result.error || 'Login failed. Please check your credentials.');
-    }
   };
 
   return (
@@ -180,51 +168,6 @@ export default function AuthLogin() {
                     Sign In to Store
                   </Button>
                 </AnimateButton>
-              </Grid>
-
-              {/* Quick Preset Demo Accounts */}
-              <Grid size={12}>
-                <Divider sx={{ my: 1 }}>
-                  <Typography variant="caption" color="textSecondary" fontWeight={600}>
-                    QUICK DEMO ACCOUNTS
-                  </Typography>
-                </Divider>
-
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="primary"
-                    size="small"
-                    startIcon={<SafetyCertificateOutlined />}
-                    onClick={() => handleQuickLogin('admin@rehmat.com', '123456')}
-                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
-                  >
-                    Super Admin
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="info"
-                    size="small"
-                    startIcon={<UserOutlined />}
-                    onClick={() => handleQuickLogin('arslan@rehmat.com', '123456')}
-                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
-                  >
-                    Arslan (Stock Only)
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="warning"
-                    size="small"
-                    startIcon={<UserOutlined />}
-                    onClick={() => handleQuickLogin('storekeeper@rehmat.com', '123456')}
-                    sx={{ fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
-                  >
-                    Store Keeper
-                  </Button>
-                </Stack>
               </Grid>
             </Grid>
           </form>
