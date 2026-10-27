@@ -22,7 +22,7 @@ export default function DrawerHeader({ open }) {
         paddingRight: 0
       }}
     >
-      <Logo isIcon={!open} sx={{ width: open ? '100%' : 44, height: open ? 'auto' : 44, display: 'flex', justifyContent: 'center' }} />
+      <Logo isIcon={!open} sx={{ width: open ? '100%' : 44, height: open ? 'auto' : 44, display: 'flex', justifyContent: 'center', alignItems: 'center', mx: 'auto' }} />
     </DrawerHeaderStyled>
   );
 }

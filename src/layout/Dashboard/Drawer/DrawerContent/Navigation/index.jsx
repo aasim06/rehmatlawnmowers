@@ -6,10 +6,13 @@ import Box from '@mui/material/Box';
 import NavGroup from './NavGroup';
 import menuItem from 'menu-items';
 import usePermission from 'hooks/usePermission';
+import { useGetMenuMaster } from 'api/menu';
 
 // ==============================|| DRAWER CONTENT - NAVIGATION ||============================== //
 
 export default function Navigation() {
+  const { menuMaster } = useGetMenuMaster();
+  const drawerOpen = menuMaster.isDashboardDrawerOpened;
   const { hasAccessToItem, isSuperAdmin } = usePermission();
 
   const navGroups = menuItem.items.map((item) => {
@@ -41,5 +44,19 @@ export default function Navigation() {
     }
   });
 
-  return <Box sx={{ pt: 2 }}>{navGroups}</Box>;
+  return (
+    <Box
+      sx={{
+        pt: 2,
+        width: '100%',
+        ...(!drawerOpen && {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        })
+      }}
+    >
+      {navGroups}
+    </Box>
+  );
 }

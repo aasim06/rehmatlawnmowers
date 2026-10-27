@@ -13,13 +13,15 @@ export default function LogoIcon() {
   return (
     <Box
       sx={{
-        display: 'inline-flex',
+        width: 44,
+        height: 44,
+        display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: '50%',
         bgcolor: isDark ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
-        p: isDark ? 0.5 : 0,
-        boxShadow: 'none'
+        boxShadow: 'none',
+        overflow: 'hidden'
       }}
     >
       <Box
@@ -27,8 +29,8 @@ export default function LogoIcon() {
         src={transparentLogoSrc}
         alt="Rehmat Lawn Mowers Logo"
         sx={{
-          height: 44,
-          width: 44,
+          height: isDark ? 36 : 44,
+          width: isDark ? 36 : 44,
           objectFit: 'contain',
           borderRadius: '50%',
           display: 'block',
