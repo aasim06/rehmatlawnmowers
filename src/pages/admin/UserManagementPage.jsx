@@ -20,12 +20,14 @@ import {
   DialogTitle,
   Divider,
   Drawer,
+  FormControl,
   Grid,
   IconButton,
   InputAdornment,
   MenuItem,
   OutlinedInput,
   Paper,
+  Select,
   Stack,
   Switch,
   Tab,
@@ -53,7 +55,8 @@ import {
   CheckCircleOutlined,
   ControlOutlined,
   LockOutlined,
-  CrownOutlined
+  CrownOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 
 // project imports
@@ -92,6 +95,7 @@ export default function UserManagementPage() {
 
   const [activeTab, setActiveTab] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All');
   const [logSearchTerm, setLogSearchTerm] = useState('');
 
   // Add Staff Drawer
@@ -116,13 +120,22 @@ export default function UserManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState(null);
 
+  // Key metrics for executive stats
+  const totalStaff = staffUsers.length;
+  const superAdminCount = staffUsers.filter((u) => u.role === 'Super Admin').length;
+  const adminCount = staffUsers.filter((u) => u.role === 'Admin').length;
+  const storeKeeperCount = staffUsers.filter((u) => u.role === 'Store Keeper').length;
+  const auditLogsCount = auditLogs.length;
+
   // Filtered staff list
-  const filteredStaff = staffUsers.filter(
-    (u) =>
+  const filteredStaff = staffUsers.filter((u) => {
+    const matchesSearch =
       (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.role || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      (u.role || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   // Filtered audit logs
   const filteredAuditLogs = auditLogs.filter(
@@ -218,95 +231,288 @@ export default function UserManagementPage() {
 
   return (
     <Stack spacing={3}>
-      {/* 1. Header Card & Active User Badge */}
-      <MainCard>
-        <Grid container spacing={2} alignItems="center">
-          <Grid size={{ xs: 12, md: 7 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
+      {/* 1. Executive Page Header */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', md: 'center' },
+          gap: 2,
+          pt: 0.5
+        }}
+      >
+        <Box>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.5px' }}>
+              Staff & Access Control
+            </Typography>
+            <Chip
+              label="RBAC Security"
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 700, fontSize: '0.72rem', height: 24, borderRadius: '6px' }}
+            />
+          </Stack>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+            Manage staff credentials, configure role access privileges, and review audit trail logs.
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+          {/* Active User Session Pill */}
+          <Box
+            sx={{
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
+              gap: 1.25,
+              px: 2,
+              py: 0.85,
+              borderRadius: 2,
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                bgcolor: activeUser?.role === 'Super Admin' ? 'primary.main' : activeUser?.role === 'Admin' ? 'info.main' : 'warning.main',
+                fontSize: '0.8rem',
+                fontWeight: 700
+              }}
+            >
+              {(activeUser?.name || 'U').charAt(0).toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography variant="caption" color="textSecondary" display="block" sx={{ lineHeight: 1 }}>
+                Logged In Session
+              </Typography>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2, mt: 0.25 }}>
+                {(activeUser?.name || 'Sabeel').replace(/\s*\([^)]*\)/g, '').trim()} &bull;{' '}
+                <Box component="span" sx={{ color: 'primary.main' }}>
+                  {activeUser?.role || 'Super Admin'}
+                </Box>
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Add Staff Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PlusOutlined />}
+            onClick={() => setDrawerOpen(true)}
+            sx={{
+              fontWeight: 700,
+              px: 2.5,
+              py: 1.1,
+              boxShadow: '0 4px 12px rgba(24, 144, 255, 0.25)',
+              borderRadius: 1.5,
+              whiteSpace: 'nowrap',
+              flex: { xs: 1, md: 'none' }
+            }}
+          >
+            Add Staff Member
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* 2. Executive Stat Cards */}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+                borderColor: 'primary.main'
+              }
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Box>
+                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
+                  Total Staff Accounts
+                </Typography>
+                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: 'text.primary' }}>
+                  {totalStaff}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {totalStaff === 1 ? '1 active account' : `${totalStaff} active registered accounts`}
+                </Typography>
+              </Box>
               <Box
                 sx={{
-                  width: 50,
-                  height: 50,
+                  width: 44,
+                  height: 44,
                   borderRadius: 2,
-                  bgcolor: 'primary.light',
+                  bgcolor: 'primary.lighter',
+                  color: 'primary.main',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'primary.main',
-                  fontSize: '1.6rem'
+                  fontSize: '1.25rem'
                 }}
               >
-                <SafetyCertificateOutlined />
-              </Box>
-              <Box>
-                <Typography variant="h4" fontWeight={700}>
-                  User Management & Access Control (RBAC)
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Manage Super Admin, Admin, and Store Keeper accounts with fine-grained page & action toggles.
-                </Typography>
+                <TeamOutlined />
               </Box>
             </Stack>
-          </Grid>
+          </Paper>
+        </Grid>
 
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.5}
-              justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
-              alignItems="center"
-            >
-              {/* Professional Active User Badge */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+                borderColor: '#722ed1'
+              }
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Box>
+                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
+                  Admins & Managers
+                </Typography>
+                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#722ed1' }}>
+                  {superAdminCount + adminCount}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {superAdminCount} Super Admin &bull; {adminCount} Admin
+                </Typography>
+              </Box>
               <Box
                 sx={{
-                  display: 'inline-flex',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  bgcolor: '#f9f0ff',
+                  color: '#722ed1',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: 1.25,
-                  px: 1.75,
-                  py: 0.85,
-                  borderRadius: 2.5,
-                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'),
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  width: { xs: '100%', sm: 'auto' }
+                  justifyContent: 'center',
+                  fontSize: '1.25rem'
                 }}
               >
-                <Avatar
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: activeUser?.role === 'Super Admin' ? 'primary.main' : activeUser?.role === 'Admin' ? 'info.main' : 'warning.main',
-                    color: '#fff',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  {activeUser?.role === 'Super Admin' ? <CrownOutlined /> : <UserOutlined />}
-                </Avatar>
-                <Box sx={{ textAlign: 'left', minWidth: 0 }}>
-                  <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ lineHeight: 1.2 }}>
-                    {(activeUser?.name || 'Sabeel').replace(/\s*\([^)]*\)/g, '').trim()}
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
-                    <Chip
-                      size="small"
-                      label={activeUser?.role || 'Super Admin'}
-                      color={activeUser?.role === 'Super Admin' ? 'primary' : activeUser?.role === 'Admin' ? 'info' : 'warning'}
-                      sx={{
-                        fontWeight: 700,
-                        height: 18,
-                        fontSize: '0.65rem',
-                        borderRadius: '4px'
-                      }}
-                    />
-                  </Stack>
-                </Box>
+                <CrownOutlined />
               </Box>
             </Stack>
-          </Grid>
+          </Paper>
         </Grid>
-      </MainCard>
 
-      {/* 2. Tabs: Staff List vs Activity Audit Logs */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+                borderColor: '#52c41a'
+              }
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Box>
+                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
+                  Store Keepers
+                </Typography>
+                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#52c41a' }}>
+                  {storeKeeperCount}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Counter & Inventory operators
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  bgcolor: '#f6ffed',
+                  color: '#52c41a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.25rem'
+                }}
+              >
+                <UserOutlined />
+              </Box>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+                borderColor: '#fa8c16'
+              }
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Box>
+                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
+                  Security Audit Logs
+                </Typography>
+                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#fa8c16' }}>
+                  {auditLogsCount}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Recorded actions & events
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  bgcolor: '#fff7e6',
+                  color: '#fa8c16',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.25rem'
+                }}
+              >
+                <HistoryOutlined />
+              </Box>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* 3. Main Data Card: Staff List & Audit Logs */}
       <MainCard>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2.5 }}>
           <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
@@ -317,9 +523,9 @@ export default function UserManagementPage() {
 
         {/* TAB 0: STAFF USERS LIST */}
         {activeTab === 0 && (
-          <Stack spacing={2}>
+          <Stack spacing={2.5}>
             <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 8 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 5 }}>
                 <OutlinedInput
                   fullWidth
                   size="small"
@@ -333,16 +539,47 @@ export default function UserManagementPage() {
                   }
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }} textAlign={{ xs: 'left', sm: 'right' }}>
+
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <FormControl size="small" fullWidth>
+                  <Select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    displayEmpty
+                    renderValue={(selected) => (selected === 'All' ? 'Filter: All Roles' : `Role: ${selected}`)}
+                  >
+                    <MenuItem value="All">All Roles ({staffUsers.length})</MenuItem>
+                    <MenuItem value="Super Admin">Super Admin ({superAdminCount})</MenuItem>
+                    <MenuItem value="Admin">Admin ({adminCount})</MenuItem>
+                    <MenuItem value="Store Keeper">Store Keeper ({storeKeeperCount})</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid
+                size={{ xs: 12, md: 4 }}
+                sx={{
+                  display: 'flex',
+                  justifyContent: { xs: 'flex-start', md: 'flex-end' },
+                  alignItems: 'center',
+                  gap: 1.5
+                }}
+              >
+                <Chip
+                  label={`${filteredStaff.length} of ${staffUsers.length} staff displayed`}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontWeight: 600, color: 'text.secondary' }}
+                />
                 <Button
                   variant="contained"
                   color="primary"
-                  fullWidth={{ xs: true, sm: false }}
+                  size="small"
                   startIcon={<PlusOutlined />}
                   onClick={() => setDrawerOpen(true)}
-                  sx={{ fontWeight: 700, width: { xs: '100%', sm: 'auto' } }}
+                  sx={{ fontWeight: 700, px: 2, py: 0.75, display: { xs: 'flex', md: 'none' } }}
                 >
-                  Add Staff Member
+                  Add Staff
                 </Button>
               </Grid>
             </Grid>
@@ -385,14 +622,33 @@ export default function UserManagementPage() {
                             />
                           </Stack>
 
-                          <Box>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                              {staff.name}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary" display="block">
-                              {staff.email}
-                            </Typography>
-                          </Box>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Avatar
+                              sx={{
+                                width: 38,
+                                height: 38,
+                                bgcolor:
+                                  staff.role === 'Super Admin'
+                                    ? 'primary.main'
+                                    : staff.role === 'Admin'
+                                    ? '#722ed1'
+                                    : '#52c41a',
+                                color: '#fff',
+                                fontSize: '0.85rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              {(staff.name || 'U').charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight={700}>
+                                {staff.name}
+                              </Typography>
+                              <Typography variant="caption" color="textSecondary" display="block">
+                                {staff.email}
+                              </Typography>
+                            </Box>
+                          </Stack>
 
                           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 1.5 }}>
                             <Typography variant="caption" fontWeight={600} color="textSecondary">
@@ -488,12 +744,33 @@ export default function UserManagementPage() {
                         return (
                           <TableRow key={staff.id} hover>
                             <TableCell>
-                              <Typography variant="subtitle2" fontWeight={700}>
-                                {staff.name}
-                              </Typography>
-                              <Typography variant="caption" color="textSecondary">
-                                {staff.email}
-                              </Typography>
+                              <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Avatar
+                                  sx={{
+                                    width: 36,
+                                    height: 36,
+                                    bgcolor:
+                                      staff.role === 'Super Admin'
+                                        ? 'primary.main'
+                                        : staff.role === 'Admin'
+                                        ? '#722ed1'
+                                        : '#52c41a',
+                                    color: '#fff',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {(staff.name || 'U').charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2" fontWeight={700}>
+                                    {staff.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="textSecondary">
+                                    {staff.email}
+                                  </Typography>
+                                </Box>
+                              </Stack>
                             </TableCell>
 
                             <TableCell>{getRoleBadge(staff.role)}</TableCell>
