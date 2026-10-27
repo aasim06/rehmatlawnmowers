@@ -16,10 +16,10 @@ import Typography from './typography';
 
 export default function ThemeCustomization({ children }) {
   const { state } = useConfig();
-  const mode = state.mode || 'light';
+  const mode = state?.mode || 'light';
 
-  const themeTypography = useMemo(() => Typography(state.fontFamily), [state.fontFamily]);
-  const palettes = useMemo(() => buildPalette(state.presetColor), [state.presetColor]);
+  const themeTypography = useMemo(() => Typography(state?.fontFamily), [state?.fontFamily]);
+  const palettes = useMemo(() => buildPalette(state?.presetColor), [state?.presetColor]);
   const currentPalette = mode === 'dark' ? palettes.dark : palettes.light;
 
   // Apply data-color-scheme to <html> for CSS vars
@@ -58,7 +58,7 @@ export default function ThemeCustomization({ children }) {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider disableTransitionOnChange theme={themes} defaultColorScheme={mode}>
+      <ThemeProvider disableTransitionOnChange theme={themes} defaultColorScheme={mode} defaultMode={mode}>
         <CssBaseline enableColorScheme />
         {children}
       </ThemeProvider>

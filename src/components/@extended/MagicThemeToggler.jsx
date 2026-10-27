@@ -6,7 +6,7 @@ import { SunOutlined, MoonOutlined } from '@ant-design/icons';
 
 export default function MagicThemeToggler() {
   const { state, setField } = useConfig();
-  const isDark = state.mode === 'dark';
+  const isDark = state?.mode === 'dark';
 
   const toggleTheme = () => {
     setField('mode', isDark ? 'light' : 'dark');
