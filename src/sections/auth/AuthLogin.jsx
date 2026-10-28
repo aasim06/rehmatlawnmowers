@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // material-ui
@@ -40,7 +40,7 @@ export default function AuthLogin() {
     try {
       return localStorage.getItem('rehmat_remember_login') === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
   const [authError, setAuthError] = useState('');
@@ -48,9 +48,12 @@ export default function AuthLogin() {
 
   const savedEmail = (() => {
     try {
-      return localStorage.getItem('rehmat_saved_email') || 'admin@rehmat.com';
+      if (localStorage.getItem('rehmat_remember_login') === 'true') {
+        return localStorage.getItem('rehmat_saved_email') || '';
+      }
+      return '';
     } catch {
-      return 'admin@rehmat.com';
+      return '';
     }
   })();
 
@@ -70,9 +73,10 @@ export default function AuthLogin() {
         </Alert>
       )}
       <Formik
+        enableReinitialize
         initialValues={{
-          email: savedEmail,
-          password: '123456',
+          email: savedEmail || '',
+          password: '',
           submit: null
         }}
         validationSchema={Yup.object().shape({
@@ -103,7 +107,7 @@ export default function AuthLogin() {
         }}
       >
         {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values }) => (
-          <form noValidate onSubmit={handleSubmit}>
+          <form noValidate onSubmit={handleSubmit} autoComplete="off">
             <Grid container spacing={2.5}>
               <Grid size={12}>
                 <Stack sx={{ gap: 1 }}>
@@ -117,8 +121,10 @@ export default function AuthLogin() {
                     name="email"
                     onBlur={handleBlur}
                     onChange={handleChange}
-                    placeholder="e.g. admin@rehmat.com"
+                    placeholder="Enter username or email"
                     fullWidth
+                    autoComplete="off"
+                    inputProps={{ autoComplete: 'off' }}
                     startAdornment={
                       <InputAdornment position="start">
                         <UserOutlined style={{ color: '#94a3b8' }} />
@@ -149,6 +155,8 @@ export default function AuthLogin() {
                     name="password"
                     onBlur={handleBlur}
                     onChange={handleChange}
+                    autoComplete="new-password"
+                    inputProps={{ autoComplete: 'new-password' }}
                     startAdornment={
                       <InputAdornment position="start">
                         <LockOutlined style={{ color: '#94a3b8' }} />

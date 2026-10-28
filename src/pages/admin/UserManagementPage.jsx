@@ -58,7 +58,9 @@ import {
   ControlOutlined,
   LockOutlined,
   CrownOutlined,
-  TeamOutlined
+  TeamOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined
 } from '@ant-design/icons';
 
 // project imports
@@ -112,6 +114,8 @@ export default function UserManagementPage() {
   // Edit Staff Drawer
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [showPass, setShowPass] = useState(false);
+  const [showEditPass, setShowEditPass] = useState(false);
 
   // Manage Toggles Drawer
   const [permsDrawerOpen, setPermsDrawerOpen] = useState(false);
@@ -157,11 +161,11 @@ export default function UserManagementPage() {
     setDrawerOpen(false);
   };
 
-  const handleUpdateStaff = (e) => {
+  const handleUpdateStaff = async (e) => {
     e.preventDefault();
     if (!editingStaff) return;
 
-    updateStaffUser(editingStaff.id, editingStaff);
+    await updateStaffUser(editingStaff.id, editingStaff);
     setEditDrawerOpen(false);
     setEditingStaff(null);
   };
@@ -1123,7 +1127,18 @@ export default function UserManagementPage() {
 
               <TextField
                 label="Password *"
-                type="password"
+                type={showPass ? 'text' : 'password'}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setShowPass(!showPass)} edge="end">
+                          {showPass ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }
+                }}
                 fullWidth
                 required
                 placeholder="Enter login password"
@@ -1186,7 +1201,18 @@ export default function UserManagementPage() {
 
                 <TextField
                   label="Password"
-                  type="password"
+                  type={showEditPass ? 'text' : 'password'}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowEditPass(!showEditPass)} edge="end">
+                            {showEditPass ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }
+                  }}
                   fullWidth
                   placeholder="Enter new password (optional)"
                   value={editingStaff.password || ''}

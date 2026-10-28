@@ -2,19 +2,20 @@ import { useState } from 'react';
 import {
   Box,
   Card,
-  CardContent,
   Typography,
   Button,
   Stack,
   Chip,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material';
 import {
   LockOutlined,
   ReloadOutlined,
   WhatsAppOutlined,
   PhoneOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  CustomerServiceOutlined
 } from '@ant-design/icons';
 import { useAppSecurity } from 'context/AppSecurityContext';
 import LogoIcon from 'components/logo/LogoIcon';
@@ -33,7 +34,7 @@ export default function DesktopLockGuard() {
 
   const cleanPhone = (securityConfig.contactPhone || '').replace(/[^0-9+]/g, '');
   const waUrl = `https://wa.me/${cleanPhone.replace('+', '')}?text=${encodeURIComponent(
-    'Hello, I am using the Rehmat Lawn Mowers desktop software. Please activate my application license.'
+    'Hello, I am using the Rehmat Lawn Mowers desktop software. Please activate my workstation license.'
   )}`;
 
   return (
@@ -45,131 +46,202 @@ export default function DesktopLockGuard() {
         width: '100vw',
         height: '100vh',
         zIndex: 9999999,
-        bgcolor: 'rgba(9, 13, 22, 0.94)',
-        backdropFilter: 'blur(16px)',
+        background: 'radial-gradient(ellipse at 50% 25%, #172554 0%, #0a0f1d 70%, #030712 100%)',
+        backdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 2,
+        p: { xs: 2, sm: 3 },
         userSelect: 'none'
       }}
     >
       <Card
         sx={{
-          maxWidth: 540,
+          maxWidth: 560,
           width: '100%',
-          bgcolor: '#0f172a',
+          background: 'linear-gradient(160deg, rgba(23, 37, 84, 0.6) 0%, rgba(15, 23, 42, 0.95) 100%)',
+          backdropFilter: 'blur(30px)',
           color: '#f8fafc',
-          borderRadius: 3,
-          border: '1px solid rgba(239, 68, 68, 0.35)',
-          boxShadow: '0 25px 60px -15px rgba(239, 68, 68, 0.3), 0 0 40px rgba(0,0,0,0.8)',
-          textAlign: 'center',
-          p: { xs: 2.5, sm: 4 },
+          borderRadius: 4,
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          boxShadow: '0 30px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px rgba(59, 130, 246, 0.15)',
+          p: { xs: 3, sm: 4.5 },
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          textAlign: 'center'
         }}
       >
-        {/* Subtle top glow line */}
+        {/* Top elegant accent light strip */}
         <Box
           sx={{
             position: 'absolute',
             top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            background: 'linear-gradient(90deg, #ef4444, #f59e0b, #ef4444)'
+            left: '10%',
+            right: '10%',
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent)'
           }}
         />
 
-        <Stack alignItems="center" spacing={2.5}>
-          {/* Logo & Shield Icon */}
+        <Stack alignItems="center" spacing={3}>
+          {/* Official Logo with Glowing Shield Badge */}
           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-            <LogoIcon />
+            <Box
+              sx={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255, 255, 255, 0.98)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 30px -5px rgba(56, 189, 248, 0.4), 0 0 0 4px rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              <LogoIcon />
+            </Box>
             <Box
               sx={{
                 position: 'absolute',
-                bottom: -6,
-                right: -6,
-                bgcolor: '#ef4444',
-                color: '#fff',
+                bottom: -2,
+                right: -2,
+                bgcolor: '#f59e0b',
+                color: '#0f172a',
                 width: 26,
                 height: 26,
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)'
+                boxShadow: '0 4px 10px rgba(245, 158, 11, 0.5)',
+                border: '2px solid #0f172a'
               }}
             >
-              <LockOutlined style={{ fontSize: 13 }} />
+              <LockOutlined style={{ fontSize: 13, fontWeight: 'bold' }} />
             </Box>
           </Box>
 
           {/* Status Chip */}
           <Chip
-            icon={<SafetyCertificateOutlined style={{ color: '#ef4444' }} />}
-            label={isOfflineExpired ? 'OFFLINE SECURITY LOCK' : 'APPLICATION LICENSE INACTIVE'}
+            icon={<SafetyCertificateOutlined style={{ color: '#f59e0b', fontSize: 14 }} />}
+            label={isOfflineExpired ? 'OFFLINE SECURITY LIMIT' : 'LICENSE ACTIVATION REQUIRED'}
             sx={{
-              bgcolor: 'rgba(239, 68, 68, 0.15)',
-              color: '#fca5a5',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              bgcolor: 'rgba(245, 158, 11, 0.12)',
+              color: '#fbbf24',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
               fontWeight: 700,
-              fontSize: '0.75rem',
-              letterSpacing: '0.06em'
+              fontSize: '0.72rem',
+              letterSpacing: '0.08em',
+              px: 1,
+              py: 0.5
             }}
           />
 
-          {/* Title */}
+          {/* Heading & Notice Message */}
           <Box>
-            <Typography variant="h3" fontWeight={700} sx={{ color: '#f8fafc', mb: 1, fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
-              {isOfflineExpired ? 'Security Verification Required' : (securityConfig.lockTitle || 'License Verification Required')}
+            <Typography
+              variant="h3"
+              sx={{
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: { xs: '1.45rem', sm: '1.75rem' },
+                letterSpacing: '-0.02em',
+                mb: 1.2
+              }}
+            >
+              {isOfflineExpired ? 'Workstation Offline Verification' : (securityConfig.lockTitle || 'Application License Verification Required')}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', lineHeight: 1.6, px: { xs: 0, sm: 2 } }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: '#94a3b8',
+                lineHeight: 1.65,
+                fontSize: '0.92rem',
+                maxWidth: 460,
+                mx: 'auto'
+              }}
+            >
               {isOfflineExpired
-                ? 'Your desktop installation has been offline beyond the permitted grace period. Please connect to the internet to verify and activate your software license.'
-                : (securityConfig.lockMessage || 'Your desktop software license is temporarily pending authorization. Please contact the administrator to continue.')}
+                ? 'This workstation has been operating offline beyond the approved grace window. Connect to the internet to verify your license and resume operations.'
+                : (securityConfig.lockMessage || 'Your workstation license is currently pending activation or authorization. Please contact the administrator below to enable access.')}
             </Typography>
           </Box>
 
-          {/* Developer Contact Card */}
+          {/* Contact Administrator Glass Panel */}
           <Box
             sx={{
               width: '100%',
-              p: 2,
-              borderRadius: 2,
-              bgcolor: 'rgba(30, 41, 59, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
+              p: 2.5,
+              borderRadius: 3,
+              background: 'rgba(15, 23, 42, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              textAlign: 'left'
             }}
           >
-            <Typography variant="caption" sx={{ color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-              Authorized Software Administrator
-            </Typography>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#38bdf8', mt: 0.5 }}>
-              {securityConfig.contactPerson || 'System Administrator'}
-            </Typography>
-            {securityConfig.contactPhone && (
-              <Typography variant="body2" sx={{ color: '#e2e8f0', mt: 0.25, fontWeight: 600 }}>
-                📞 {securityConfig.contactPhone}
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
+              <CustomerServiceOutlined style={{ color: '#38bdf8', fontSize: 18 }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#94a3b8',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  fontWeight: 700,
+                  fontSize: '0.75rem'
+                }}
+              >
+                Authorized Software Support
               </Typography>
-            )}
+            </Stack>
+
+            <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.08)', mb: 1.5 }} />
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  Administrator
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#f1f5f9' }}>
+                  {securityConfig.contactPerson || 'Software Administrator'}
+                </Typography>
+              </Box>
+
+              {securityConfig.contactPhone && (
+                <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                  <Typography variant="caption" sx={{ color: '#64748b' }}>
+                    Helpline / Phone
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#38bdf8' }}>
+                    {securityConfig.contactPhone}
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
           </Box>
 
-          {/* Contact & Verification Buttons */}
+          {/* Action Buttons */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: '100%' }}>
             {securityConfig.contactPhone && (
               <Button
                 variant="contained"
                 fullWidth
-                startIcon={<WhatsAppOutlined />}
+                startIcon={<WhatsAppOutlined style={{ fontSize: 18 }} />}
                 href={waUrl}
                 target="_blank"
                 rel="noreferrer"
                 sx={{
-                  bgcolor: '#22c55e',
+                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                   color: '#ffffff',
-                  fontWeight: 600,
-                  py: 1.2,
-                  '&:hover': { bgcolor: '#16a34a' }
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  py: 1.3,
+                  borderRadius: 2.5,
+                  boxShadow: '0 8px 20px -4px rgba(34, 197, 94, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    boxShadow: '0 10px 25px -4px rgba(34, 197, 94, 0.6)'
+                  }
                 }}
               >
                 Contact via WhatsApp
@@ -179,24 +251,44 @@ export default function DesktopLockGuard() {
             <Button
               variant="outlined"
               fullWidth
-              startIcon={checking ? <CircularProgress size={16} color="inherit" /> : <ReloadOutlined />}
+              startIcon={checking ? <CircularProgress size={16} color="inherit" /> : <ReloadOutlined style={{ fontSize: 16 }} />}
               onClick={handleManualCheck}
               disabled={checking}
               sx={{
                 borderColor: 'rgba(255, 255, 255, 0.2)',
                 color: '#f8fafc',
-                py: 1.2,
-                fontWeight: 600,
-                '&:hover': { borderColor: '#38bdf8', bgcolor: 'rgba(56, 189, 248, 0.1)' }
+                py: 1.3,
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                borderRadius: 2.5,
+                background: 'rgba(255, 255, 255, 0.03)',
+                '&:hover': {
+                  borderColor: '#38bdf8',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8'
+                }
               }}
             >
-              {checking ? 'Checking...' : 'Re-check Activation'}
+              {checking ? 'Checking Status...' : 'Re-check Activation'}
             </Button>
           </Stack>
 
-          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
-            System checks activation automatically every 15 seconds. Once unlocked by admin, this window will automatically dismiss.
-          </Typography>
+          {/* Auto-dismissing real-time subtext */}
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: '#22c55e',
+                boxShadow: '0 0 10px #22c55e',
+                animation: 'pulse 2s infinite'
+              }}
+            />
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.72rem' }}>
+              Automatic cloud handshake active (15s). Once unlocked by admin, this window dismisses instantly.
+            </Typography>
+          </Stack>
         </Stack>
       </Card>
     </Box>

@@ -201,12 +201,16 @@ export function AuthProvider({ children }) {
         const emails = new Set(parsed.map((p) => (p.email || '').toLowerCase()));
         const merged = parsed.map((u) => {
           if ((u.email || '').toLowerCase() === 'admin@rehmat.com') {
-            return { ...u, password: '123456', permissions: defaultSuperAdminPermissions };
+            return {
+              ...u,
+              password: u.password || '123456',
+              permissions: defaultSuperAdminPermissions
+            };
           }
           if ((u.email || '').toLowerCase() === 'arslan@rehmat.com') {
             return {
               ...u,
-              password: '123456',
+              password: u.password || '123456',
               role: 'Store Keeper',
               permissions: {
                 ...(u.permissions || {}),
@@ -336,16 +340,36 @@ export function AuthProvider({ children }) {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPass = (password || '').trim();
 
-    // 1. Instant deterministic login for Master Super Admin
+    // 1. Instant deterministic & dynamic login for Master Super Admin
     if (cleanEmail === 'admin@rehmat.com') {
-      if (cleanPass === '123456' || cleanPass === 'admin123' || !cleanPass) {
+      let adminStaff = staffUsers.find((u) => (u.email || '').toLowerCase() === 'admin@rehmat.com');
+
+      // Check cloud Firestore for latest password in case changed on another machine
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', 'admin@rehmat.com'));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          const docData = qSnap.docs[0].data();
+          if (docData.password) {
+            adminStaff = { ...(adminStaff || {}), ...docData, id: qSnap.docs[0].id };
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore admin verification fallback:', err);
+      }
+
+      const expectedPass = (adminStaff?.password || '123456').trim();
+      const isPassValid = cleanPass === expectedPass || (expectedPass === '123456' && cleanPass === 'admin123');
+
+      if (isPassValid) {
         const rootAdmin = {
-          id: 'USR-1',
-          name: 'Sabeel (Super Admin)',
+          id: adminStaff?.id || 'USR-1',
+          name: adminStaff?.name || 'Sabeel (Super Admin)',
           email: 'admin@rehmat.com',
+          password: expectedPass,
           role: 'Super Admin',
           status: 'Active',
-          permissions: defaultSuperAdminPermissions
+          permissions: adminStaff?.permissions || defaultSuperAdminPermissions
         };
         setUser(rootAdmin);
         sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(rootAdmin));
@@ -353,13 +377,16 @@ export function AuthProvider({ children }) {
         return { success: true, user: rootAdmin };
       }
       setLoading(false);
-      return { success: false, error: 'Incorrect password for admin! Use 123456.' };
+      return { success: false, error: 'Incorrect password for Super Admin! Please check your credentials.' };
     }
 
-    // 2. Instant deterministic login for Arslan
+    // 2. Instant deterministic & dynamic login for Arslan
     if (cleanEmail === 'arslan@rehmat.com') {
-      if (cleanPass === '123456' || !cleanPass) {
-        const arslanPerms = {
+      let arslanStaff = staffUsers.find((u) => (u.email || '').toLowerCase() === 'arslan@rehmat.com');
+      const expectedPass = (arslanStaff?.password || '123456').trim();
+
+      if (cleanPass === expectedPass || cleanPass === '123456') {
+        const arslanPerms = arslanStaff?.permissions || {
           'stock-in': true,
           'stock-out': true,
           'dashboard': false,
@@ -382,8 +409,8 @@ export function AuthProvider({ children }) {
         };
 
         const activeArslan = {
-          id: 'USR-arslan',
-          name: 'Arslan',
+          id: arslanStaff?.id || 'USR-arslan',
+          name: arslanStaff?.name || 'Arslan',
           email: 'arslan@rehmat.com',
           role: 'Store Keeper',
           status: 'Active',
@@ -396,7 +423,7 @@ export function AuthProvider({ children }) {
         return { success: true, user: activeArslan };
       }
       setLoading(false);
-      return { success: false, error: 'Incorrect password for Arslan! Use 123456.' };
+      return { success: false, error: 'Incorrect password for Arslan! Please check your credentials.' };
     }
 
     // 3. Check in local staff users list first
@@ -592,6 +619,22 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Quick Direct Password Change for active user
+  const changePassword = async (newPassword) => {
+    if (!user || !user.email) return { success: false, error: 'No active user found.' };
+    const cleanPass = (newPassword || '').trim();
+    if (!cleanPass) return { success: false, error: 'Password cannot be empty.' };
+
+    try {
+      const targetId = user.id || 'USR-1';
+      await updateStaffUser(targetId, { password: cleanPass });
+      setUser((prev) => ({ ...prev, password: cleanPass }));
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   // Logout Action
   const logout = async () => {
     try {
@@ -603,6 +646,8 @@ export function AuthProvider({ children }) {
     setSession(null);
     sessionStorage.removeItem('rehmat_erp_active_user');
     localStorage.removeItem('factory_store_user');
+    localStorage.removeItem('rehmat_saved_email');
+    localStorage.removeItem('rehmat_remember_login');
   };
 
   return (
@@ -614,6 +659,7 @@ export function AuthProvider({ children }) {
         staffUsers,
         login,
         logout,
+        changePassword,
         addStaffUser,
         deleteStaffUser,
         updateStaffUser,
