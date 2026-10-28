@@ -1,11 +1,12 @@
-import { supabase } from './supabase';
+import { db } from './firebase';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
 
 const API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   'http://localhost:5000/api';
 
 /**
- * High-performance hybrid client using Supabase fallback
+ * High-performance hybrid client using Firebase Firestore fallback
  */
 export const backendApi = {
   // Items & Catalog
@@ -15,8 +16,10 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      const { data } = await supabase.from('store_items').select('*').order('name', { ascending: true });
-      return data || [];
+      const snap = await getDocs(collection(db, 'store_items'));
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return items;
     }
   },
 
@@ -30,29 +33,21 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      const res = await sql`
-        INSERT INTO store_items (
-          id, name, sku_code, category, unit,
-          current_stock, remaining_stock, unit_price, min_threshold, location, updated_at
-        ) VALUES (
-          ${item.id}, ${item.name}, ${item.sku_code || item.itemCode || 'N/A'}, ${item.category || 'General'}, ${item.unit || 'PCS'},
-          ${item.current_stock || item.totalStock || 0}, ${item.remaining_stock || item.remainingStock || 0}, ${item.unit_price || item.unitPrice || 0},
-          ${item.min_threshold || item.minLevel || 10}, ${item.location || item.rackLocation || 'Main Store'}, NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          sku_code = EXCLUDED.sku_code,
-          category = EXCLUDED.category,
-          unit = EXCLUDED.unit,
-          current_stock = EXCLUDED.current_stock,
-          remaining_stock = EXCLUDED.remaining_stock,
-          unit_price = EXCLUDED.unit_price,
-          min_threshold = EXCLUDED.min_threshold,
-          location = EXCLUDED.location,
-          updated_at = NOW()
-        RETURNING *;
-      `;
-      return res[0];
+      const payload = {
+        id: item.id,
+        name: item.name,
+        sku_code: item.sku_code || item.itemCode || 'N/A',
+        category: item.category || 'General',
+        unit: item.unit || 'PCS',
+        current_stock: item.current_stock || item.totalStock || 0,
+        remaining_stock: item.remaining_stock || item.remainingStock || 0,
+        unit_price: item.unit_price || item.unitPrice || 0,
+        min_threshold: item.min_threshold || item.minLevel || 10,
+        location: item.location || item.rackLocation || 'Main Store',
+        updated_at: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'store_items', String(item.id)), payload, { merge: true });
+      return payload;
     }
   },
 
@@ -60,7 +55,7 @@ export const backendApi = {
     try {
       await fetch(`${API_BASE_URL}/items/${id}`, { method: 'DELETE' });
     } catch {
-      await sql`DELETE FROM store_items WHERE id = ${id};`;
+      await deleteDoc(doc(db, 'store_items', String(id)));
     }
   },
 
@@ -71,7 +66,10 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      return await sql`SELECT * FROM usage_logs ORDER BY created_at DESC LIMIT 500;`;
+      const snap = await getDocs(collection(db, 'usage_logs'));
+      const logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      logs.sort((a, b) => new Date(b.created_at || b.date_iso || 0) - new Date(a.created_at || a.date_iso || 0));
+      return logs.slice(0, 500);
     }
   },
 
@@ -91,28 +89,24 @@ export const backendApi = {
       const discVal = parseFloat(payload.discount_amount) || 0;
       const total = Math.max(0, qtyVal * priceVal - discVal);
 
-      const log = await sql`
-        INSERT INTO usage_logs (
-          id, type, item_id, item_name, item_code,
-          qty_used, unit_price, discount_amount, line_total,
-          used_by, department, time
-        ) VALUES (
-          ${logId}, 'Stock In', ${payload.item_id}, ${payload.item_name}, ${payload.item_code || 'N/A'},
-          ${qtyVal}, ${priceVal}, ${discVal}, ${total},
-          ${payload.vendor || 'Vendor'}, 'Main Store', NOW()::TEXT
-        ) RETURNING *;
-      `;
+      const log = {
+        id: logId,
+        type: 'Stock In',
+        item_id: payload.item_id,
+        item_name: payload.item_name,
+        item_code: payload.item_code || 'N/A',
+        qty_used: qtyVal,
+        unit_price: priceVal,
+        discount_amount: discVal,
+        line_total: total,
+        used_by: payload.vendor || 'Vendor',
+        department: 'Main Store',
+        time: new Date().toLocaleString(),
+        created_at: new Date().toISOString()
+      };
 
-      if (payload.item_id) {
-        await sql`
-          UPDATE store_items
-          SET remaining_stock = remaining_stock + ${qtyVal},
-              current_stock = current_stock + ${qtyVal},
-              updated_at = NOW()
-          WHERE id = ${payload.item_id};
-        `;
-      }
-      return { success: true, log: log[0] };
+      await setDoc(doc(db, 'usage_logs', logId), log, { merge: true });
+      return { success: true, log };
     }
   },
 
@@ -123,7 +117,10 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      return await sql`SELECT * FROM machine_repairs ORDER BY created_at DESC;`;
+      const snap = await getDocs(collection(db, 'machine_repairs'));
+      const repairs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      repairs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      return repairs;
     }
   },
 
@@ -138,36 +135,29 @@ export const backendApi = {
       throw new Error('API offline');
     } catch {
       const repNo = repair.repair_no || repair.repairNo || `REP-${Math.floor(1000 + Math.random() * 9000)}`;
-      const saved = await sql`
-        INSERT INTO machine_repairs (
-          id, repair_no, customer_name, customer_phone, city_address,
-          machine_name, serial_no, fault_description, parts_cost,
-          labor_cost, discount_amount, total_cost, paid_amount,
-          balance_amount, repair_status, received_date, promised_date,
-          repair_items, created_at
-        ) VALUES (
-          ${repair.id}, ${repNo}, ${repair.customer_name || repair.customerName},
-          ${repair.customer_phone || repair.customerPhone || 'N/A'}, ${repair.city_address || repair.cityAddress || 'Lahore'},
-          ${repair.machine_name || repair.machineName || 'Lawn Mower'}, ${repair.serial_no || repair.serialNo || 'N/A'},
-          ${repair.fault_description || repair.faultDescription || 'General Overhaul'},
-          ${repair.parts_cost || repair.partsCost || 0}, ${repair.labor_cost || repair.laborCost || 0},
-          ${repair.discount_amount || repair.discountAmount || 0}, ${repair.total_cost || repair.totalCost || 0},
-          ${repair.paid_amount || repair.paidAmount || 0}, ${repair.balance_amount || repair.balanceAmount || 0},
-          ${repair.repair_status || repair.repairStatus || 'Received'},
-          ${repair.received_date || repair.receivedDate || new Date().toLocaleDateString('en-GB')},
-          ${repair.promised_date || repair.promisedDate || '1-2 Days'},
-          ${JSON.stringify(repair.repair_items || repair.repairItems || [])}, NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          customer_name = EXCLUDED.customer_name,
-          customer_phone = EXCLUDED.customer_phone,
-          city_address = EXCLUDED.city_address,
-          repair_status = EXCLUDED.repair_status,
-          paid_amount = EXCLUDED.paid_amount,
-          balance_amount = EXCLUDED.balance_amount
-        RETURNING *;
-      `;
-      return saved[0];
+      const saved = {
+        id: repair.id,
+        repair_no: repNo,
+        customer_name: repair.customer_name || repair.customerName,
+        customer_phone: repair.customer_phone || repair.customerPhone || 'N/A',
+        city_address: repair.city_address || repair.cityAddress || 'Lahore',
+        machine_name: repair.machine_name || repair.machineName || 'Lawn Mower',
+        serial_no: repair.serial_no || repair.serialNo || 'N/A',
+        fault_description: repair.fault_description || repair.faultDescription || 'General Overhaul',
+        parts_cost: repair.parts_cost || repair.partsCost || 0,
+        labor_cost: repair.laborCost || repair.labor_cost || 0,
+        discount_amount: repair.discount_amount || repair.discountAmount || 0,
+        total_cost: repair.total_cost || repair.totalCost || 0,
+        paid_amount: repair.paid_amount || repair.paidAmount || 0,
+        balance_amount: repair.balance_amount || repair.balanceAmount || 0,
+        repair_status: repair.repair_status || repair.repairStatus || 'Received',
+        received_date: repair.received_date || repair.receivedDate || new Date().toLocaleDateString('en-GB'),
+        promised_date: repair.promised_date || repair.promisedDate || '1-2 Days',
+        repair_items: repair.repair_items || repair.repairItems || [],
+        created_at: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'machine_repairs', String(repair.id)), saved, { merge: true });
+      return saved;
     }
   },
 
@@ -175,7 +165,7 @@ export const backendApi = {
     try {
       await fetch(`${API_BASE_URL}/repairs/${id}`, { method: 'DELETE' });
     } catch {
-      await sql`DELETE FROM machine_repairs WHERE id = ${id};`;
+      await deleteDoc(doc(db, 'machine_repairs', String(id)));
     }
   },
 
@@ -186,7 +176,10 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      return await sql`SELECT * FROM machine_sales ORDER BY created_at DESC;`;
+      const snap = await getDocs(collection(db, 'machine_sales'));
+      const sales = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      sales.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      return sales;
     }
   },
 
@@ -201,28 +194,27 @@ export const backendApi = {
       throw new Error('API offline');
     } catch {
       const sNo = sale.sale_no || sale.saleNo || `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-      const saved = await sql`
-        INSERT INTO machine_sales (
-          id, sale_no, customer_name, customer_phone, city_address,
-          machine_name, serial_no, qty, unit_price, discount_amount,
-          line_total, paid_amount, balance_amount, payment_status,
-          time, items, created_at
-        ) VALUES (
-          ${sale.id}, ${sNo}, ${sale.customer_name || sale.customerName},
-          ${sale.customer_phone || sale.customerPhone || 'N/A'}, ${sale.city_address || sale.cityAddress || 'Lahore'},
-          ${sale.machine_name || sale.machineName || 'Lawn Mower'}, ${sale.serial_no || sale.serialNo || 'N/A'},
-          ${sale.qty || 1}, ${sale.unit_price || sale.unitPrice || 0}, ${sale.discount_amount || sale.discountAmount || 0},
-          ${sale.line_total || sale.lineTotal || 0}, ${sale.paid_amount || sale.paidAmount || 0},
-          ${sale.balance_amount || sale.balanceAmount || 0}, ${sale.payment_status || sale.paymentStatus || 'Paid'},
-          NOW()::TEXT, ${JSON.stringify(sale.items || [])}, NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          customer_name = EXCLUDED.customer_name,
-          paid_amount = EXCLUDED.paid_amount,
-          balance_amount = EXCLUDED.balance_amount
-        RETURNING *;
-      `;
-      return saved[0];
+      const saved = {
+        id: sale.id,
+        sale_no: sNo,
+        customer_name: sale.customer_name || sale.customerName,
+        customer_phone: sale.customer_phone || sale.customerPhone || 'N/A',
+        city_address: sale.city_address || sale.cityAddress || 'Lahore',
+        machine_name: sale.machine_name || sale.machineName || 'Lawn Mower',
+        serial_no: sale.serial_no || sale.serialNo || 'N/A',
+        qty: sale.qty || 1,
+        unit_price: sale.unit_price || sale.unitPrice || 0,
+        discount_amount: sale.discount_amount || sale.discountAmount || 0,
+        line_total: sale.line_total || sale.lineTotal || 0,
+        paid_amount: sale.paid_amount || sale.paidAmount || 0,
+        balance_amount: sale.balance_amount || sale.balanceAmount || 0,
+        payment_status: sale.payment_status || sale.paymentStatus || 'Paid',
+        time: new Date().toLocaleString(),
+        items: sale.items || [],
+        created_at: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'machine_sales', String(sale.id)), saved, { merge: true });
+      return saved;
     }
   },
 
@@ -233,7 +225,10 @@ export const backendApi = {
       if (res.ok) return await res.json();
       throw new Error('API offline');
     } catch {
-      return await sql`SELECT * FROM vendors ORDER BY name ASC;`;
+      const snap = await getDocs(collection(db, 'vendors'));
+      const vendors = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      vendors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return vendors;
     }
   },
 

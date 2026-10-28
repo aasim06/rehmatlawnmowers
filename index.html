@@ -44,6 +44,37 @@
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    <script>
+      (function() {
+        try {
+          var isTauri = Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+          var isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'tauri:';
+          
+          if (isTauri && isLocal) {
+            try { sessionStorage.setItem('rehmat_is_desktop', 'true'); } catch(e){}
+            var targetCloudUrl = 'https://rehmatlawnmowers.vercel.app/?platform=tauri';
+            
+            // Fast ping check with 2.5s timeout
+            var controller = new AbortController();
+            var timer = setTimeout(function() { controller.abort(); }, 2500);
+            
+            fetch('https://rehmatlawnmowers.vercel.app/favicon.svg', {
+              method: 'HEAD',
+              mode: 'no-cors',
+              cache: 'no-store',
+              signal: controller.signal
+            }).then(function() {
+              clearTimeout(timer);
+              window.location.replace(targetCloudUrl);
+            }).catch(function(e) {
+              console.log('⚡ Offline Mode: Running local bundled desktop app', e);
+            });
+          }
+        } catch (e) {
+          console.warn('Hybrid loader skipped:', e);
+        }
+      })();
+    </script>
     <div id="root"></div>
     <!--
       This HTML file is a template.

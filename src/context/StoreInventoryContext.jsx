@@ -1,7 +1,14 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
-import { supabase } from 'api/supabase';
+import { db } from 'api/firebase';
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  deleteDoc
+} from 'firebase/firestore';
 
 const StoreInventoryContext = createContext();
 
@@ -383,8 +390,8 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Parallel Data Fetching via Supabase for zero-latency initial load & clean error handling
-  const fetchSupabaseData = async () => {
+  // Parallel Data Fetching via Firebase Firestore for zero-latency initial load & clean error handling
+  const fetchFirebaseData = async () => {
     try {
       const deletedItemSet = new Set(safeParseJSON('rehmat_deleted_item_ids', []).map(String));
       const deletedLogSet = new Set(safeParseJSON('rehmat_deleted_log_ids', []).map(String));
@@ -393,102 +400,125 @@ export function StoreInventoryProvider({ children }) {
       const deletedCategorySet = new Set(safeParseJSON('rehmat_deleted_category_ids', []).map((x) => String(x).toLowerCase()));
 
       const [
-        itemsRes,
-        logsRes,
-        vendorsRes,
-        salesRes,
-        catRes,
-        masterItemsRes,
-        custPayRes,
-        vendPayRes,
-        repairsRes,
-        expensesRes,
-        recipesRes
+        itemsSnap,
+        logsSnap,
+        vendorsSnap,
+        salesSnap,
+        catSnap,
+        masterItemsSnap,
+        custPaySnap,
+        vendPaySnap,
+        repairsSnap,
+        expensesSnap,
+        recipesSnap
       ] = await Promise.allSettled([
-        supabase.from('store_items').select('*').order('name', { ascending: true }),
-        supabase.from('usage_logs').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('vendors').select('*').order('name', { ascending: true }),
-        supabase.from('machine_sales').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('categories').select('*').order('name', { ascending: true }),
-        supabase.from('master_item_names').select('*').order('name', { ascending: true }),
-        supabase.from('customer_payments').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('vendor_payments').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('machine_repairs').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('machine_recipes').select('*').order('created_at', { ascending: false })
+        getDocs(collection(db, 'store_items')),
+        getDocs(collection(db, 'usage_logs')),
+        getDocs(collection(db, 'vendors')),
+        getDocs(collection(db, 'machine_sales')),
+        getDocs(collection(db, 'categories')),
+        getDocs(collection(db, 'master_item_names')),
+        getDocs(collection(db, 'customer_payments')),
+        getDocs(collection(db, 'vendor_payments')),
+        getDocs(collection(db, 'machine_repairs')),
+        getDocs(collection(db, 'expenses')),
+        getDocs(collection(db, 'machine_recipes'))
       ]);
 
-      if (itemsRes.status === 'fulfilled' && Array.isArray(itemsRes.value?.data)) {
-        const cleanItemsData = itemsRes.value.data.filter(
-          (i) => !deletedItemSet.has(String(i.id)) && !deletedItemSet.has(String(i.sku_code || i.item_code))
+      const toDocs = (res) => (res.status === 'fulfilled' && res.value?.docs ? res.value.docs.map((d) => ({ id: d.id, ...d.data() })) : []);
+      const itemsList = toDocs(itemsSnap);
+      const logsList = toDocs(logsSnap);
+      const vendorsList = toDocs(vendorsSnap);
+      const salesList = toDocs(salesSnap);
+      const catList = toDocs(catSnap);
+      const masterItemsList = toDocs(masterItemsSnap);
+      const custPayList = toDocs(custPaySnap);
+      const vendPayList = toDocs(vendPaySnap);
+      const repairsList = toDocs(repairsSnap);
+      const expensesList = toDocs(expensesSnap);
+      const recipesList = toDocs(recipesSnap);
+
+      if (itemsSnap.status === 'fulfilled') {
+        const cleanItemsData = itemsList.filter(
+          (i) => !deletedItemSet.has(String(i.id)) && !deletedItemSet.has(String(i.sku_code || i.item_code || i.itemCode))
         );
+        cleanItemsData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const mappedItems = cleanItemsData.map((i) => ({
           id: i.id,
           name: i.name,
-          itemCode: i.sku_code || i.item_code || i.id,
+          itemCode: i.sku_code || i.item_code || i.itemCode || i.id,
           category: i.category || 'General',
           unit: i.unit || 'PCS',
-          totalStock: parseFloat(i.current_stock || i.total_stock) || 0,
-          usedToday: 0,
-          remainingStock: parseFloat(i.remaining_stock) || 0,
-          unitPrice: parseFloat(i.unit_price) || 0,
-          minLevel: parseFloat(i.min_threshold || i.min_level) || 10,
-          rackLocation: i.location || i.rack_location || 'Main Store',
-          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= (parseFloat(i.min_threshold || i.min_level) || 10) ? 0 : 1
+          totalStock: parseFloat(i.current_stock || i.total_stock || i.totalStock) || 0,
+          usedToday: parseFloat(i.used_today || i.usedToday) || 0,
+          remainingStock: parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) || 0,
+          unitPrice: parseFloat(i.unit_price !== undefined ? i.unit_price : i.unitPrice) || 0,
+          minLevel: parseFloat(i.min_threshold || i.min_level || i.minLevel) || 10,
+          rackLocation: i.location || i.rack_location || i.rackLocation || 'Main Store',
+          status: parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= 0 ? 2 : parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= (parseFloat(i.min_threshold || i.min_level || i.minLevel) || 10) ? 0 : 1
         }));
-        setItems(mappedItems);
-        localStorage.setItem('rehmat_store_items_v2', JSON.stringify(mappedItems));
+        if (mappedItems.length > 0 || itemsList.length === 0) {
+          setItems(mappedItems);
+          localStorage.setItem('rehmat_store_items_v2', JSON.stringify(mappedItems));
+        }
       }
 
-      if (logsRes.status === 'fulfilled' && Array.isArray(logsRes.value?.data)) {
-        const cleanLogsData = logsRes.value.data.filter(
+      if (logsSnap.status === 'fulfilled') {
+        const cleanLogsData = logsList.filter(
           (l) => !deletedLogSet.has(String(l.id))
         );
+        cleanLogsData.sort((a, b) => new Date(b.created_at || b.date_iso || b.dateISO || 0) - new Date(a.created_at || a.date_iso || a.dateISO || 0));
         const mappedLogs = cleanLogsData.map((l) => ({
           id: l.id,
           type: l.type || 'Stock Out',
-          itemCode: l.item_code || 'N/A',
-          itemName: l.item_name || 'Item',
-          qtyUsed: parseFloat(l.qty_used) || 1,
-          unitPrice: parseFloat(l.unit_price) || 0,
-          discountAmount: parseFloat(l.discount_amount) || 0,
-          lineTotal: parseFloat(l.line_total) || 0,
-          usedBy: l.used_by || 'Store',
+          itemCode: l.item_code || l.itemCode || 'N/A',
+          itemName: l.item_name || l.itemName || 'Item',
+          qtyUsed: parseFloat(l.qty_used !== undefined ? l.qty_used : l.qtyUsed) || 1,
+          unitPrice: parseFloat(l.unit_price !== undefined ? l.unit_price : l.unitPrice) || 0,
+          discountAmount: parseFloat(l.discount_amount !== undefined ? l.discount_amount : l.discountAmount) || 0,
+          lineTotal: parseFloat(l.line_total !== undefined ? l.line_total : l.lineTotal) || 0,
+          usedBy: l.used_by || l.usedBy || 'Store',
           department: l.department || 'Store',
-          issuedBy: l.issued_by || 'Store Manager',
-          time: l.time || new Date(l.created_at).toLocaleString(),
-          dateISO: l.created_at || new Date().toISOString()
+          issuedBy: l.issued_by || l.issuedBy || 'Store Manager',
+          time: l.time || (l.created_at ? new Date(l.created_at).toLocaleString() : new Date().toLocaleString()),
+          dateISO: l.created_at || l.date_iso || l.dateISO || new Date().toISOString()
         }));
-        setUsageLogs(mappedLogs);
-        localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
+        if (mappedLogs.length > 0 || logsList.length === 0) {
+          setUsageLogs(mappedLogs);
+          localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
+        }
       }
 
-      if (vendorsRes.status === 'fulfilled' && Array.isArray(vendorsRes.value?.data)) {
-        const cleanVendorsData = vendorsRes.value.data.filter(
+      if (vendorsSnap.status === 'fulfilled') {
+        const cleanVendorsData = vendorsList.filter(
           (v) => !deletedVendorSet.has(String(v.id))
         );
+        cleanVendorsData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const mappedVendors = cleanVendorsData.map((v) => ({
           id: v.id,
           name: v.name,
-          contactPerson: v.company_name || v.name,
-          companyName: v.company_name || v.name,
+          contactPerson: v.company_name || v.contact_person || v.contactPerson || v.name,
+          companyName: v.company_name || v.companyName || v.name,
           phone: v.phone || 'N/A',
           email: v.email || 'N/A',
           address: v.city_address || v.address || 'Local',
-          suppliedCategory: v.supplied_category || 'General',
-          openingBalance: parseFloat(v.opening_balance) || 0,
-          currentBalance: parseFloat(v.current_balance) || 0
+          suppliedCategory: v.supplied_category || v.suppliedCategory || 'General',
+          openingBalance: parseFloat(v.opening_balance || v.openingBalance) || 0,
+          currentBalance: parseFloat(v.current_balance || v.currentBalance) || 0
         }));
-        setVendors(mappedVendors);
-        localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
+        if (mappedVendors.length > 0 || vendorsList.length === 0) {
+          setVendors(mappedVendors);
+          localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
+        }
       }
 
-      if (salesRes.status === 'fulfilled' && Array.isArray(salesRes.value?.data)) {
-        const cleanSalesData = salesRes.value.data.filter(
+      if (salesSnap.status === 'fulfilled') {
+        const cleanSalesData = salesList.filter(
           (s) => !deletedSaleSet.has(String(s.id))
         );
+        cleanSalesData.sort((a, b) => new Date(b.created_at || b.dateISO || 0) - new Date(a.created_at || a.dateISO || 0));
         const mappedSales = cleanSalesData.map((s) => {
-          const rawSaleNo = s.sale_no;
+          const rawSaleNo = s.sale_no || s.saleNo;
           const cleanSaleNo = (rawSaleNo && !rawSaleNo.includes('-') && rawSaleNo.length < 15) || (rawSaleNo && rawSaleNo.startsWith('MS-') && rawSaleNo.length < 15)
             ? rawSaleNo
             : `MS-${String(s.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`;
@@ -496,30 +526,33 @@ export function StoreInventoryProvider({ children }) {
           return {
             id: s.id,
             saleNo: cleanSaleNo,
-            customerName: s.customer_name,
-            customerPhone: s.customer_phone || 'N/A',
-            cityAddress: s.city_address || 'Lahore',
-            machineName: s.machine_name,
-            serialNo: s.serial_no,
+            customerName: s.customer_name || s.customerName,
+            customerPhone: s.customer_phone || s.customerPhone || 'N/A',
+            cityAddress: s.city_address || s.cityAddress || 'Lahore',
+            machineName: s.machine_name || s.machineName,
+            serialNo: s.serial_no || s.serialNo,
             qty: parseFloat(s.qty) || 1,
-            unitPrice: parseFloat(s.unit_price) || 0,
-            discountAmount: parseFloat(s.discount_amount) || 0,
-            lineTotal: parseFloat(s.line_total) || 0,
-            paidAmount: parseFloat(s.paid_amount) || 0,
-            balanceAmount: parseFloat(s.balance_amount) || 0,
-            paymentStatus: s.payment_status || 'Paid',
-            time: s.time || new Date(s.created_at).toLocaleString(),
+            unitPrice: parseFloat(s.unit_price !== undefined ? s.unit_price : s.unitPrice) || 0,
+            discountAmount: parseFloat(s.discount_amount !== undefined ? s.discount_amount : s.discountAmount) || 0,
+            lineTotal: parseFloat(s.line_total !== undefined ? s.line_total : s.lineTotal) || 0,
+            paidAmount: parseFloat(s.paid_amount !== undefined ? s.paid_amount : s.paidAmount) || 0,
+            balanceAmount: parseFloat(s.balance_amount !== undefined ? s.balance_amount : s.balanceAmount) || 0,
+            paymentStatus: s.payment_status || s.paymentStatus || 'Paid',
+            time: s.time || (s.created_at ? new Date(s.created_at).toLocaleString() : new Date().toLocaleString()),
             items: s.items || []
           };
         });
-        setMachineSales(mappedSales);
-        localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
+        if (mappedSales.length > 0 || salesList.length === 0) {
+          setMachineSales(mappedSales);
+          localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
+        }
       }
 
-      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value?.data)) {
-        const cleanCatData = catRes.value.data.filter(
+      if (catSnap.status === 'fulfilled') {
+        const cleanCatData = catList.filter(
           (c) => !deletedCategorySet.has(String(c.id).toLowerCase()) && !deletedCategorySet.has(String(c.name || '').toLowerCase())
         );
+        cleanCatData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const mappedCats = cleanCatData.map((c) => ({
           id: c.id,
           name: c.name,
@@ -531,10 +564,10 @@ export function StoreInventoryProvider({ children }) {
         }
       }
 
-      if (masterItemsRes.status === 'fulfilled' && Array.isArray(masterItemsRes.value?.data)) {
+      if (masterItemsSnap.status === 'fulfilled') {
         setMasterItemNames((prev) => {
-          const fetchedMap = new Map((masterItemsRes.value.data || []).map((m) => [String(m.id), m]));
-          const combined = [...(masterItemsRes.value.data || [])];
+          const fetchedMap = new Map((masterItemsList || []).map((m) => [String(m.id), m]));
+          const combined = [...(masterItemsList || [])];
           (prev || []).forEach((loc) => {
             if (!fetchedMap.has(String(loc.id))) {
               combined.push(loc);
@@ -545,16 +578,16 @@ export function StoreInventoryProvider({ children }) {
         });
       }
 
-      if (custPayRes?.status === 'fulfilled' && Array.isArray(custPayRes.value?.data)) {
-        const mappedCustPay = custPayRes.value.data.map((p) => ({
+      if (custPaySnap.status === 'fulfilled') {
+        const mappedCustPay = custPayList.map((p) => ({
           id: p.id,
-          customerName: p.customer_name,
-          amountPaid: parseFloat(p.amount_paid) || 0,
-          paymentMethod: p.payment_method || 'Cash',
-          referenceNo: p.reference_no || '',
+          customerName: p.customer_name || p.customerName,
+          amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
+          paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
+          referenceNo: p.reference_no || p.referenceNo || '',
           notes: p.notes || '',
-          time: p.payment_date || new Date(p.created_at).toLocaleString(),
-          createdAt: p.created_at
+          time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
+          createdAt: p.created_at || p.createdAt
         }));
         setCustomerPayments((prev) => {
           const fetchedMap = new Map(mappedCustPay.map((c) => [String(c.id), c]));
@@ -567,16 +600,16 @@ export function StoreInventoryProvider({ children }) {
         });
       }
 
-      if (vendPayRes?.status === 'fulfilled' && Array.isArray(vendPayRes.value?.data)) {
-        const mappedVendPay = vendPayRes.value.data.map((p) => ({
+      if (vendPaySnap.status === 'fulfilled') {
+        const mappedVendPay = vendPayList.map((p) => ({
           id: p.id,
-          vendorName: p.vendor_name,
-          amountPaid: parseFloat(p.amount_paid) || 0,
-          paymentMethod: p.payment_method || 'Cash',
-          referenceNo: p.reference_no || '',
+          vendorName: p.vendor_name || p.vendorName,
+          amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
+          paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
+          referenceNo: p.reference_no || p.referenceNo || '',
           notes: p.notes || '',
-          time: p.payment_date || new Date(p.created_at).toLocaleString(),
-          createdAt: p.created_at
+          time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
+          createdAt: p.created_at || p.createdAt
         }));
         setVendorPayments((prev) => {
           const fetchedMap = new Map(mappedVendPay.map((v) => [String(v.id), v]));
@@ -589,27 +622,27 @@ export function StoreInventoryProvider({ children }) {
         });
       }
 
-      if (repairsRes?.status === 'fulfilled' && Array.isArray(repairsRes.value?.data)) {
-        const mappedRepairs = repairsRes.value.data.map((r) => ({
+      if (repairsSnap.status === 'fulfilled') {
+        const mappedRepairs = repairsList.map((r) => ({
           id: r.id,
-          repairNo: r.repair_no || `REP-${String(r.id).slice(0, 4)}`,
-          customerName: r.customer_name,
-          customerPhone: r.customer_phone || 'N/A',
-          cityAddress: r.city_address || 'Lahore',
-          machineName: r.machine_name,
-          serialNo: r.serial_no || 'N/A',
-          faultDescription: r.fault_description || 'General Service',
-          partsCost: parseFloat(r.parts_cost) || 0,
-          laborCost: parseFloat(r.labor_cost) || 0,
-          discountAmount: parseFloat(r.discount_amount) || 0,
-          totalCost: parseFloat(r.total_cost) || 0,
-          paidAmount: parseFloat(r.paid_amount) || 0,
-          balanceAmount: parseFloat(r.balance_amount) || 0,
-          repairStatus: r.repair_status || 'Received',
-          paymentStatus: (parseFloat(r.balance_amount) || 0) <= 0 ? 'Paid' : (parseFloat(r.paid_amount) || 0) > 0 ? 'Partial' : 'Pending',
-          receivedDate: r.received_date || new Date(r.created_at).toLocaleDateString(),
-          promisedDate: r.promised_date || '1-2 Days',
-          repairItems: r.repair_items || []
+          repairNo: r.repair_no || r.repairNo || `REP-${String(r.id).slice(0, 4)}`,
+          customerName: r.customer_name || r.customerName,
+          customerPhone: r.customer_phone || r.customerPhone || 'N/A',
+          cityAddress: r.city_address || r.cityAddress || 'Lahore',
+          machineName: r.machine_name || r.machineName,
+          serialNo: r.serial_no || r.serialNo || 'N/A',
+          faultDescription: r.fault_description || r.faultDescription || 'General Service',
+          partsCost: parseFloat(r.parts_cost !== undefined ? r.parts_cost : r.partsCost) || 0,
+          laborCost: parseFloat(r.labor_cost !== undefined ? r.labor_cost : r.laborCost) || 0,
+          discountAmount: parseFloat(r.discount_amount !== undefined ? r.discount_amount : r.discountAmount) || 0,
+          totalCost: parseFloat(r.total_cost !== undefined ? r.total_cost : r.totalCost) || 0,
+          paidAmount: parseFloat(r.paid_amount !== undefined ? r.paid_amount : r.paidAmount) || 0,
+          balanceAmount: parseFloat(r.balance_amount !== undefined ? r.balance_amount : r.balanceAmount) || 0,
+          repairStatus: r.repair_status || r.repairStatus || 'Received',
+          paymentStatus: (parseFloat(r.balance_amount !== undefined ? r.balance_amount : r.balanceAmount) || 0) <= 0 ? 'Paid' : (parseFloat(r.paid_amount !== undefined ? r.paid_amount : r.paidAmount) || 0) > 0 ? 'Partial' : 'Pending',
+          receivedDate: r.received_date || r.receivedDate || (r.created_at ? new Date(r.created_at).toLocaleDateString() : new Date().toLocaleDateString()),
+          promisedDate: r.promised_date || r.promisedDate || '1-2 Days',
+          repairItems: r.repair_items || r.repairItems || []
         }));
         setMachineRepairs((prev) => {
           const fetchedMap = new Map(mappedRepairs.map((r) => [String(r.id), r]));
@@ -622,17 +655,17 @@ export function StoreInventoryProvider({ children }) {
         });
       }
 
-      if (expensesRes?.status === 'fulfilled' && Array.isArray(expensesRes.value?.data)) {
-        const mappedExpenses = expensesRes.value.data.map((e) => ({
+      if (expensesSnap.status === 'fulfilled') {
+        const mappedExpenses = expensesList.map((e) => ({
           id: e.id,
           title: e.title,
           category: e.category || 'General',
           amount: parseFloat(e.amount) || 0,
-          paymentMethod: e.payment_method || 'Cash',
-          paidTo: e.paid_to || 'N/A',
-          expenseDate: e.expense_date || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+          paymentMethod: e.payment_method || e.paymentMethod || 'Cash',
+          paidTo: e.paid_to || e.paidTo || 'N/A',
+          expenseDate: e.expense_date || e.expenseDate || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
           notes: e.notes || '',
-          createdAt: e.created_at || new Date().toISOString()
+          createdAt: e.created_at || e.createdAt || new Date().toISOString()
         }));
         setExpenses((prev) => {
           const fetchedMap = new Map(mappedExpenses.map((e) => [String(e.id), e]));
@@ -645,8 +678,8 @@ export function StoreInventoryProvider({ children }) {
         });
       }
 
-      if (recipesRes?.status === 'fulfilled' && Array.isArray(recipesRes.value?.data)) {
-        const cleanRecipeData = recipesRes.value.data.filter(
+      if (recipesSnap.status === 'fulfilled') {
+        const cleanRecipeData = recipesList.filter(
           (r) => r.id !== '__APP_SECURITY__' && !r.model_name?.startsWith('__APP_')
         );
         const mappedRecipes = cleanRecipeData.map((r) => ({
@@ -666,36 +699,25 @@ export function StoreInventoryProvider({ children }) {
         });
       }
     } catch (err) {
-      // Background sync notification
+      // Cloud fetch notification
     }
   };
 
+  const fetchSupabaseData = fetchFirebaseData;
+
   useEffect(() => {
-    fetchSupabaseData();
+    fetchFirebaseData();
 
     // Auto-refetch on window focus for multi-device sync
-    const handleFocus = () => fetchSupabaseData();
+    const handleFocus = () => fetchFirebaseData();
     window.addEventListener('focus', handleFocus);
 
     // Periodic cloud poll every 15 seconds
-    const interval = setInterval(fetchSupabaseData, 15000);
-
-    // Supabase Realtime Listener across all operational tables
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public' },
-        () => {
-          fetchSupabaseData();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(fetchFirebaseData, 15000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
-      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -726,11 +748,13 @@ export function StoreInventoryProvider({ children }) {
     setMasterItemNames((prev) => [newMaster, ...prev]);
 
     try {
-      await supabase.from('master_item_names').insert([{
+      await setDoc(doc(db, 'master_item_names', String(newMaster.id)), {
+        id: newMaster.id,
         name: newName,
         category,
-        default_unit: defaultUnit
-      }]);
+        default_unit: defaultUnit,
+        created_at: new Date().toISOString()
+      }, { merge: true });
     } catch (e) {
       console.error(e);
     }
@@ -740,11 +764,12 @@ export function StoreInventoryProvider({ children }) {
     setMasterItemNames((prev) => prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m)));
 
     try {
-      await supabase.from('master_item_names').update({
+      await setDoc(doc(db, 'master_item_names', String(id)), {
         name: updatedData.name,
         category: updatedData.category,
-        default_unit: updatedData.defaultUnit
-      }).eq('id', id);
+        default_unit: updatedData.defaultUnit,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
     } catch (e) {
       console.error(e);
     }
@@ -754,7 +779,7 @@ export function StoreInventoryProvider({ children }) {
     setMasterItemNames((prev) => prev.filter((m) => m.id !== id));
 
     try {
-      await supabase.from('master_item_names').delete().eq('id', id);
+      await deleteDoc(doc(db, 'master_item_names', String(id)));
     } catch (e) {
       console.error(e);
     }
@@ -765,7 +790,7 @@ export function StoreInventoryProvider({ children }) {
     setMasterItemNames((prev) => prev.filter((m) => !idsSet.has(m.id)));
 
     try {
-      await supabase.from('master_item_names').delete().in('id', ids);
+      await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'master_item_names', String(id)))));
     } catch (e) {
       console.error(e);
     }
@@ -849,13 +874,13 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Stock Out', `Issued ${actualQty}x ${targetItem.name} to ${usedBy}`);
 
     try {
-      await supabase.from('store_items').update({
+      await setDoc(doc(db, 'store_items', String(targetItem.id)), {
         used_today: newUsedToday,
         remaining_stock: newRemainingStock,
         unit_price: price > 0 ? price : targetItem.unitPrice
-      }).eq('id', targetItem.id);
+      }, { merge: true });
 
-      const { error } = await supabase.from('usage_logs').insert([{
+      await setDoc(doc(db, 'usage_logs', String(logId)), {
         id: logId,
         type: 'Stock Out',
         item_code: targetItem.itemCode || 'N/A',
@@ -870,11 +895,10 @@ export function StoreInventoryProvider({ children }) {
         remaining_stock_after: newRemainingStock,
         status: 1,
         notes: notes || ''
-      }]);
-      if (error) console.error('usage_logs insert error:', error);
-      else await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error(e);
+      console.error('Firebase issueStock error:', e);
     }
 
     return true;
@@ -968,7 +992,7 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('store_items').upsert([{
+      await setDoc(doc(db, 'store_items', String(targetItem.id)), {
         id: targetItem.id,
         name: targetItem.name,
         item_code: targetItem.itemCode,
@@ -978,9 +1002,9 @@ export function StoreInventoryProvider({ children }) {
         used_today: targetItem.usedToday || 0,
         remaining_stock: newRemainingStock,
         unit_price: price > 0 ? price : (targetItem.unitPrice || 0)
-      }]);
+      }, { merge: true });
 
-      const { error } = await supabase.from('usage_logs').insert([{
+      await setDoc(doc(db, 'usage_logs', String(logId)), {
         id: logId,
         type: 'Stock In',
         item_code: targetItem.itemCode || 'N/A',
@@ -995,9 +1019,8 @@ export function StoreInventoryProvider({ children }) {
         remaining_stock_after: newRemainingStock,
         status: 1,
         notes: `Shipment Ref: ${refNo}`
-      }]);
-      if (error) console.error('usage_logs insert error:', error);
-      else await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
       console.error('receiveStock exception:', e);
     }
@@ -1028,7 +1051,7 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => [newItem, ...prev]);
 
     try {
-      const { error } = await supabase.from('store_items').upsert([{
+      await setDoc(doc(db, 'store_items', String(itemId)), {
         id: itemId,
         name: newItem.name,
         item_code: itemCode,
@@ -1041,14 +1064,10 @@ export function StoreInventoryProvider({ children }) {
         min_level: minLevelVal,
         rack_location: rackLocationVal,
         status: 1
-      }]);
-      if (error) {
-        console.error('Supabase store_items insert error:', error);
-      } else {
-        await fetchSupabaseData();
-      }
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error(e);
+      console.error('Firebase store_items insert error:', e);
     }
     return newItem;
   };
@@ -1086,8 +1105,8 @@ export function StoreInventoryProvider({ children }) {
       if (minLevelVal !== undefined) updatePayload.min_level = minLevelVal;
       if (updatedData.rackLocation) updatePayload.rack_location = updatedData.rackLocation;
 
-      await supabase.from('store_items').update(updatePayload).eq('id', itemId);
-      await fetchSupabaseData();
+      await setDoc(doc(db, 'store_items', String(itemId)), updatePayload, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
       console.error(e);
     }
@@ -1119,17 +1138,13 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       if (itemId) {
-        await supabase.from('store_items').delete().eq('id', itemId);
-        const numId = parseInt(itemId);
-        if (!isNaN(numId)) {
-          await supabase.from('store_items').delete().eq('id', numId);
-        }
-        if (targetItem?.itemCode) {
-          await supabase.from('store_items').delete().eq('item_code', targetItem.itemCode);
+        await deleteDoc(doc(db, 'store_items', String(itemId)));
+        if (targetItem?.itemCode && String(targetItem.itemCode) !== String(itemId)) {
+          await deleteDoc(doc(db, 'store_items', String(targetItem.itemCode)));
         }
       }
     } catch (e) {
-      console.error('deleteItem error:', e);
+      console.error('Firebase deleteItem error:', e);
     }
   };
 
@@ -1154,10 +1169,9 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('store_items').delete().in('id', itemIds);
-      await supabase.from('store_items').delete().in('item_code', itemIds);
+      await Promise.allSettled(itemIds.map((id) => deleteDoc(doc(db, 'store_items', String(id)))));
     } catch (e) {
-      console.error('deleteMultipleItems error:', e);
+      console.error('Firebase deleteMultipleItems error:', e);
     }
   };
 
@@ -1177,7 +1191,7 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_items_v2', JSON.stringify(cleaned));
 
     try {
-      await supabase.from('store_items').delete().eq('remaining_stock', 0);
+      // Firebase clean duplicate placeholder
     } catch (e) {
       console.error(e);
     }
@@ -1193,7 +1207,7 @@ export function StoreInventoryProvider({ children }) {
     setVendors((prev) => [newVendor, ...prev]);
 
     try {
-      const { error } = await supabase.from('vendors').insert([{
+      await setDoc(doc(db, 'vendors', String(vendorId)), {
         id: vendorId,
         name: vendorData.name || 'Vendor',
         contact_person: vendorData.contactPerson || vendorData.name,
@@ -1203,10 +1217,9 @@ export function StoreInventoryProvider({ children }) {
         supplied_category: vendorData.suppliedCategory || 'General',
         status: 1,
         rating: 5.0
-      }]);
-      if (error) console.error('Supabase addVendor error:', error);
+      }, { merge: true });
     } catch (e) {
-      console.error(e);
+      console.error('Firebase addVendor error:', e);
     }
   };
 
@@ -1216,17 +1229,16 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      const { error } = await supabase.from('vendors').update({
+      await setDoc(doc(db, 'vendors', String(vendorId)), {
         name: updatedData.name,
         contact_person: updatedData.contactPerson || updatedData.name,
         phone: updatedData.phone,
         email: updatedData.email,
         address: updatedData.address,
         supplied_category: updatedData.suppliedCategory
-      }).eq('id', vendorId);
-      if (error) console.error('Supabase updateVendor error:', error);
+      }, { merge: true });
     } catch (e) {
-      console.error(e);
+      console.error('Firebase updateVendor error:', e);
     }
   };
 
@@ -1243,9 +1255,9 @@ export function StoreInventoryProvider({ children }) {
     setVendors((prev) => prev.filter((v) => String(v.id) !== stringId));
 
     try {
-      await supabase.from('vendors').delete().eq('id', vendorId);
+      await deleteDoc(doc(db, 'vendors', String(vendorId)));
     } catch (e) {
-      console.error(e);
+      console.error('Firebase deleteVendor error:', e);
     }
   };
 
@@ -1265,9 +1277,9 @@ export function StoreInventoryProvider({ children }) {
     setVendors((prev) => prev.filter((v) => !idsSet.has(String(v.id))));
 
     try {
-      await supabase.from('vendors').delete().in('id', vendorIds);
+      await Promise.allSettled(vendorIds.map((id) => deleteDoc(doc(db, 'vendors', String(id)))));
     } catch (e) {
-      console.error(e);
+      console.error('Firebase deleteMultipleVendors error:', e);
     }
   };
 
@@ -1292,9 +1304,9 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('usage_logs').delete().in('id', logIds);
+      await Promise.allSettled(logIds.map((id) => deleteDoc(doc(db, 'usage_logs', String(id)))));
     } catch (e) {
-      console.error(e);
+      console.error('Firebase deleteMultipleLogs error:', e);
     }
   };
 
@@ -1328,13 +1340,13 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Category Added', `Added category "${newCategory.name}" (${categoryId})`);
 
     try {
-      await supabase.from('categories').insert([{
+      await setDoc(doc(db, 'categories', String(categoryId)), {
         id: categoryId,
         name: newCategory.name,
         description: newCategory.description
-      }]);
+      }, { merge: true });
     } catch (e) {
-      console.error('addCategory Supabase error:', e);
+      console.error('Firebase addCategory error:', e);
     }
   };
 
@@ -1348,12 +1360,12 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Category Updated', `Updated category "${updatedData.name}"`);
 
     try {
-      await supabase.from('categories').update({
+      await setDoc(doc(db, 'categories', String(categoryId)), {
         name: updatedData.name,
         description: updatedData.description || ''
-      }).eq('id', categoryId);
+      }, { merge: true });
     } catch (e) {
-      console.error('updateCategory Supabase error:', e);
+      console.error('Firebase updateCategory error:', e);
     }
   };
 
@@ -1378,9 +1390,9 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Category Deleted', `Deleted category "${target?.name || categoryId}"`);
 
     try {
-      await supabase.from('categories').delete().eq('id', categoryId);
+      await deleteDoc(doc(db, 'categories', String(categoryId)));
     } catch (e) {
-      console.error('deleteCategory Supabase error:', e);
+      console.error('Firebase deleteCategory error:', e);
     }
   };
 
@@ -1403,9 +1415,9 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Bulk Categories Deleted', `Deleted ${categoryIds.length} categories`);
 
     try {
-      await supabase.from('categories').delete().in('id', categoryIds);
+      await Promise.allSettled(categoryIds.map((id) => deleteDoc(doc(db, 'categories', String(id)))));
     } catch (e) {
-      console.error('deleteMultipleCategories Supabase error:', e);
+      console.error('Firebase deleteMultipleCategories error:', e);
     }
   };
 
@@ -1436,14 +1448,10 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       if (logId) {
-        await supabase.from('usage_logs').delete().eq('id', logId);
-        const numId = parseInt(logId);
-        if (!isNaN(numId)) {
-          await supabase.from('usage_logs').delete().eq('id', numId);
-        }
+        await deleteDoc(doc(db, 'usage_logs', String(logId)));
       }
     } catch (e) {
-      console.error('deleteLog error:', e);
+      console.error('Firebase deleteLog error:', e);
     }
   };
 
@@ -1470,16 +1478,16 @@ export function StoreInventoryProvider({ children }) {
     }
 
     try {
-      await supabase.from('usage_logs').update({
+      await setDoc(doc(db, 'usage_logs', String(logId)), {
         item_name: updatedData.itemName,
         used_by: updatedData.usedBy,
         qty_used: updatedData.qtyUsed,
         unit_price: updatedData.unitPrice,
         line_total: updatedData.lineTotal
-      }).eq('id', logId);
-      await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error(e);
+      console.error('Firebase updateLog error:', e);
     }
   };
 
@@ -1560,7 +1568,7 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => [newEntry, ...prev]);
 
     try {
-      const { error } = await supabase.from('machine_sales').upsert([{
+      await setDoc(doc(db, 'machine_sales', String(saleId)), {
         id: saleId,
         sale_no: saleNo,
         customer_name: newEntry.customerName,
@@ -1577,11 +1585,10 @@ export function StoreInventoryProvider({ children }) {
         payment_status: newEntry.paymentStatus,
         time: newEntry.time,
         items: newEntry.items || []
-      }]);
-      if (error) console.error('Supabase addMachineSale Error:', error);
-      else await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error('Supabase addMachineSale Exception:', e);
+      console.error('Firebase addMachineSale Exception:', e);
     }
     return newEntry;
   };
@@ -1591,7 +1598,7 @@ export function StoreInventoryProvider({ children }) {
       prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
     );
     try {
-      await supabase.from('machine_sales').update({
+      await setDoc(doc(db, 'machine_sales', String(id)), {
         customer_name: updatedData.customerName,
         customer_phone: updatedData.customerPhone,
         city_address: updatedData.cityAddress,
@@ -1603,10 +1610,10 @@ export function StoreInventoryProvider({ children }) {
         paid_amount: updatedData.paidAmount,
         balance_amount: updatedData.balanceAmount,
         payment_status: updatedData.paymentStatus
-      }).eq('id', id);
-      await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error(e);
+      console.error('Firebase updateMachineSale error:', e);
     }
   };
 
@@ -1632,23 +1639,23 @@ export function StoreInventoryProvider({ children }) {
     });
 
     try {
-      await supabase.from('machine_recipes').upsert([{
+      await setDoc(doc(db, 'machine_recipes', String(recipeToSave.id)), {
         id: recipeToSave.id,
         model_name: recipeToSave.modelName,
         description: recipeToSave.description || '',
         ingredients: recipeToSave.ingredients || []
-      }]);
+      }, { merge: true });
     } catch (e) {
-      console.warn('Machine recipes cloud sync optional fallback:', e);
+      console.warn('Machine recipes cloud sync error:', e);
     }
   };
 
   const deleteMachineRecipe = async (id) => {
     setMachineRecipes((prev) => prev.filter((r) => r.id !== id));
     try {
-      await supabase.from('machine_recipes').delete().eq('id', id);
+      await deleteDoc(doc(db, 'machine_recipes', String(id)));
     } catch (e) {
-      console.warn('Machine recipes cloud delete fallback:', e);
+      console.warn('Machine recipes delete error:', e);
     }
   };
 
@@ -1665,9 +1672,9 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => prev.filter((m) => String(m.id) !== stringId));
 
     try {
-      await supabase.from('machine_sales').delete().eq('id', id);
+      await deleteDoc(doc(db, 'machine_sales', String(id)));
     } catch (e) {
-      console.error(e);
+      console.error('Firebase deleteMachineSale error:', e);
     }
   };
 
@@ -1686,9 +1693,9 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => prev.filter((m) => !idsSet.has(String(m.id))));
 
     try {
-      await supabase.from('machine_sales').delete().in('id', ids);
+      await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'machine_sales', String(id)))));
     } catch (e) {
-      console.error(e);
+      console.error('Firebase deleteMultipleMachineSales error:', e);
     }
   };
 
@@ -1762,7 +1769,7 @@ export function StoreInventoryProvider({ children }) {
     }
 
     try {
-      const { error } = await supabase.from('customer_payments').upsert([{
+      await setDoc(doc(db, 'customer_payments', String(paymentId)), {
         id: paymentId,
         customer_name: newPayment.customerName,
         payment_date: newPayment.time,
@@ -1770,11 +1777,10 @@ export function StoreInventoryProvider({ children }) {
         payment_method: newPayment.paymentMethod,
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
-      }]);
-      if (error) console.error('Supabase addCustomerPayment Error:', error);
-      else await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error('Supabase addCustomerPayment Exception:', e);
+      console.error('Firebase addCustomerPayment Exception:', e);
     }
   };
 
@@ -1800,7 +1806,7 @@ export function StoreInventoryProvider({ children }) {
     setVendorPayments((prev) => [newPayment, ...prev]);
 
     try {
-      const { error } = await supabase.from('vendor_payments').upsert([{
+      await setDoc(doc(db, 'vendor_payments', String(paymentId)), {
         id: paymentId,
         vendor_name: newPayment.vendorName,
         payment_date: newPayment.time,
@@ -1808,11 +1814,10 @@ export function StoreInventoryProvider({ children }) {
         payment_method: newPayment.paymentMethod,
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
-      }]);
-      if (error) console.error('Supabase addVendorPayment Error:', error);
-      else await fetchSupabaseData();
+      }, { merge: true });
+      await fetchFirebaseData();
     } catch (e) {
-      console.error('Supabase addVendorPayment Exception:', e);
+      console.error('Firebase addVendorPayment Exception:', e);
     }
   };
 
@@ -1854,7 +1859,7 @@ export function StoreInventoryProvider({ children }) {
           used_today: i.usedToday || 0,
           remaining_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0)
         }));
-        await supabase.from('store_items').upsert(itemsToInsert);
+        await Promise.allSettled(itemsToInsert.map((item) => setDoc(doc(db, 'store_items', String(item.id)), item, { merge: true })));
       }
       if (data.usageLogs && Array.isArray(data.usageLogs)) {
         setUsageLogs(data.usageLogs);
@@ -1872,7 +1877,7 @@ export function StoreInventoryProvider({ children }) {
           time: l.time || 'Today',
           timestamp: l.dateISO || new Date().toISOString()
         }));
-        await supabase.from('usage_logs').upsert(logsToInsert);
+        await Promise.allSettled(logsToInsert.map((log) => setDoc(doc(db, 'usage_logs', String(log.id)), log, { merge: true })));
       }
       if (data.machineSales && Array.isArray(data.machineSales)) {
         setMachineSales(data.machineSales);
@@ -1894,14 +1899,14 @@ export function StoreInventoryProvider({ children }) {
           time: s.time,
           items: s.items || []
         }));
-        await supabase.from('machine_sales').upsert(salesToInsert);
+        await Promise.allSettled(salesToInsert.map((sale) => setDoc(doc(db, 'machine_sales', String(sale.id)), sale, { merge: true })));
       }
       if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
       if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
       if (data.expenses && Array.isArray(data.expenses)) setExpenses(data.expenses);
       if (data.expenseCategories && Array.isArray(data.expenseCategories)) setExpenseCategories(data.expenseCategories);
 
-      await fetchSupabaseData();
+      await fetchFirebaseData();
       return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
     } catch (err) {
       console.error(err);
@@ -1943,7 +1948,7 @@ export function StoreInventoryProvider({ children }) {
     setMachineRepairs((prev) => [newRepair, ...prev]);
 
     try {
-      await supabase.from('machine_repairs').upsert([{
+      await setDoc(doc(db, 'machine_repairs', String(repairId)), {
         id: repairId,
         repair_no: repairNo,
         customer_name: repairData.customerName || 'Walk-in Customer',
@@ -1962,9 +1967,9 @@ export function StoreInventoryProvider({ children }) {
         received_date: formattedDate,
         promised_date: repairData.promisedDate || '1-2 Days',
         repair_items: repairData.repairItems || []
-      }]);
+      }, { merge: true });
     } catch (e) {
-      console.error('Supabase addMachineRepair Exception:', e);
+      console.error('Firebase addMachineRepair Exception:', e);
     }
     return newRepair;
   };
@@ -2000,18 +2005,18 @@ export function StoreInventoryProvider({ children }) {
       if (updatedFields.repairStatus) updatePayload.repair_status = updatedFields.repairStatus;
       if (updatedFields.paidAmount !== undefined) updatePayload.paid_amount = parseFloat(updatedFields.paidAmount) || 0;
       if (updatedFields.balanceAmount !== undefined) updatePayload.balance_amount = parseFloat(updatedFields.balanceAmount) || 0;
-      await supabase.from('machine_repairs').update(updatePayload).eq('id', repairId);
+      await setDoc(doc(db, 'machine_repairs', String(repairId)), updatePayload, { merge: true });
     } catch (e) {
-      console.error('Supabase updateMachineRepair Exception:', e);
+      console.error('Firebase updateMachineRepair Exception:', e);
     }
   };
 
   const deleteMachineRepair = async (repairId) => {
     setMachineRepairs((prev) => prev.filter((r) => r.id !== repairId));
     try {
-      await supabase.from('machine_repairs').delete().eq('id', repairId);
+      await deleteDoc(doc(db, 'machine_repairs', String(repairId)));
     } catch (e) {
-      console.error('Supabase deleteMachineRepair Exception:', e);
+      console.error('Firebase deleteMachineRepair Exception:', e);
     }
   };
 
@@ -2033,7 +2038,7 @@ export function StoreInventoryProvider({ children }) {
     logActivity('Expense Added', `Added expense: PKR ${newExpense.amount} for ${newExpense.title}`);
 
     try {
-      await supabase.from('expenses').upsert([{
+      await setDoc(doc(db, 'expenses', String(newExpense.id)), {
         id: newExpense.id,
         title: newExpense.title,
         category: newExpense.category,
@@ -2042,9 +2047,9 @@ export function StoreInventoryProvider({ children }) {
         paid_to: newExpense.paidTo,
         expense_date: newExpense.expenseDate,
         notes: newExpense.notes
-      }]);
+      }, { merge: true });
     } catch (e) {
-      console.error('Supabase addExpense error:', e);
+      console.error('Firebase addExpense error:', e);
     }
     return newExpense;
   };
@@ -2053,9 +2058,9 @@ export function StoreInventoryProvider({ children }) {
     setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
     logActivity('Expense Deleted', `Deleted expense ID ${expenseId}`);
     try {
-      await supabase.from('expenses').delete().eq('id', expenseId);
+      await deleteDoc(doc(db, 'expenses', String(expenseId)));
     } catch (e) {
-      console.error('Supabase deleteExpense error:', e);
+      console.error('Firebase deleteExpense error:', e);
     }
   };
 
@@ -2077,16 +2082,16 @@ export function StoreInventoryProvider({ children }) {
 
   const resetAllDataToZero = async () => {
     try {
-      // 1. Wipe store_items, usage_logs, and all operational tables from Supabase Database
-      await Promise.allSettled([
-        supabase.from('store_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('usage_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('machine_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('machine_repairs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('customer_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('vendor_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('vendors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      ]);
+      // 1. Wipe store_items, usage_logs, and all operational collections from Firebase Firestore
+      const collectionsToWipe = ['store_items', 'usage_logs', 'machine_sales', 'machine_repairs', 'customer_payments', 'vendor_payments', 'vendors'];
+      for (const colName of collectionsToWipe) {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          await Promise.allSettled(snap.docs.map((d) => deleteDoc(d.ref)));
+        } catch (wipeErr) {
+          console.warn('Wipe collection warning:', colName, wipeErr);
+        }
+      }
 
       // 2. Clear all local browser storage
       localStorage.clear();
@@ -2102,7 +2107,7 @@ export function StoreInventoryProvider({ children }) {
       setVendorPayments([]);
 
       // 4. Refetch live state from Supabase immediately so the UI reflects an empty state across all browsers
-      await fetchSupabaseData();
+      await fetchFirebaseData();
 
       return { success: true, message: 'All Cloud Database records & Local Storage wiped successfully to 0!' };
     } catch (err) {

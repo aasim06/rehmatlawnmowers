@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from 'api/supabase';
-import { sql } from 'api/neon';
+import { db, auth } from 'api/firebase';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -242,18 +243,16 @@ export function AuthProvider({ children }) {
         return merged;
       }
       return initialStaffUsers;
-    } catch (e) {
+    } catch {
       return initialStaffUsers;
     }
   });
 
   const [user, setUser] = useState(() => {
     try {
-      // Use sessionStorage so every fresh app start demands sign-in
       const saved = sessionStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
-        // Use user's own explicit permissions if present, else fallback to role defaults
         return {
           ...parsedUser,
           permissions: (parsedUser.permissions && Object.keys(parsedUser.permissions).length > 0)
@@ -286,24 +285,27 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // Fetch staff users from Neon Cloud Database on mount for instant multi-device / multi-browser sync
+  // Fetch staff users from Firebase Cloud Database on mount for instant multi-device / multi-browser sync
   useEffect(() => {
     let isMounted = true;
     const fetchCloudUsers = async () => {
       try {
-        const rows = await sql.query('SELECT * FROM users ORDER BY created_at ASC');
-        if (isMounted && Array.isArray(rows) && rows.length > 0) {
-          const mapped = rows.map((u) => ({
-            id: u.id || `USR-${u.email}`,
-            name: u.name,
-            email: u.email,
-            password: u.password,
-            role: u.role || 'Store Keeper',
-            status: u.status || 'Active',
-            permissions: (u.permissions && Object.keys(u.permissions).length > 0)
-              ? u.permissions
-              : getRoleDefaultPermissions(u.role || 'Store Keeper')
-          }));
+        const snap = await getDocs(collection(db, 'users'));
+        if (isMounted && !snap.empty) {
+          const mapped = snap.docs.map((docSnap) => {
+            const u = docSnap.data();
+            return {
+              id: docSnap.id || u.id || `USR-${u.email}`,
+              name: u.name,
+              email: u.email,
+              password: u.password,
+              role: u.role || 'Store Keeper',
+              status: u.status || 'Active',
+              permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+                ? u.permissions
+                : getRoleDefaultPermissions(u.role || 'Store Keeper')
+            };
+          });
 
           setStaffUsers((prev) => {
             const remoteEmails = new Set(mapped.map((m) => (m.email || '').toLowerCase()));
@@ -318,7 +320,7 @@ export function AuthProvider({ children }) {
           });
         }
       } catch (err) {
-        console.warn('Neon cloud user fetch failed, using local cache:', err);
+        console.warn('Firebase cloud user fetch failed, using local cache:', err);
       }
     };
 
@@ -327,50 +329,6 @@ export function AuthProvider({ children }) {
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    // 1. Get initial Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user && !user) {
-        const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
-        const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
-        const userData = {
-          id: session.user.id,
-          name: found?.name || session.user.email?.split('@')[0] || 'User',
-          email: session.user.email,
-          role: resolvedRole,
-          permissions: (found?.permissions && Object.keys(found.permissions).length > 0)
-            ? found.permissions
-            : getRoleDefaultPermissions(resolvedRole)
-        };
-        setUser(userData);
-      }
-      setLoading(false);
-    });
-
-    // 2. Listen to Supabase auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user && !user) {
-        const found = staffUsers.find((u) => u.email.toLowerCase() === session.user.email?.toLowerCase());
-        const resolvedRole = found?.role || session.user.user_metadata?.role || 'Super Admin';
-        const userData = {
-          id: session.user.id,
-          name: found?.name || session.user.email?.split('@')[0] || 'User',
-          email: session.user.email,
-          role: resolvedRole,
-          permissions: (found?.permissions && Object.keys(found.permissions).length > 0)
-            ? found.permissions
-            : getRoleDefaultPermissions(resolvedRole)
-        };
-        setUser(userData);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [user, staffUsers]);
 
   // Login Action
   const login = async (email, password) => {
@@ -449,27 +407,28 @@ export function AuthProvider({ children }) {
         (u.email || '').toLowerCase().split('@')[0] === cleanEmail
     );
 
-    // 4. If not found in local memory, check Neon Cloud Database directly
+    // 4. If not found in local memory, check Firebase Cloud Database directly
     if (!localMatch) {
       try {
-        const rows = await sql.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
-        if (rows && rows.length > 0) {
-          const u = rows[0];
+        const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          const docData = qSnap.docs[0].data();
           localMatch = {
-            id: u.id || `USR-${u.email}`,
-            name: u.name,
-            email: u.email,
-            password: u.password,
-            role: u.role || 'Store Keeper',
-            status: u.status || 'Active',
-            permissions: (u.permissions && Object.keys(u.permissions).length > 0)
-              ? u.permissions
-              : getRoleDefaultPermissions(u.role || 'Store Keeper')
+            id: qSnap.docs[0].id || docData.id || `USR-${docData.email}`,
+            name: docData.name,
+            email: docData.email,
+            password: docData.password,
+            role: docData.role || 'Store Keeper',
+            status: docData.status || 'Active',
+            permissions: (docData.permissions && Object.keys(docData.permissions).length > 0)
+              ? docData.permissions
+              : getRoleDefaultPermissions(docData.role || 'Store Keeper')
           };
           setStaffUsers((prev) => [localMatch, ...prev.filter((p) => (p.email || '').toLowerCase() !== cleanEmail)]);
         }
       } catch (err) {
-        console.warn('Neon query error during login:', err);
+        console.warn('Firebase query error during login:', err);
       }
     }
 
@@ -521,21 +480,11 @@ export function AuthProvider({ children }) {
 
     setStaffUsers((prev) => [created, ...prev.filter((p) => p.email.toLowerCase() !== created.email)]);
 
-    // Sync to Neon Cloud Database
+    // Sync to Firebase Cloud Firestore
     try {
-      await sql.query(
-        `INSERT INTO users (id, name, email, password, role, status, permissions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (email) DO UPDATE SET
-           name = EXCLUDED.name,
-           password = EXCLUDED.password,
-           role = EXCLUDED.role,
-           status = EXCLUDED.status,
-           permissions = EXCLUDED.permissions;`,
-        [created.id, created.name, created.email, created.password, created.role, created.status, JSON.stringify(created.permissions)]
-      );
+      await setDoc(doc(db, 'users', created.id), created, { merge: true });
     } catch (e) {
-      console.error('Neon save staff error:', e);
+      console.error('Firebase save staff error:', e);
     }
 
     return created;
@@ -551,9 +500,9 @@ export function AuthProvider({ children }) {
     setStaffUsers((prev) => prev.filter((u) => u.id !== id));
 
     try {
-      await sql.query('DELETE FROM users WHERE id = $1 OR LOWER(email) = $2', [String(id), (target?.email || '').toLowerCase()]);
+      await deleteDoc(doc(db, 'users', String(id)));
     } catch (err) {
-      console.error('Neon delete staff error:', err);
+      console.error('Firebase delete staff error:', err);
     }
 
     return true;
@@ -581,20 +530,9 @@ export function AuthProvider({ children }) {
 
     if (savedUser) {
       try {
-        await sql.query(
-          'UPDATE users SET name = $1, password = $2, role = $3, status = $4, permissions = $5 WHERE id = $6 OR LOWER(email) = $7',
-          [
-            savedUser.name,
-            savedUser.password,
-            savedUser.role,
-            savedUser.status || 'Active',
-            JSON.stringify(savedUser.permissions),
-            String(id),
-            (savedUser.email || '').toLowerCase()
-          ]
-        );
+        await setDoc(doc(db, 'users', String(id)), savedUser, { merge: true });
       } catch (err) {
-        console.error('Neon update staff error:', err);
+        console.error('Firebase update staff error:', err);
       }
     }
   };
@@ -616,13 +554,9 @@ export function AuthProvider({ children }) {
     );
 
     try {
-      await sql.query('UPDATE users SET permissions = $1 WHERE id = $2 OR LOWER(email) = $3', [
-        JSON.stringify(newPermissions),
-        String(userId),
-        (targetEmail || String(userId)).toLowerCase()
-      ]);
+      await updateDoc(doc(db, 'users', String(userId)), { permissions: newPermissions });
     } catch (err) {
-      console.error('Neon update permissions error:', err);
+      console.error('Firebase update permissions error:', err);
     }
   };
 
@@ -661,7 +595,7 @@ export function AuthProvider({ children }) {
   // Logout Action
   const logout = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut(auth);
     } catch (e) {
       console.error(e);
     }

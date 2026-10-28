@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       port: PORT,
       host: true,
       watch: {
-        ignored: ['**/src-tauri/**', '**/*.exe']
+        ignored: ['**/src-tauri/**', '**/*.exe', '**/*.zip', '**/*.msi', '**/*.pdb', '**/*.rar']
       }
     },
     preview: {

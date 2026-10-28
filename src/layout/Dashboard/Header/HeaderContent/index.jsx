@@ -8,6 +8,7 @@ import Profile from './Profile';
 import Notification from './Notification';
 import MobileSection from './MobileSection';
 import MagicThemeToggler from 'components/@extended/MagicThemeToggler';
+import LiveCloudStatusBadge from 'components/@extended/LiveCloudStatusBadge';
 
 // ==============================|| HEADER - CONTENT ||============================== //
 
@@ -18,6 +19,9 @@ export default function HeaderContent() {
     <>
       {!downLG && <Search />}
       {downLG && <Box sx={{ width: '100%', ml: 1 }} />}
+
+      {/* Live Cloud Status Badge (Auto-Update indicator) */}
+      <LiveCloudStatusBadge />
 
       {/* Magic UI Style Theme Toggler */}
       <MagicThemeToggler />

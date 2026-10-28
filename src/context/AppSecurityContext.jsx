@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { supabase } from 'api/supabase';
+import { db } from 'api/firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { isTauriApp, isWebApp } from 'utils/platform';
 
 const AppSecurityContext = createContext();
@@ -43,25 +44,23 @@ export function AppSecurityProvider({ children }) {
   const offlineMsElapsed = Date.now() - lastHandshakeTime;
   const isOfflineExpired = isTauri && offlineMsElapsed > allowedOfflineMs;
 
-  // The application is only ever locked if running in Tauri desktop mode AND locked via Supabase or offline limit
+  // The application is only ever locked if running in Tauri desktop mode AND locked via Firebase or offline limit
   const isAppLocked = isTauri && (Boolean(securityConfig.isLocked) || isOfflineExpired);
 
-  // Fetch latest security state from Supabase
+  // Fetch latest security state from Firebase Firestore
   const refreshSecurityConfig = useCallback(async () => {
     try {
       setLoading(true);
-      // Query the reserved system control record
-      const { data, error } = await supabase
-        .from('machine_recipes')
-        .select('*')
-        .eq('id', '__APP_SECURITY__')
-        .maybeSingle();
+      const securityDocRef = doc(db, 'app_security', 'config');
+      const snap = await getDoc(securityDocRef);
 
-      if (!error && data?.ingredients) {
+      if (snap.exists()) {
+        const data = snap.data();
+        const ingredients = data.ingredients || data;
         const config = {
           ...DEFAULT_SECURITY_CONFIG,
-          ...data.ingredients,
-          isLocked: Boolean(data.ingredients.isLocked)
+          ...ingredients,
+          isLocked: Boolean(ingredients.isLocked)
         };
         setSecurityConfig(config);
         localStorage.setItem('rehmat_desktop_security_v1', JSON.stringify(config));
@@ -90,58 +89,51 @@ export function AppSecurityProvider({ children }) {
 
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('machine_recipes')
-        .upsert([{
-          id: '__APP_SECURITY__',
-          model_name: '__APP_CONTROL__',
-          description: merged.isLocked ? 'LOCKED' : 'ACTIVE',
-          ingredients: merged
-        }]);
+      const securityDocRef = doc(db, 'app_security', 'config');
+      await setDoc(securityDocRef, {
+        id: 'config',
+        model_name: '__APP_CONTROL__',
+        description: merged.isLocked ? 'LOCKED' : 'ACTIVE',
+        ingredients: merged,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
 
-      if (error) {
-        console.error('Failed to sync security config to Supabase:', error);
-        return { success: false, error: error.message };
-      }
       return { success: true };
     } catch (err) {
-      console.error('Exception syncing security config:', err);
+      console.error('Exception syncing security config to Firebase:', err);
       return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
   }, [securityConfig]);
 
-  // Initial fetch and Realtime subscription
+  // Initial fetch and Realtime Firebase subscription
   useEffect(() => {
     refreshSecurityConfig();
 
-    // Subscribe to real-time changes
-    let channel;
+    let unsubscribe = null;
     try {
-      channel = supabase
-        .channel('app_security_sync')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'machine_recipes', filter: 'id=eq.__APP_SECURITY__' },
-          (payload) => {
-            if (payload?.new?.ingredients) {
-              const updated = {
-                ...DEFAULT_SECURITY_CONFIG,
-                ...payload.new.ingredients,
-                isLocked: Boolean(payload.new.ingredients.isLocked)
-              };
-              setSecurityConfig(updated);
-              localStorage.setItem('rehmat_desktop_security_v1', JSON.stringify(updated));
-              const now = Date.now();
-              setLastHandshakeTime(now);
-              localStorage.setItem('rehmat_last_security_handshake', now.toString());
-            }
-          }
-        )
-        .subscribe();
+      const securityDocRef = doc(db, 'app_security', 'config');
+      unsubscribe = onSnapshot(securityDocRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const ingredients = data.ingredients || data;
+          const updated = {
+            ...DEFAULT_SECURITY_CONFIG,
+            ...ingredients,
+            isLocked: Boolean(ingredients.isLocked)
+          };
+          setSecurityConfig(updated);
+          localStorage.setItem('rehmat_desktop_security_v1', JSON.stringify(updated));
+          const now = Date.now();
+          setLastHandshakeTime(now);
+          localStorage.setItem('rehmat_last_security_handshake', now.toString());
+        }
+      }, (err) => {
+        console.warn('Firebase security realtime listener warning:', err);
+      });
     } catch (e) {
-      console.warn('Realtime channel subscription error:', e);
+      console.warn('Realtime Firebase subscription error:', e);
     }
 
     // Periodic check every 15 seconds in Tauri
@@ -151,7 +143,7 @@ export function AppSecurityProvider({ children }) {
 
     return () => {
       clearInterval(interval);
-      if (channel) supabase.removeChannel(channel);
+      if (unsubscribe) unsubscribe();
     };
   }, [isTauri, refreshSecurityConfig]);
 
