@@ -565,17 +565,14 @@ export function StoreInventoryProvider({ children }) {
       }
 
       if (masterItemsSnap.status === 'fulfilled') {
-        setMasterItemNames((prev) => {
-          const fetchedMap = new Map((masterItemsList || []).map((m) => [String(m.id), m]));
-          const combined = [...(masterItemsList || [])];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id))) {
-              combined.push(loc);
-            }
-          });
-          localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(combined));
-          return combined;
-        });
+        const cleanMasterItems = (masterItemsList || []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          category: m.category || 'General',
+          defaultUnit: m.default_unit || m.defaultUnit || 'PCS'
+        }));
+        setMasterItemNames(cleanMasterItems);
+        localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(cleanMasterItems));
       }
 
       if (custPaySnap.status === 'fulfilled') {
@@ -589,15 +586,8 @@ export function StoreInventoryProvider({ children }) {
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
-        setCustomerPayments((prev) => {
-          const fetchedMap = new Map(mappedCustPay.map((c) => [String(c.id), c]));
-          const combined = [...mappedCustPay];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
-          });
-          localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setCustomerPayments(mappedCustPay);
+        localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(mappedCustPay));
       }
 
       if (vendPaySnap.status === 'fulfilled') {
@@ -611,15 +601,8 @@ export function StoreInventoryProvider({ children }) {
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
-        setVendorPayments((prev) => {
-          const fetchedMap = new Map(mappedVendPay.map((v) => [String(v.id), v]));
-          const combined = [...mappedVendPay];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
-          });
-          localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setVendorPayments(mappedVendPay);
+        localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
       }
 
       if (repairsSnap.status === 'fulfilled') {
@@ -644,15 +627,8 @@ export function StoreInventoryProvider({ children }) {
           promisedDate: r.promised_date || r.promisedDate || '1-2 Days',
           repairItems: r.repair_items || r.repairItems || []
         }));
-        setMachineRepairs((prev) => {
-          const fetchedMap = new Map(mappedRepairs.map((r) => [String(r.id), r]));
-          const combined = [...mappedRepairs];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
-          });
-          localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(combined));
-          return combined;
-        });
+        setMachineRepairs(mappedRepairs);
+        localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
       }
 
       if (expensesSnap.status === 'fulfilled') {
@@ -667,15 +643,8 @@ export function StoreInventoryProvider({ children }) {
           notes: e.notes || '',
           createdAt: e.created_at || e.createdAt || new Date().toISOString()
         }));
-        setExpenses((prev) => {
-          const fetchedMap = new Map(mappedExpenses.map((e) => [String(e.id), e]));
-          const combined = [...mappedExpenses];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.id))) combined.push(loc);
-          });
-          localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(combined));
-          return combined;
-        });
+        setExpenses(mappedExpenses);
+        localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
       }
 
       if (recipesSnap.status === 'fulfilled') {
@@ -688,15 +657,8 @@ export function StoreInventoryProvider({ children }) {
           description: r.description || '',
           ingredients: r.ingredients || []
         }));
-        setMachineRecipes((prev) => {
-          const fetchedMap = new Map(mappedRecipes.map((r) => [String(r.modelName).toLowerCase(), r]));
-          const combined = [...mappedRecipes];
-          (prev || []).forEach((loc) => {
-            if (!fetchedMap.has(String(loc.modelName).toLowerCase())) combined.push(loc);
-          });
-          localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(combined));
-          return combined;
-        });
+        setMachineRecipes(mappedRecipes);
+        localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
       }
     } catch (err) {
       // Cloud fetch notification
