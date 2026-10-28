@@ -104,7 +104,7 @@ export default function Notification() {
   };
 
   return (
-    <Box sx={{ flexShrink: 0, ml: 0.75 }}>
+    <Box sx={{ flexShrink: 0 }}>
       <IconButton
         color="secondary"
         variant="light"

@@ -61,15 +61,18 @@ export default function Profile() {
   const userRole = user?.role || 'Super Admin';
 
   return (
-    <Box sx={{ flexShrink: 0, ml: 'auto' }}>
+    <Box sx={{ flexShrink: 0 }}>
       <Tooltip title="Profile & Account" disableInteractive>
         <ButtonBase
           sx={(theme) => ({
-            p: 0.5,
+            p: '3px 8px',
             borderRadius: 2,
             border: '1px solid',
             borderColor: open ? 'primary.main' : 'divider',
             bgcolor: open ? 'action.hover' : 'transparent',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             transition: 'all 0.2s ease',
             '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
             '&:focus-visible': { outline: `2px solid ${theme.vars.palette.secondary.dark}`, outlineOffset: 2 }
@@ -80,9 +83,22 @@ export default function Profile() {
           aria-haspopup="true"
           onClick={handleToggle}
         >
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 0.5 }}>
-            <Avatar alt="profile user" src={avatar1} size="sm" sx={{ width: 30, height: 30 }} />
-            <Typography variant="subtitle2" fontWeight={700} sx={{ textTransform: 'capitalize', color: 'text.primary' }}>
+          <Stack direction="row" spacing={1.2} alignItems="center" justifyContent="center">
+            <Avatar alt="profile user" src={avatar1} size="sm" sx={{ width: 28, height: 28 }} />
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              sx={{
+                textTransform: 'capitalize',
+                color: 'text.primary',
+                display: 'inline-flex',
+                alignItems: 'center',
+                lineHeight: 1,
+                m: 0,
+                p: 0,
+                userSelect: 'none'
+              }}
+            >
               {userRole}
             </Typography>
           </Stack>

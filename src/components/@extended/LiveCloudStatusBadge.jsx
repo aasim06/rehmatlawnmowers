@@ -59,11 +59,11 @@ export default function LiveCloudStatusBadge() {
         onClick={handleRefresh}
         sx={{
           cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: '0.72rem',
-          height: 26,
-          px: 0.5,
-          ml: 1,
+          fontWeight: 700,
+          fontSize: '0.74rem',
+          height: 28,
+          px: 0.75,
+          borderRadius: 2,
           borderColor: isCloud ? 'success.main' : 'warning.main',
           '&:hover': {
             backgroundColor: isCloud ? 'rgba(82, 196, 26, 0.1)' : 'rgba(250, 173, 20, 0.1)'
