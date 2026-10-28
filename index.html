@@ -47,31 +47,32 @@
     <script>
       (function() {
         try {
-          var isTauri = Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
-          var isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'tauri:';
-          
-          if (isTauri && isLocal) {
+          if (window.location.hostname.includes('vercel.app')) {
             try { sessionStorage.setItem('rehmat_is_desktop', 'true'); } catch(e){}
-            var targetCloudUrl = 'https://rehmatlawnmowers.vercel.app/?platform=tauri';
-            
-            // Fast ping check with 2.5s timeout
-            var controller = new AbortController();
-            var timer = setTimeout(function() { controller.abort(); }, 2500);
-            
-            fetch('https://rehmatlawnmowers.vercel.app/favicon.svg', {
-              method: 'HEAD',
-              mode: 'no-cors',
-              cache: 'no-store',
-              signal: controller.signal
-            }).then(function() {
-              clearTimeout(timer);
-              window.location.replace(targetCloudUrl);
-            }).catch(function(e) {
-              console.log('⚡ Offline Mode: Running local bundled desktop app', e);
-            });
+            return;
           }
+
+          var targetCloudUrl = 'https://rehmatlawnmowers.vercel.app/?platform=tauri';
+          var img = new Image();
+          var redirected = false;
+          var timer = setTimeout(function() {
+            if (!redirected) {
+              console.log('⚡ Offline fallback active');
+            }
+          }, 1500);
+
+          img.onload = function() {
+            redirected = true;
+            clearTimeout(timer);
+            try { sessionStorage.setItem('rehmat_is_desktop', 'true'); } catch(e){}
+            window.location.replace(targetCloudUrl);
+          };
+          img.onerror = function() {
+            console.log('⚡ Cloud ping failed, using local offline bundle');
+          };
+          img.src = 'https://rehmatlawnmowers.vercel.app/favicon.svg?ping=' + Date.now();
         } catch (e) {
-          console.warn('Hybrid loader skipped:', e);
+          console.warn('Live sync loader error:', e);
         }
       })();
     </script>
