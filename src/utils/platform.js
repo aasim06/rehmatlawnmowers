@@ -8,8 +8,16 @@ export const isTauriApp = () => {
   if (typeof window === 'undefined') return false;
   if (Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__)) return true;
   if (window.location.search.includes('platform=tauri') || window.location.search.includes('desktop=1')) {
+    try {
+      sessionStorage.setItem('rehmat_is_desktop', 'true');
+    } catch {}
     return true;
   }
+  try {
+    if (sessionStorage.getItem('rehmat_is_desktop') === 'true') {
+      return true;
+    }
+  } catch {}
   return false;
 };
 

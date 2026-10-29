@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -36,6 +37,12 @@ import { isTauriApp } from 'utils/platform';
 
 export default function AppSecurityPage() {
   const isTauri = isTauriApp();
+
+  // Desktop App Protection: Strictly forbidden from accessing Remote Control inside .exe
+  if (isTauri) {
+    return <Navigate to="/dashboard/default" replace />;
+  }
+
   const { securityConfig, updateSecurityConfig, refreshSecurityConfig, loading } = useAppSecurity();
 
   const [formData, setFormData] = useState({

@@ -1,4 +1,5 @@
 import { useAuth, defaultSuperAdminPermissions, defaultAdminPermissions, defaultStoreKeeperPermissions, getRoleDefaultPermissions } from 'context/AuthContext';
+import { isTauriApp } from 'utils/platform';
 
 /**
  * ==============================================================================
@@ -61,14 +62,23 @@ export function usePermission() {
 
   // Check if a specific navigation item (by id or url) is allowed
   const hasAccessToItem = (item) => {
-    // Super Admin has zero restrictions anywhere
-    if (isSuperAdmin) return true;
     if (!item) return false;
 
     const itemId = item.id || (item.url ? urlMap[item.url] : null);
 
-    // Direct role guard: user-management, backup-restore, app-security are strictly for authorized users
-    if ((itemId === 'user-management' || itemId === 'app-security') && !canManageUsers) return false;
+    // 🔒 REMOTE SOFTWARE BLOCK & LICENSE CONTROL:
+    // Strictly available ONLY on the Web Administration URL (Vercel).
+    // NEVER available inside the Desktop (.exe) application under any circumstances.
+    if (itemId === 'app-security' || item.url === '/admin/security' || item.url === '/inventory/security') {
+      if (isTauriApp()) return false;
+      return isSuperAdmin;
+    }
+
+    // Super Admin has zero restrictions anywhere else
+    if (isSuperAdmin) return true;
+
+    // Direct role guard: user-management, backup-restore are strictly for authorized users
+    if (itemId === 'user-management' && !canManageUsers) return false;
     if (itemId === 'backup-restore' && !canAccessBackup) return false;
 
     // Check by item ID (e.g. 'stock-out', 'stock-in', 'items', 'machine-sales', 'dashboard')
