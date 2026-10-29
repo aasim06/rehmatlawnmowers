@@ -195,11 +195,24 @@ const initialStaffUsers = [
 export function AuthProvider({ children }) {
   const [staffUsers, setStaffUsers] = useState(() => {
     try {
+      const deletedIds = new Set(
+        JSON.parse(localStorage.getItem('rehmat_deleted_staff_ids') || '[]').map((x) => String(x).toLowerCase())
+      );
       const saved = localStorage.getItem('rehmat_store_staff_users');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const emails = new Set(parsed.map((p) => (p.email || '').toLowerCase()));
-        const merged = parsed.map((u) => {
+        // Exclude any staff accounts that were explicitly deleted
+        const filtered = parsed.filter(
+          (u) => !deletedIds.has(String(u.id).toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase())
+        );
+
+        // Ensure Master Super Admin always exists
+        const hasMaster = filtered.some((u) => (u.email || '').toLowerCase() === 'admin@rehmat.com');
+        if (!hasMaster) {
+          filtered.unshift(initialStaffUsers[0]);
+        }
+
+        return filtered.map((u) => {
           if ((u.email || '').toLowerCase() === 'admin@rehmat.com') {
             return {
               ...u,
@@ -207,44 +220,13 @@ export function AuthProvider({ children }) {
               permissions: defaultSuperAdminPermissions
             };
           }
-          if ((u.email || '').toLowerCase() === 'arslan@rehmat.com') {
-            return {
-              ...u,
-              password: u.password || '123456',
-              role: 'Store Keeper',
-              permissions: {
-                ...(u.permissions || {}),
-                'stock-in': true,
-                'stock-out': true,
-                'dashboard': false,
-                'items': false,
-                'categories': false,
-                'machine-sales': false,
-                'machine-repairs': false,
-                'customer-ledgers': false,
-                'vendor-ledgers': false,
-                'vendors': false,
-                'ledger': false,
-                'reports': false,
-                'expenses': false,
-                'backup-restore': false,
-                'user-management': false
-              }
-            };
-          }
           return {
             ...u,
-            permissions: u.permissions || getRoleDefaultPermissions(u.role)
+            permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+              ? u.permissions
+              : getRoleDefaultPermissions(u.role)
           };
         });
-
-        initialStaffUsers.forEach((init) => {
-          if (!emails.has(init.email.toLowerCase())) {
-            merged.push(init);
-          }
-        });
-
-        return merged;
       }
       return initialStaffUsers;
     } catch {
@@ -294,31 +276,63 @@ export function AuthProvider({ children }) {
     let isMounted = true;
     const fetchCloudUsers = async () => {
       try {
-        const snap = await getDocs(collection(db, 'users'));
-        if (isMounted && !snap.empty) {
-          const mapped = snap.docs.map((docSnap) => {
-            const u = docSnap.data();
-            return {
-              id: docSnap.id || u.id || `USR-${u.email}`,
-              name: u.name,
-              email: u.email,
-              password: u.password,
-              role: u.role || 'Store Keeper',
-              status: u.status || 'Active',
-              permissions: (u.permissions && Object.keys(u.permissions).length > 0)
-                ? u.permissions
-                : getRoleDefaultPermissions(u.role || 'Store Keeper')
-            };
+        const [usersSnap, deletedSnap] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'deleted_staff')).catch(() => ({ empty: true, docs: [] }))
+        ]);
+
+        const deletedIds = new Set(
+          JSON.parse(localStorage.getItem('rehmat_deleted_staff_ids') || '[]').map((x) => String(x).toLowerCase())
+        );
+
+        if (!deletedSnap.empty) {
+          deletedSnap.docs.forEach((docSnap) => {
+            const d = docSnap.data();
+            if (d.id) deletedIds.add(String(d.id).toLowerCase());
+            if (d.email) deletedIds.add(String(d.email).toLowerCase());
           });
+          localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify([...deletedIds]));
+        }
+
+        if (isMounted && !usersSnap.empty) {
+          const mapped = usersSnap.docs
+            .map((docSnap) => {
+              const u = docSnap.data();
+              return {
+                id: docSnap.id || u.id || `USR-${u.email}`,
+                name: u.name,
+                email: u.email,
+                password: u.password,
+                role: u.role || 'Store Keeper',
+                status: u.status || 'Active',
+                permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+                  ? u.permissions
+                  : getRoleDefaultPermissions(u.role || 'Store Keeper')
+              };
+            })
+            .filter(
+              (u) =>
+                (u.email || '').toLowerCase() === 'admin@rehmat.com' ||
+                (!deletedIds.has(String(u.id).toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase()))
+            );
 
           setStaffUsers((prev) => {
-            const remoteEmails = new Set(mapped.map((m) => (m.email || '').toLowerCase()));
+            const cleanPrev = prev.filter(
+              (p) =>
+                (p.email || '').toLowerCase() === 'admin@rehmat.com' ||
+                (!deletedIds.has(String(p.id).toLowerCase()) && !deletedIds.has((p.email || '').toLowerCase()))
+            );
+
+            const remoteMap = new Map(mapped.map((m) => [(m.email || '').toLowerCase(), m]));
             const combined = [...mapped];
-            prev.forEach((p) => {
-              if (!remoteEmails.has((p.email || '').toLowerCase())) {
+
+            cleanPrev.forEach((p) => {
+              const emailKey = (p.email || '').toLowerCase();
+              if (!remoteMap.has(emailKey)) {
                 combined.push(p);
               }
             });
+
             localStorage.setItem('rehmat_store_staff_users', JSON.stringify(combined));
             return combined;
           });
@@ -380,53 +394,7 @@ export function AuthProvider({ children }) {
       return { success: false, error: 'Incorrect password for Super Admin! Please check your credentials.' };
     }
 
-    // 2. Instant deterministic & dynamic login for Arslan
-    if (cleanEmail === 'arslan@rehmat.com') {
-      let arslanStaff = staffUsers.find((u) => (u.email || '').toLowerCase() === 'arslan@rehmat.com');
-      const expectedPass = (arslanStaff?.password || '123456').trim();
-
-      if (cleanPass === expectedPass || cleanPass === '123456') {
-        const arslanPerms = arslanStaff?.permissions || {
-          'stock-in': true,
-          'stock-out': true,
-          'dashboard': false,
-          'items': false,
-          'categories': false,
-          'add-item-name': false,
-          'bom': false,
-          'machine-sales': false,
-          'machine-repairs': false,
-          'customer-ledgers': false,
-          'vendor-ledgers': false,
-          'vendors': false,
-          'ledger': false,
-          'reports': false,
-          'expenses': false,
-          'backup-restore': false,
-          'user-management': false,
-          'canEditPrice': false,
-          'canDelete': false
-        };
-
-        const activeArslan = {
-          id: arslanStaff?.id || 'USR-arslan',
-          name: arslanStaff?.name || 'Arslan',
-          email: 'arslan@rehmat.com',
-          role: 'Store Keeper',
-          status: 'Active',
-          permissions: arslanPerms
-        };
-
-        setUser(activeArslan);
-        sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(activeArslan));
-        setLoading(false);
-        return { success: true, user: activeArslan };
-      }
-      setLoading(false);
-      return { success: false, error: 'Incorrect password for Arslan! Please check your credentials.' };
-    }
-
-    // 3. Check in local staff users list first
+    // 2. Check in local staff users list first (supports all staff accounts: Arslan, Tariq, Asim, Ali)
     let localMatch = staffUsers.find(
       (u) =>
         (u.email || '').toLowerCase() === cleanEmail ||
@@ -518,16 +486,42 @@ export function AuthProvider({ children }) {
   };
 
   const deleteStaffUser = async (id) => {
-    const target = staffUsers.find((u) => u.id === id);
+    const target = staffUsers.find((u) => u.id === id || (u.email || '').toLowerCase() === String(id).toLowerCase());
     if (target?.email?.toLowerCase() === 'admin@rehmat.com') {
       alert('The primary Super Admin account is permanently protected and cannot be deleted!');
       return false;
     }
 
-    setStaffUsers((prev) => prev.filter((u) => u.id !== id));
+    const deletedEmail = (target?.email || '').toLowerCase();
+    const deletedId = String(target?.id || id);
 
+    // 1. Mark in local deleted set so this user is never resurrected on logout/reload
     try {
-      await deleteDoc(doc(db, 'users', String(id)));
+      const deletedList = JSON.parse(localStorage.getItem('rehmat_deleted_staff_ids') || '[]');
+      if (deletedEmail && !deletedList.includes(deletedEmail)) deletedList.push(deletedEmail);
+      if (deletedId && !deletedList.includes(deletedId)) deletedList.push(deletedId);
+      localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify(deletedList));
+    } catch {}
+
+    // 2. Remove from state and localStorage immediately
+    setStaffUsers((prev) => {
+      const next = prev.filter((u) => String(u.id) !== deletedId && (u.email || '').toLowerCase() !== deletedEmail);
+      localStorage.setItem('rehmat_store_staff_users', JSON.stringify(next));
+      return next;
+    });
+
+    // 3. Delete from Firebase & record tombstone in deleted_staff collection
+    try {
+      await deleteDoc(doc(db, 'users', deletedId));
+      await setDoc(
+        doc(db, 'deleted_staff', deletedId),
+        {
+          id: deletedId,
+          email: deletedEmail,
+          deletedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
     } catch (err) {
       console.error('Firebase delete staff error:', err);
     }
@@ -537,27 +531,29 @@ export function AuthProvider({ children }) {
 
   const updateStaffUser = async (id, updatedFields) => {
     let savedUser = null;
-    setStaffUsers((prev) =>
-      prev.map((u) => {
+    setStaffUsers((prev) => {
+      const next = prev.map((u) => {
         if (u.id === id || (u.email || '').toLowerCase() === String(id).toLowerCase()) {
           const updated = { ...u, ...updatedFields };
-          // If role changed without explicit custom permissions, assign role defaults
           if (updatedFields.role && updatedFields.role !== u.role && !updatedFields.permissions) {
             updated.permissions = getRoleDefaultPermissions(updatedFields.role);
           }
           if (user?.id === u.id || (user?.email || '').toLowerCase() === (u.email || '').toLowerCase()) {
             setUser(updated);
+            sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(updated));
           }
           savedUser = updated;
           return updated;
         }
         return u;
-      })
-    );
+      });
+      localStorage.setItem('rehmat_store_staff_users', JSON.stringify(next));
+      return next;
+    });
 
     if (savedUser) {
       try {
-        await setDoc(doc(db, 'users', String(id)), savedUser, { merge: true });
+        await setDoc(doc(db, 'users', String(savedUser.id || id)), savedUser, { merge: true });
       } catch (err) {
         console.error('Firebase update staff error:', err);
       }
@@ -566,24 +562,42 @@ export function AuthProvider({ children }) {
 
   const updateUserPermissions = async (userId, newPermissions) => {
     let targetEmail = '';
-    setStaffUsers((prev) =>
-      prev.map((u) => {
+    let updatedStaffMember = null;
+
+    setStaffUsers((prev) => {
+      const next = prev.map((u) => {
         if (u.id === userId || (u.email || '').toLowerCase() === String(userId).toLowerCase()) {
           targetEmail = (u.email || '').toLowerCase();
           const updated = { ...u, permissions: newPermissions };
+          updatedStaffMember = updated;
+
           if (user?.id === u.id || (user?.email || '').toLowerCase() === targetEmail) {
             setUser(updated);
+            sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(updated));
           }
           return updated;
         }
         return u;
-      })
-    );
+      });
+      localStorage.setItem('rehmat_store_staff_users', JSON.stringify(next));
+      return next;
+    });
 
-    try {
-      await updateDoc(doc(db, 'users', String(userId)), { permissions: newPermissions });
-    } catch (err) {
-      console.error('Firebase update permissions error:', err);
+    if (updatedStaffMember) {
+      try {
+        const docId = String(updatedStaffMember.id || userId);
+        await setDoc(
+          doc(db, 'users', docId),
+          {
+            ...updatedStaffMember,
+            permissions: newPermissions,
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error('Firebase update permissions error:', err);
+      }
     }
   };
 
