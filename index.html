@@ -29,52 +29,10 @@
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
     <link rel="dns-prefetch" href="//fonts.gstatic.com" />
 
-    <!-- this is to resolve issue in old safari browser in tablet -->
-    <script src="https://cdn.jsdelivr.net/npm/resize-observer-polyfill@1.5.1/dist/ResizeObserver.min.js"></script>
-
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "Mantis - React Material UI Dashboard Template",
-        "url": "https://mantisdashboard.com/"
-      }
-    </script>
   </head>
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <script>
-      (function() {
-        try {
-          if (window.location.hostname.includes('vercel.app')) {
-            return;
-          }
-
-          var targetCloudUrl = 'https://rehmatlawnmowers.vercel.app/?platform=tauri';
-          var img = new Image();
-          var redirected = false;
-          var timer = setTimeout(function() {
-            if (!redirected) {
-              console.log('⚡ Offline fallback active');
-            }
-          }, 1500);
-
-          img.onload = function() {
-            redirected = true;
-            clearTimeout(timer);
-            try { sessionStorage.setItem('rehmat_is_desktop', 'true'); } catch(e){}
-            window.location.replace(targetCloudUrl);
-          };
-          img.onerror = function() {
-            console.log('⚡ Cloud ping failed, using local offline bundle');
-          };
-          img.src = 'https://rehmatlawnmowers.vercel.app/favicon.svg?ping=' + Date.now();
-        } catch (e) {
-          console.warn('Live sync loader error:', e);
-        }
-      })();
-    </script>
     <div id="root"></div>
     <!--
       This HTML file is a template.

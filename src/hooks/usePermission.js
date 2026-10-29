@@ -21,9 +21,9 @@ export function usePermission() {
   const isStoreKeeper = role === 'Store Keeper';
 
   // Resolve user permissions: prioritize explicit custom permissions saved on user object
-  const userPerms = user?.permissions && Object.keys(user.permissions).length > 0
+  const userPerms = (user?.permissions && Object.keys(user.permissions).length > 0)
     ? user.permissions
-    : getRoleDefaultPermissions(role);
+    : (getRoleDefaultPermissions(role) || {});
 
   // Permission flags
   const canEditPrice = isSuperAdmin || Boolean(userPerms.canEditPrice);

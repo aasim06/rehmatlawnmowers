@@ -7,17 +7,12 @@ const LoginRoutes = {
   path: '/',
   children: [
     {
-      path: '/',
-      children: [
-        {
-          path: '/login',
-          element: <LoginPage />
-        },
-        {
-          path: '/register',
-          element: <Navigate to="/login" replace />
-        }
-      ]
+      path: 'login',
+      element: <LoginPage />
+    },
+    {
+      path: 'register',
+      element: <Navigate to="/login" replace />
     }
   ]
 };

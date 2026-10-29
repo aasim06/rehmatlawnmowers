@@ -51,8 +51,21 @@ export default defineConfig(({ mode }) => {
             if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(name)) return `images/[name]-[hash].${ext}`;
             if (/\.(woff2?|eot|ttf|otf)$/.test(name)) return `fonts/[name]-[hash].${ext}`;
             return `assets/[name]-[hash].${ext}`;
+          },
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@mui') || id.includes('@emotion')) {
+                return 'vendor-mui';
+              }
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              if (id.includes('@ant-design/icons')) {
+                return 'vendor-icons';
+              }
+              return 'vendor-lib';
+            }
           }
-          // manualChunks: { ... } // Add if you want custom chunk splitting
         }
       },
       // Only drop console/debugger in production

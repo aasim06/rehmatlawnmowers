@@ -34,7 +34,7 @@ function RootIndexRoute() {
   const { hasAccessToItem, isMasterAdmin, isSuperAdmin } = usePermission();
 
   if (isMasterAdmin || isSuperAdmin || hasAccessToItem({ id: 'dashboard' })) {
-    return <DashboardDefault />;
+    return <Navigate to="/dashboard/default" replace />;
   }
 
   if (hasAccessToItem({ id: 'stock-in' })) return <Navigate to="/inventory/stock-in" replace />;
@@ -48,7 +48,7 @@ function RootIndexRoute() {
   if (hasAccessToItem({ id: 'ledger' })) return <Navigate to="/inventory/ledger" replace />;
   if (hasAccessToItem({ id: 'reports' })) return <Navigate to="/inventory/reports" replace />;
 
-  return <DashboardDefault />;
+  return <Navigate to="/dashboard/default" replace />;
 }
 
 // ==============================|| MAIN ROUTING (ZERO-LATENCY INSTANT NAVIGATION WITH RBAC ROLEGUARDS) ||============================== //
@@ -62,7 +62,7 @@ const MainRoutes = {
   ),
   children: [
     {
-      path: '/',
+      index: true,
       element: <RootIndexRoute />
     },
     {
