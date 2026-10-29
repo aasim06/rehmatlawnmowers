@@ -22,7 +22,6 @@ import {
   WalletOutlined,
   LockOutlined
 } from '@ant-design/icons';
-import { isTauriApp } from 'utils/platform';
 
 const icons = {
   DashboardOutlined,
@@ -162,17 +161,13 @@ const inventoryMenu = {
       url: '/admin/users',
       icon: icons.SafetyCertificateOutlined
     },
-    ...(!isTauriApp()
-      ? [
-          {
-            id: 'app-security',
-            title: 'Remote App Control',
-            type: 'item',
-            url: '/admin/security',
-            icon: icons.LockOutlined
-          }
-        ]
-      : [])
+    {
+      id: 'app-security',
+      title: 'Software Block & Remote License',
+      type: 'item',
+      url: '/admin/security',
+      icon: icons.LockOutlined
+    }
   ]
 };
 

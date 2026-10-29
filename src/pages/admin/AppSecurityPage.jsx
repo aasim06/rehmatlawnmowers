@@ -74,16 +74,6 @@ export default function AppSecurityPage() {
     }
   };
 
-  if (isTauri) {
-    return (
-      <MainCard title="System Security & Remote Control">
-        <Alert severity="info" sx={{ py: 3 }}>
-          Remote command controls are only accessible through the authorized Web Administration Console (Vercel URL).
-        </Alert>
-      </MainCard>
-    );
-  }
-
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', pb: 5 }}>
       {/* Executive Header */}

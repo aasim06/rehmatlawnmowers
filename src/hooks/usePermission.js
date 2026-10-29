@@ -5,7 +5,7 @@ import { useAuth, defaultSuperAdminPermissions, defaultAdminPermissions, default
  * 🔐 usePermission Hook
  * ==============================================================================
  * Central permission and authorization hook for the 3-tier RBAC system:
- * - Master Admin (admin@rehmat.com): Absolute root access to all modules and system controls.
+ * - Master Admin (admin@rehmat.com) / Super Admin: Absolute root access to all modules and system controls.
  * - Staff Accounts: Strictly bounded by their individual custom permissions or role defaults.
  */
 export function usePermission() {
@@ -15,9 +15,9 @@ export function usePermission() {
   const isMasterAdmin = userEmail === 'admin@rehmat.com';
 
   const role = user?.role || (isMasterAdmin ? 'Super Admin' : 'Store Keeper');
-  const isSuperAdmin = isMasterAdmin;
+  const isSuperAdmin = isMasterAdmin || role === 'Super Admin';
   const isStoreAdmin = role === 'Admin';
-  const isAdmin = isMasterAdmin || role === 'Admin';
+  const isAdmin = isSuperAdmin || role === 'Admin';
   const isStoreKeeper = role === 'Store Keeper';
 
   // Resolve user permissions: prioritize explicit custom permissions saved on user object
@@ -26,14 +26,14 @@ export function usePermission() {
     : getRoleDefaultPermissions(role);
 
   // Permission flags
-  const canEditPrice = isMasterAdmin || Boolean(userPerms.canEditPrice);
-  const canDelete = isMasterAdmin || Boolean(userPerms.canDelete);
-  const canManageUsers = isMasterAdmin || Boolean(userPerms['user-management']);
-  const canAccessBackup = isMasterAdmin || Boolean(userPerms['backup-restore']);
-  const canResetData = isMasterAdmin && Boolean(userPerms.canResetData);
-  const canViewReports = isMasterAdmin || Boolean(userPerms.reports);
-  const canViewExpenses = isMasterAdmin || Boolean(userPerms.expenses);
-  const canViewLedgers = isMasterAdmin || Boolean(userPerms['vendor-ledgers'] || userPerms['customer-ledgers'] || userPerms.ledger);
+  const canEditPrice = isSuperAdmin || Boolean(userPerms.canEditPrice);
+  const canDelete = isSuperAdmin || Boolean(userPerms.canDelete);
+  const canManageUsers = isSuperAdmin || Boolean(userPerms['user-management']);
+  const canAccessBackup = isSuperAdmin || Boolean(userPerms['backup-restore']);
+  const canResetData = isSuperAdmin && Boolean(userPerms.canResetData);
+  const canViewReports = isSuperAdmin || Boolean(userPerms.reports);
+  const canViewExpenses = isSuperAdmin || Boolean(userPerms.expenses);
+  const canViewLedgers = isSuperAdmin || Boolean(userPerms['vendor-ledgers'] || userPerms['customer-ledgers'] || userPerms.ledger);
 
   const urlMap = {
     '/dashboard/default': 'dashboard',
@@ -54,19 +54,21 @@ export function usePermission() {
     '/inventory/expenses': 'expenses',
     '/inventory/backup-restore': 'backup-restore',
     '/admin/users': 'user-management',
-    '/inventory/user-management': 'user-management'
+    '/inventory/user-management': 'user-management',
+    '/admin/security': 'user-management',
+    '/inventory/security': 'user-management'
   };
 
   // Check if a specific navigation item (by id or url) is allowed
   const hasAccessToItem = (item) => {
-    // Only the primary Master Super Admin has zero restrictions anywhere
-    if (isMasterAdmin) return true;
+    // Super Admin has zero restrictions anywhere
+    if (isSuperAdmin) return true;
     if (!item) return false;
 
     const itemId = item.id || (item.url ? urlMap[item.url] : null);
 
-    // Direct role guard: user-management & backup-restore are strictly for users with explicit permission
-    if (itemId === 'user-management' && !canManageUsers) return false;
+    // Direct role guard: user-management, backup-restore, app-security are strictly for authorized users
+    if ((itemId === 'user-management' || itemId === 'app-security') && !canManageUsers) return false;
     if (itemId === 'backup-restore' && !canAccessBackup) return false;
 
     // Check by item ID (e.g. 'stock-out', 'stock-in', 'items', 'machine-sales', 'dashboard')
