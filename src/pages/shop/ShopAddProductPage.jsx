@@ -109,8 +109,22 @@ export default function ShopAddProductPage() {
     addNewItem,
     updateItem,
     deleteItem,
-    seedShopDemoData
+    seedShopDemoData,
+    resetShopDataToZero
   } = useStoreInventory();
+
+  // Factory Reset State
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetShopData = async () => {
+    if (!resetShopDataToZero) return;
+    setResetting(true);
+    await resetShopDataToZero();
+    setResetting(false);
+    setResetConfirmOpen(false);
+    setSuccessMsg('All Shop items and data reset to 0 successfully!');
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -321,7 +335,7 @@ export default function ShopAddProductPage() {
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
           {typeof seedShopDemoData === 'function' && (
             <Button
               variant="outlined"
@@ -344,6 +358,16 @@ export default function ShopAddProductPage() {
             sx={{ fontWeight: 700, borderRadius: 1.5, height: 35, fontSize: '0.78rem', bgcolor: '#f59e0b', '&:hover': { bgcolor: '#d97706' } }}
           >
             Open Shop Mart
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            onClick={() => setResetConfirmOpen(true)}
+            startIcon={<DeleteOutlined />}
+            sx={{ fontWeight: 800, borderRadius: 1.5, height: 35, fontSize: '0.78rem' }}
+          >
+            Factory Reset (0)
           </Button>
         </Stack>
       </Box>
@@ -874,6 +898,26 @@ export default function ShopAddProductPage() {
           </Button>
           <Button onClick={handleDeleteItem} color="error" variant="contained" sx={{ fontWeight: 700 }}>
             Delete Product
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── FACTORY RESET CONFIRMATION DIALOG ── */}
+      <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
+          ⚠️ Confirm Factory Reset Shop Data?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Are you sure you want to wipe all Shop inventory products, stock counts, counter sales slips, and ledger records? This action will set all shop data to 0 for a completely fresh start.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetConfirmOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleResetShopData} color="error" variant="contained" disabled={resetting} sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}>
+            {resetting ? 'Resetting...' : 'Yes, Reset All Shop Data to 0'}
           </Button>
         </DialogActions>
       </Dialog>

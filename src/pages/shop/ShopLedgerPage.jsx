@@ -42,6 +42,7 @@ import UpOutlined from '@ant-design/icons/UpOutlined';
 import CloseOutlined from '@ant-design/icons/CloseOutlined';
 import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
 import AppstoreOutlined from '@ant-design/icons/AppstoreOutlined';
+import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 
 // ==============================|| SHOP MATERIAL ISSUE LEDGER ||============================== //
 
@@ -49,11 +50,23 @@ export default function ShopLedgerPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  const { shopSales = [] } = useStoreInventory();
+  const { shopSales = [], resetShopDataToZero } = useStoreInventory();
 
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedPerson, setExpandedPerson] = useState(null);
+
+  // Factory Reset Dialog State
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetShopData = async () => {
+    if (!resetShopDataToZero) return;
+    setResetting(true);
+    await resetShopDataToZero();
+    setResetting(false);
+    setResetConfirmOpen(false);
+  };
 
   // Print Statement Modal State
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -135,7 +148,7 @@ export default function ShopLedgerPage() {
   return (
     <Box sx={{ width: '100%', pb: 4 }}>
       {/* 1. Header Banner */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{ bgcolor: 'primary.lighter', color: 'primary.main', p: 1, borderRadius: 2, display: 'flex' }}>
             <BookOutlined style={{ fontSize: '1.4rem' }} />
@@ -149,6 +162,16 @@ export default function ShopLedgerPage() {
             </Typography>
           </Box>
         </Box>
+
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteOutlined />}
+          onClick={() => setResetConfirmOpen(true)}
+          sx={{ fontWeight: 800, borderRadius: 1.5, height: 36, px: 2, fontSize: '0.8rem' }}
+        >
+          Factory Reset (0)
+        </Button>
       </Box>
 
       {/* 2. Top Metric KPI Cards - 4 Columns Across Full Width */}
@@ -585,6 +608,26 @@ export default function ShopLedgerPage() {
             sx={{ fontWeight: 800, px: 3 }}
           >
             Print Issue Statement
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm Reset Dialog */}
+      <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
+          ⚠️ Confirm Factory Reset Shop Data?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Are you sure you want to wipe all Shop inventory items, issue history, and sales slips? This action will set all shop ledger metrics to 0 for a completely fresh start.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetConfirmOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleResetShopData} color="error" variant="contained" disabled={resetting} sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}>
+            {resetting ? 'Resetting...' : 'Yes, Reset All Shop Data to 0'}
           </Button>
         </DialogActions>
       </Dialog>

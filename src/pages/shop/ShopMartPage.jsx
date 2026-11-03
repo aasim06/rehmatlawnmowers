@@ -87,14 +87,20 @@ export default function ShopMartPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  const { items = [], issueStock, addUsageLog, addNewItem, seedShopDemoData, updateItem, deleteItem, addShopSale } = useStoreInventory();
+  const { items = [], issueStock, addUsageLog, addNewItem, seedShopDemoData, updateItem, deleteItem, addShopSale, resetShopDataToZero } = useStoreInventory();
 
-  // Auto-seed demo products if items are currently 0
-  useEffect(() => {
-    if (items.length === 0 && typeof seedShopDemoData === 'function') {
-      seedShopDemoData();
-    }
-  }, [items.length, seedShopDemoData]);
+  // Factory Reset State
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetShopData = async () => {
+    if (!resetShopDataToZero) return;
+    setResetting(true);
+    await resetShopDataToZero();
+    setCart([]);
+    setResetting(false);
+    setResetConfirmOpen(false);
+  };
 
   // ── State ──────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -582,7 +588,7 @@ export default function ShopMartPage() {
         </Box>
 
         {/* Top Actions */}
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           {typeof seedShopDemoData === 'function' && (
             <Button
               variant="outlined"
@@ -596,6 +602,17 @@ export default function ShopMartPage() {
               Demo Setup
             </Button>
           )}
+
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            onClick={() => setResetConfirmOpen(true)}
+            startIcon={<DeleteOutlined />}
+            sx={{ fontWeight: 800, borderRadius: 1.5, height: 35, fontSize: '0.78rem' }}
+          >
+            Factory Reset (0)
+          </Button>
 
           {/* Cart button */}
           <Tooltip title="Open Cart">
@@ -1554,6 +1571,26 @@ export default function ShopMartPage() {
             sx={{ fontWeight: 800, borderRadius: 1.5, px: 3, bgcolor: '#005F56', '&:hover': { bgcolor: '#004740' } }}
           >
             Print Invoice
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm Reset Dialog */}
+      <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
+          ⚠️ Confirm Factory Reset Shop Data?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Are you sure you want to wipe all Shop inventory items, stock counts, counter sales slips, and ledger records? This action will set all shop metrics and data to 0 for a completely fresh start.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetConfirmOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleResetShopData} color="error" variant="contained" disabled={resetting} sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}>
+            {resetting ? 'Resetting...' : 'Yes, Reset All Shop Data to 0'}
           </Button>
         </DialogActions>
       </Dialog>

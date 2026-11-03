@@ -9,6 +9,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   InputAdornment,
@@ -41,6 +45,7 @@ import WarningOutlined from '@ant-design/icons/WarningOutlined';
 import BarChartOutlined from '@ant-design/icons/BarChartOutlined';
 import ShoppingCartOutlined from '@ant-design/icons/ShoppingCartOutlined';
 import BookOutlined from '@ant-design/icons/BookOutlined';
+import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 
 // ==============================|| SHOP DASHBOARD — POLISHED ||============================== //
 
@@ -58,11 +63,22 @@ export default function ShopDashboardPage() {
     todaySalesAmount = 0,
     totalSalesAmount = 0,
     lowStockAlerts = [],
-    shopSales = []
+    shopSales = [],
+    resetShopDataToZero
   } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetShopData = async () => {
+    if (!resetShopDataToZero) return;
+    setResetting(true);
+    await resetShopDataToZero();
+    setResetting(false);
+    setResetConfirmOpen(false);
+  };
 
   // Filtered transaction logs
   const filteredLogs = useMemo(() => {
@@ -156,7 +172,7 @@ export default function ShopDashboardPage() {
         </Box>
 
         {/* Action buttons at the top */}
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
           <Button size="small" variant="contained" component={Link} to="/shop/mart"
             startIcon={<ShoppingCartOutlined />} sx={{ fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35, bgcolor: '#f59e0b', color: '#fff', '&:hover': { bgcolor: '#d97706' } }}>
             Shop Mart
@@ -168,6 +184,16 @@ export default function ShopDashboardPage() {
           <Button size="small" variant="contained" color="success" component={Link} to="/shop/add-product"
             startIcon={<PlusOutlined />} sx={{ fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35 }}>
             + Add Product
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteOutlined />}
+            onClick={() => setResetConfirmOpen(true)}
+            sx={{ fontWeight: 800, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35 }}
+          >
+            Factory Reset (0)
           </Button>
         </Stack>
       </Box>
@@ -592,6 +618,51 @@ export default function ShopDashboardPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* ── 5. FACTORY RESET SHOP DATA (ZERO ALL) ── */}
+      <Box sx={{ width: '100%', mt: 4, p: 2.5, borderRadius: 2, border: '1px dashed #fca5a5', bgcolor: isDark ? 'rgba(239,68,68,0.05)' : '#fff5f5' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 2 }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight={800} color="error.main">
+              Factory Reset Shop Data to Zero (Fresh Start)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              Wipe all shop items, sales slips, inventory counts, and issue history to start completely clean at 0.
+            </Typography>
+          </Box>
+          <Box>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteOutlined />}
+              onClick={() => setResetConfirmOpen(true)}
+              sx={{ fontWeight: 800, height: 38, borderRadius: 2, px: 3, whiteSpace: 'nowrap' }}
+            >
+              Factory Reset (0)
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Confirm Reset Dialog */}
+      <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
+          ⚠️ Confirm Factory Reset Shop Data?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Are you sure you want to wipe all Shop inventory items, counter sales slips, and ledger records? This action will set all shop metrics and history to 0 for a completely fresh start.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetConfirmOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleResetShopData} color="error" variant="contained" disabled={resetting} sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}>
+            {resetting ? 'Resetting...' : 'Yes, Reset All Shop Data to 0'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

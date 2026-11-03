@@ -165,10 +165,16 @@ export const defaultShopItems = [
 ];
 
 export function ShopInventoryProvider({ children }) {
-  // 1. Shop Inventory Items State (Auto-seed demo products if empty)
+  // 1. Shop Inventory Items State
   const [items, setItems] = useState(() => {
-    const saved = safeParseJSON('rehmat_shop_items_v2', []);
-    if (Array.isArray(saved) && saved.length > 0) return saved;
+    const raw = localStorage.getItem('rehmat_shop_items_v2');
+    if (raw !== null) {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        return [];
+      }
+    }
     return defaultShopItems;
   });
 
@@ -180,8 +186,14 @@ export function ShopInventoryProvider({ children }) {
 
   // 4. Shop Categories State
   const [categories, setCategories] = useState(() => {
-    const saved = safeParseJSON('rehmat_shop_categories_v2', null);
-    if (Array.isArray(saved) && saved.length > 0) return saved;
+    const raw = localStorage.getItem('rehmat_shop_categories_v2');
+    if (raw !== null) {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        return defaultShopCategories;
+      }
+    }
     return defaultShopCategories;
   });
 
@@ -754,6 +766,57 @@ export function ShopInventoryProvider({ children }) {
     return items.filter((item) => (parseInt(item.totalStock, 10) || 0) <= (parseInt(item.minLevel, 10) || 5));
   }, [items]);
 
+  // 15. Factory Reset Shop Data to Zero
+  const resetShopDataToZero = async () => {
+    try {
+      // 1. Wipe all shop collections from Firebase Firestore
+      const collectionsToWipe = [
+        'shop_items',
+        'shop_usage_logs',
+        'shop_vendors',
+        'shop_categories',
+        'shop_sales',
+        'shop_customer_payments',
+        'shop_master_item_names'
+      ];
+
+      for (const colName of collectionsToWipe) {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          await Promise.allSettled(snap.docs.map((d) => deleteDoc(d.ref)));
+        } catch (wipeErr) {
+          console.warn('Shop wipe collection warning:', colName, wipeErr);
+        }
+      }
+
+      // 2. Clear and set all shop-specific localStorage keys to empty array
+      const shopKeys = [
+        'rehmat_shop_items_v2',
+        'rehmat_shop_usage_logs_v2',
+        'rehmat_shop_vendors_v2',
+        'rehmat_shop_categories_v2',
+        'rehmat_shop_master_item_names_v2',
+        'rehmat_shop_sales_v2',
+        'rehmat_shop_customer_payments_v2'
+      ];
+      shopKeys.forEach((key) => localStorage.setItem(key, JSON.stringify([])));
+
+      // 3. Clear UI State immediately to 0 / empty
+      setItems([]);
+      setUsageLogs([]);
+      setVendors([]);
+      setCategories([]);
+      setMasterItemNames([]);
+      setShopSales([]);
+      setShopCustomerPayments([]);
+
+      return { success: true, message: 'All Shop Data & Metrics wiped successfully to 0!' };
+    } catch (err) {
+      console.error('Reset Shop Data Error:', err);
+      return { success: false, message: 'Wipe error: ' + err.message };
+    }
+  };
+
   const contextValue = useMemo(
     () => ({
       isShop: true,
@@ -766,6 +829,8 @@ export function ShopInventoryProvider({ children }) {
       shopCustomerPayments,
       machineSales: shopSales,
       customerPayments: shopCustomerPayments,
+      resetShopDataToZero,
+      resetAllDataToZero: resetShopDataToZero,
       addShopSale,
       deleteShopSale,
       addShopCustomerPayment,

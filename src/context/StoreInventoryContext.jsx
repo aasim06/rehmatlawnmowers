@@ -2044,8 +2044,23 @@ export function StoreInventoryProvider({ children }) {
 
   const resetAllDataToZero = async () => {
     try {
-      // 1. Wipe store_items, usage_logs, and all operational collections from Firebase Firestore
-      const collectionsToWipe = ['store_items', 'usage_logs', 'machine_sales', 'machine_repairs', 'customer_payments', 'vendor_payments', 'vendors'];
+      // 1. Wipe store_items, usage_logs, and all operational collections from Firebase Firestore (including Shop)
+      const collectionsToWipe = [
+        'store_items',
+        'usage_logs',
+        'machine_sales',
+        'machine_repairs',
+        'customer_payments',
+        'vendor_payments',
+        'vendors',
+        'shop_items',
+        'shop_usage_logs',
+        'shop_vendors',
+        'shop_categories',
+        'shop_sales',
+        'shop_customer_payments',
+        'shop_master_item_names'
+      ];
       for (const colName of collectionsToWipe) {
         try {
           const snap = await getDocs(collection(db, colName));
