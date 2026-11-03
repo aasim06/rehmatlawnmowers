@@ -38,13 +38,10 @@ import ImportOutlined from '@ant-design/icons/ImportOutlined';
 import ExportOutlined from '@ant-design/icons/ExportOutlined';
 import DollarOutlined from '@ant-design/icons/DollarOutlined';
 import InboxOutlined from '@ant-design/icons/InboxOutlined';
-import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import ArrowRightOutlined from '@ant-design/icons/ArrowRightOutlined';
 import WarningOutlined from '@ant-design/icons/WarningOutlined';
 import BarChartOutlined from '@ant-design/icons/BarChartOutlined';
-import ShoppingCartOutlined from '@ant-design/icons/ShoppingCartOutlined';
-import BookOutlined from '@ant-design/icons/BookOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 
 // ==============================|| SHOP DASHBOARD — POLISHED ||============================== //
@@ -170,32 +167,6 @@ export default function ShopDashboardPage() {
             Retail counter management • Independent sales, stock in &amp; sales out
           </Typography>
         </Box>
-
-        {/* Action buttons at the top */}
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Button size="small" variant="contained" component={Link} to="/shop/mart"
-            startIcon={<ShoppingCartOutlined />} sx={{ fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35, bgcolor: '#f59e0b', color: '#fff', '&:hover': { bgcolor: '#d97706' } }}>
-            Shop Mart
-          </Button>
-          <Button size="small" variant="contained" component={Link} to="/shop/ledger"
-            startIcon={<BookOutlined />} sx={{ fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35, bgcolor: '#0284c7', color: '#fff', '&:hover': { bgcolor: '#0369a1' } }}>
-            Shop Ledger
-          </Button>
-          <Button size="small" variant="contained" color="success" component={Link} to="/shop/add-product"
-            startIcon={<PlusOutlined />} sx={{ fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35 }}>
-            + Add Product
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteOutlined />}
-            onClick={() => setResetConfirmOpen(true)}
-            sx={{ fontWeight: 800, borderRadius: 1.5, px: 1.75, fontSize: '0.775rem', height: 35, minHeight: 35 }}
-          >
-            Factory Reset (0)
-          </Button>
-        </Stack>
       </Box>
 
       {/* ── 2. LOW STOCK ALERT ── */}
