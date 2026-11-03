@@ -57,7 +57,13 @@ export function usePermission() {
     '/admin/users': 'user-management',
     '/inventory/user-management': 'user-management',
     '/admin/security': 'user-management',
-    '/inventory/security': 'user-management'
+    '/inventory/security': 'user-management',
+    '/shop/dashboard': 'shop-dashboard',
+    '/shop/add-product': 'shop-add-product',
+    '/shop/stock-in': 'shop-add-product',
+    '/shop/stock-out': 'shop-mart',
+    '/shop/mart': 'shop-mart',
+    '/shop/ledger': 'shop-ledger'
   };
 
   // Check if a specific navigation item (by id or url) is allowed
@@ -90,6 +96,11 @@ export function usePermission() {
     const permKey = urlMap[item.url || item];
     if (permKey && userPerms[permKey] !== undefined) {
       return Boolean(userPerms[permKey]);
+    }
+
+    // Default allow for shop items unless explicitly set to false
+    if (itemId === 'shop-management' || itemId === 'shop-dashboard' || itemId === 'shop-add-product' || itemId === 'shop-mart' || itemId === 'shop-ledger') {
+      return true;
     }
 
     return false;

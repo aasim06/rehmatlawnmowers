@@ -17,11 +17,11 @@ import BackupRestorePage from 'pages/inventory/BackupRestorePage';
 import ExpensesPage from 'pages/inventory/ExpensesPage';
 import UserManagementPage from 'pages/admin/UserManagementPage';
 import AppSecurityPage from 'pages/admin/AppSecurityPage';
-import Color from 'pages/component-overview/color';
-import Typography from 'pages/component-overview/typography';
-import Shadow from 'pages/component-overview/shadows';
-import SamplePage from 'pages/extra-pages/sample-page';
-
+import ShopRouteWrapper from 'pages/shop/ShopRouteWrapper';
+import ShopDashboardPage from 'pages/shop/ShopDashboardPage';
+import ShopAddProductPage from 'pages/shop/ShopAddProductPage';
+import ShopMartPage from 'pages/shop/ShopMartPage';
+import ShopLedgerPage from 'pages/shop/ShopLedgerPage';
 // layout, auth & RBAC guards
 import { Navigate } from 'react-router-dom';
 import DashboardLayout from 'layout/Dashboard';
@@ -241,22 +241,62 @@ const MainRoutes = {
       ]
     },
     {
-      path: 'typography',
-      element: <Typography />
-    },
-    {
-      path: 'color',
-      element: <Color />
-    },
-    {
-      path: 'shadow',
-      element: <Shadow />
-    },
-    {
-      path: 'sample-page',
-      element: <SamplePage />
+      path: 'shop',
+      element: <ShopRouteWrapper />,
+      children: [
+        {
+          index: true,
+          element: <Navigate to="/shop/dashboard" replace />
+        },
+        {
+          path: 'dashboard',
+          element: (
+            <RoleGuard permission="shop-dashboard">
+              <ShopDashboardPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'add-product',
+          element: (
+            <RoleGuard permission="shop-add-product">
+              <ShopAddProductPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'products',
+          element: <Navigate to="/shop/add-product" replace />
+        },
+        {
+          path: 'stock-in',
+          element: <Navigate to="/shop/add-product" replace />
+        },
+        {
+          path: 'stock-out',
+          element: <Navigate to="/shop/mart" replace />
+        },
+        {
+          path: 'mart',
+          element: (
+            <RoleGuard permission="shop-mart">
+              <ShopMartPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'ledger',
+          element: (
+            <RoleGuard permission="shop-ledger">
+              <ShopLedgerPage />
+            </RoleGuard>
+          )
+        }
+      ]
     }
   ]
 };
 
 export default MainRoutes;
+
+

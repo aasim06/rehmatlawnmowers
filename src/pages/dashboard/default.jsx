@@ -341,7 +341,7 @@ export default function DashboardDefault() {
         <Grid container sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Grid>
             <Typography variant="h5" fontWeight={700}>
-              📑 Customer Machine Sales & Billing Summary
+              Customer Machine Sales & Billing Summary
             </Typography>
           </Grid>
           <Grid>

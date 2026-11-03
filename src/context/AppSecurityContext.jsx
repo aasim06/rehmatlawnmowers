@@ -136,10 +136,8 @@ export function AppSecurityProvider({ children }) {
       console.warn('Realtime Firebase subscription error:', e);
     }
 
-    // Periodic check every 15 seconds in Tauri
-    const interval = setInterval(() => {
-      refreshSecurityConfig();
-    }, isTauri ? 15000 : 30000);
+    // Realtime onSnapshot handles updates instantly without polling CPU overhead
+    const interval = null;
 
     return () => {
       clearInterval(interval);

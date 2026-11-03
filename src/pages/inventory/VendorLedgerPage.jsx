@@ -375,7 +375,8 @@ export default function VendorLedgerPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-vendor-statement, #printable-vendor-statement * {

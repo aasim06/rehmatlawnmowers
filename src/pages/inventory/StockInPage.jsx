@@ -35,7 +35,7 @@ import {
 } from '@mui/material';
 
 // icons
-import { ImportOutlined, SearchOutlined, ArrowUpOutlined, PlusOutlined, DeleteOutlined, EditOutlined, PrinterOutlined } from '@ant-design/icons';
+import { ImportOutlined, SearchOutlined, ArrowUpOutlined, PlusOutlined, DeleteOutlined, EditOutlined, PrinterOutlined, UploadOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
@@ -43,7 +43,7 @@ import usePermission from 'hooks/usePermission';
 
 export default function StockInPage() {
   const { canDelete, canEditPrice } = usePermission();
-  const { items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
+  const { isShop, items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -71,7 +71,8 @@ export default function StockInPage() {
     category: 'General',
     qty: 1,
     unitPrice: 0,
-    discount: 0
+    discount: 0,
+    imageUrl: ''
   });
 
   // Edit Drawer Form State
@@ -86,6 +87,31 @@ export default function StockInPage() {
   // Print Invoice Modal State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printData, setPrintData] = useState(null);
+
+  // Local File Upload for Item Image
+  const handleLocalImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 500;
+          const scale = Math.min(1, MAX_WIDTH / img.width);
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          setForm((prev) => ({ ...prev, imageUrl: dataUrl }));
+        };
+        img.onerror = () => setForm((prev) => ({ ...prev, imageUrl: event.target.result }));
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Combine all items list from store items and master item names for complete dropdown options
   const existingNamesList = Array.from(
@@ -104,7 +130,8 @@ export default function StockInPage() {
         ...prev,
         itemName: val,
         category: matchedItem.category || prev.category || 'General',
-        unitPrice: matchedItem.unitPrice || prev.unitPrice
+        unitPrice: matchedItem.unitPrice || prev.unitPrice,
+        imageUrl: matchedItem.imageUrl || prev.imageUrl || ''
       }));
     } else {
       const matchedMaster = (masterItemNames || []).find((m) => m.name.toLowerCase() === val.toLowerCase());
@@ -128,9 +155,9 @@ export default function StockInPage() {
     const poCode = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
 
     if (matchedItem) {
-      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal, form.category || matchedItem.category || 'General');
+      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal, form.category || matchedItem.category || 'General', form.imageUrl || matchedItem.imageUrl || '');
     } else {
-      const newCode = `RM-${Math.floor(100 + Math.random() * 900)}`;
+      const newCode = isShop ? `SHP-${Math.floor(100 + Math.random() * 900)}` : `RM-${Math.floor(100 + Math.random() * 900)}`;
       const createdItem = await addNewItem({
         name: form.itemName.trim(),
         itemCode: newCode,
@@ -139,9 +166,10 @@ export default function StockInPage() {
         totalStock: 0,
         minLevel: 10,
         unitPrice: priceVal,
-        rackLocation: 'Main Store'
+        rackLocation: isShop ? 'Shop Counter' : 'Main Store',
+        imageUrl: form.imageUrl || ''
       });
-      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal, form.category || 'General');
+      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal, form.category || 'General', form.imageUrl || '');
     }
 
     setForm((prev) => ({
@@ -149,7 +177,8 @@ export default function StockInPage() {
       itemName: '',
       qty: 1,
       unitPrice: 0,
-      discount: 0
+      discount: 0,
+      imageUrl: ''
     }));
 
     // Auto-focus back to ITEM SELECT for non-stop typing
@@ -322,7 +351,7 @@ export default function StockInPage() {
     <Stack spacing={3}>
       {/* 1. TOP SECTION: Record Stock In Form Card */}
       <MainCard
-        title=" Record Stock In (Receiving Invoice)"
+        title={isShop ? "Shop - Record Stock In (Receiving Invoice)" : " Record Stock In (Receiving Invoice)"}
         sx={{
           boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
           borderRadius: 2
@@ -332,7 +361,7 @@ export default function StockInPage() {
           <Grid container spacing={2.5} alignItems="center">
             {/* ROW 1: 50% / 50% split */}
             {/* 1. SELECT VENDOR / SUPPLIER */}
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Autocomplete
                 freeSolo
                 options={vendorList}
@@ -363,7 +392,7 @@ export default function StockInPage() {
             </Grid>
 
             {/* 2. ITEM SELECT */}
-            <Grid size={{ xs: 12, md: 5 }}>
+            <Grid size={{ xs: 12, md: 3.5 }}>
               <Autocomplete
                 freeSolo
                 options={existingNamesList}
@@ -390,7 +419,7 @@ export default function StockInPage() {
             </Grid>
 
             {/* 3. CATEGORY SELECT */}
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 2.5 }}>
               <Autocomplete
                 freeSolo
                 options={categoryOptions}
@@ -416,6 +445,35 @@ export default function StockInPage() {
                     placeholder="Category"
                   />
                 )}
+              />
+            </Grid>
+
+            {/* 4. IMAGE URL / UPLOAD FROM PC */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="IMAGE (URL OR PC UPLOAD)"
+                placeholder="Paste link or click icon ->"
+                value={form.imageUrl ? (form.imageUrl.startsWith('data:') ? 'Local file selected' : form.imageUrl) : ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Upload local image from computer">
+                        <IconButton component="label" size="small" edge="end">
+                          <UploadOutlined style={{ fontSize: '1rem', color: '#005F56' }} />
+                          <input type="file" hidden accept="image/*" onChange={handleLocalImageUpload} />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  )
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '44px',
+                    minHeight: '44px'
+                  }
+                }}
               />
             </Grid>
 
@@ -550,7 +608,7 @@ export default function StockInPage() {
 
       {/* 2. BOTTOM SECTION: Stock In Logs Table Card */}
       <MainCard
-        title="Stock In (Receiving Logs)"
+        title={isShop ? "Shop Stock In (Receiving Logs)" : "Stock In (Receiving Logs)"}
         secondary={
           selected.length > 0 && canDelete && (
             <Button
@@ -944,7 +1002,8 @@ export default function StockInPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-invoice-stockin, #printable-invoice-stockin * {

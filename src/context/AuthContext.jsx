@@ -32,6 +32,11 @@ export const defaultSuperAdminPermissions = {
   'expenses': true,
   'backup-restore': true,
   'user-management': true,
+  'shop-management': true,
+  'shop-dashboard': true,
+  'shop-stock-in': true,
+  'shop-stock-out': true,
+  'shop-mart': true,
   'canEditPrice': true,
   'canDelete': true,
   'canResetData': true
@@ -59,7 +64,16 @@ export const defaultAdminPermissions = {
   'reports': true,
   'expenses': true,
   'backup-restore': false, // Restricted to Super Admin
-  'user-management': false, // Restricted to Super Admin
+  'user-management': false,
+  'shop-management': true,
+  'shop-dashboard': true,
+  'shop-stock-in': true,
+  'shop-stock-out': true, // Restricted to Super Admin
+  'shop-management': true,
+  'shop-dashboard': true,
+  'shop-stock-in': true,
+  'shop-stock-out': true,
+  'shop-mart': true,
   'canEditPrice': true,
   'canDelete': true,
   'canResetData': false // Restricted to Super Admin
@@ -88,6 +102,11 @@ export const defaultStoreKeeperPermissions = {
   'expenses': false,
   'backup-restore': false,
   'user-management': false,
+  'shop-management': true,
+  'shop-dashboard': true,
+  'shop-stock-in': true,
+  'shop-stock-out': true,
+  'shop-mart': true,
   'canEditPrice': false,
   'canDelete': false,
   'canResetData': false
@@ -166,6 +185,10 @@ const initialStaffUsers = [
       'expenses': false,
       'backup-restore': false,
       'user-management': false,
+  'shop-management': true,
+  'shop-dashboard': true,
+  'shop-stock-in': true,
+  'shop-stock-out': true,
       'canEditPrice': false,
       'canDelete': false
     }

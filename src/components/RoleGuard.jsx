@@ -43,7 +43,11 @@ export default function RoleGuard({ permission, allowedRoles, children, fallback
 
   // 2. Check Module Permission Flag if specified
   if (permission) {
-    if (!userPerms || !userPerms[permission]) {
+    if (permission.startsWith('shop-')) {
+      if (userPerms && userPerms[permission] === false) {
+        return fallback || <AccessDeniedView role={role} permissionKey={permission} navigate={navigate} />;
+      }
+    } else if (!userPerms || !userPerms[permission]) {
       return fallback || <AccessDeniedView role={role} permissionKey={permission} navigate={navigate} />;
     }
   }

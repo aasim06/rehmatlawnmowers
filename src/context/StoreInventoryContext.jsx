@@ -10,7 +10,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 
-const StoreInventoryContext = createContext();
+export const StoreInventoryContext = createContext();
 
 const safeParseJSON = (key, fallback = []) => {
   try {
@@ -675,7 +675,7 @@ export function StoreInventoryProvider({ children }) {
     window.addEventListener('focus', handleFocus);
 
     // Periodic cloud poll every 15 seconds
-    const interval = setInterval(fetchFirebaseData, 15000);
+    const interval = setInterval(fetchFirebaseData, 90000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
@@ -858,7 +858,7 @@ export function StoreInventoryProvider({ children }) {
         status: 1,
         notes: notes || ''
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase issueStock error:', e);
     }
@@ -982,7 +982,7 @@ export function StoreInventoryProvider({ children }) {
         status: 1,
         notes: `Shipment Ref: ${refNo}`
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('receiveStock exception:', e);
     }
@@ -1027,7 +1027,7 @@ export function StoreInventoryProvider({ children }) {
         rack_location: rackLocationVal,
         status: 1
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase store_items insert error:', e);
     }
@@ -1068,7 +1068,7 @@ export function StoreInventoryProvider({ children }) {
       if (updatedData.rackLocation) updatePayload.rack_location = updatedData.rackLocation;
 
       await setDoc(doc(db, 'store_items', String(itemId)), updatePayload, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error(e);
     }
@@ -1447,7 +1447,7 @@ export function StoreInventoryProvider({ children }) {
         unit_price: updatedData.unitPrice,
         line_total: updatedData.lineTotal
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase updateLog error:', e);
     }
@@ -1548,7 +1548,7 @@ export function StoreInventoryProvider({ children }) {
         time: newEntry.time,
         items: newEntry.items || []
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase addMachineSale Exception:', e);
     }
@@ -1573,7 +1573,7 @@ export function StoreInventoryProvider({ children }) {
         balance_amount: updatedData.balanceAmount,
         payment_status: updatedData.paymentStatus
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase updateMachineSale error:', e);
     }
@@ -1740,7 +1740,7 @@ export function StoreInventoryProvider({ children }) {
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase addCustomerPayment Exception:', e);
     }
@@ -1777,7 +1777,7 @@ export function StoreInventoryProvider({ children }) {
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
       }, { merge: true });
-      await fetchFirebaseData();
+      fetchFirebaseData();
     } catch (e) {
       console.error('Firebase addVendorPayment Exception:', e);
     }
@@ -1868,7 +1868,7 @@ export function StoreInventoryProvider({ children }) {
       if (data.expenses && Array.isArray(data.expenses)) setExpenses(data.expenses);
       if (data.expenseCategories && Array.isArray(data.expenseCategories)) setExpenseCategories(data.expenseCategories);
 
-      await fetchFirebaseData();
+      fetchFirebaseData();
       return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
     } catch (err) {
       console.error(err);
@@ -2069,7 +2069,7 @@ export function StoreInventoryProvider({ children }) {
       setVendorPayments([]);
 
       // 4. Refetch live state from Supabase immediately so the UI reflects an empty state across all browsers
-      await fetchFirebaseData();
+      fetchFirebaseData();
 
       return { success: true, message: 'All Cloud Database records & Local Storage wiped successfully to 0!' };
     } catch (err) {

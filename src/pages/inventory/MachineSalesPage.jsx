@@ -1150,7 +1150,8 @@ export default function MachineSalesPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-machine-invoice, #printable-machine-invoice * {

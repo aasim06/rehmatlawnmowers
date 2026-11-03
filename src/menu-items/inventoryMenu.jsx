@@ -20,7 +20,9 @@ import {
   ShopOutlined,
   CloudSyncOutlined,
   WalletOutlined,
-  LockOutlined
+  LockOutlined,
+  ShoppingOutlined,
+  PlusSquareOutlined
 } from '@ant-design/icons';
 
 const icons = {
@@ -44,7 +46,9 @@ const icons = {
   ShopOutlined,
   CloudSyncOutlined,
   WalletOutlined,
-  LockOutlined
+  LockOutlined,
+  ShoppingOutlined,
+  PlusSquareOutlined
 };
 
 // ==============================|| MENU ITEMS - FACTORY STORE INVENTORY ||============================== //
@@ -120,11 +124,48 @@ const inventoryMenu = {
       ]
     },
     {
+      id: 'shop-management',
+      title: 'Shop',
+      type: 'collapse',
+      icon: icons.ShopOutlined,
+      children: [
+        {
+          id: 'shop-dashboard',
+          title: 'Shop Dashboard',
+          type: 'item',
+          url: '/shop/dashboard',
+          icon: icons.DashboardOutlined,
+          breadcrumbs: false
+        },
+        {
+          id: 'shop-add-product',
+          title: 'Add Product',
+          type: 'item',
+          url: '/shop/add-product',
+          icon: icons.PlusSquareOutlined
+        },
+        {
+          id: 'shop-mart',
+          title: 'Shop Mart',
+          type: 'item',
+          url: '/shop/mart',
+          icon: icons.ShoppingCartOutlined
+        },
+        {
+          id: 'shop-ledger',
+          title: 'Shop Customer Ledger',
+          type: 'item',
+          url: '/shop/ledger',
+          icon: icons.BookOutlined
+        }
+      ]
+    },
+    {
       id: 'vendors',
       title: 'Vendors & Parties',
       type: 'item',
       url: '/inventory/vendors',
-      icon: icons.ShopOutlined
+      icon: icons.TeamOutlined
     },
     {
       id: 'ledger',

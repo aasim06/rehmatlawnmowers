@@ -23,9 +23,13 @@ export default function HeaderContent() {
 
       <Stack
         direction="row"
-        alignItems="center"
         spacing={{ xs: 1.5, sm: 2 }}
-        sx={{ ml: 'auto', flexShrink: 0 }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          ml: 'auto',
+          flexShrink: 0
+        }}
       >
         {/* Live Cloud Status Badge (Auto-Update indicator) */}
         <LiveCloudStatusBadge />

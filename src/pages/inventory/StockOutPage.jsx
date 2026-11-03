@@ -43,7 +43,7 @@ import usePermission from 'hooks/usePermission';
 
 export default function StockOutPage() {
   const { canDelete, canEditPrice, isStoreKeeper } = usePermission();
-  const { items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs, addNotification } = useStoreInventory();
+  const { isShop, items = [], vendors = [], masterItemNames = [], categories = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs, addNotification } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -404,7 +404,7 @@ export default function StockOutPage() {
     <Stack spacing={3}>
       {/* 1. TOP SECTION: Record Stock Out Form Card */}
       <MainCard
-        title="Record Stock Out (Sales / Usage Invoice)"
+        title={isShop ? "Shop - Record Stock Out (Sales Invoice)" : "Record Stock Out (Sales / Usage Invoice)"}
         sx={{
           boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
           borderRadius: 2
@@ -561,7 +561,7 @@ export default function StockOutPage() {
 
       {/* 2. BOTTOM SECTION: Stock Out Logs Table Card */}
       <MainCard
-        title="Stock Out (Sales / Usage Logs)"
+        title={isShop ? "Shop Stock Out (Sales Logs)" : "Stock Out (Sales / Usage Logs)"}
         secondary={
           selected.length > 0 && (
             <Button
@@ -935,7 +935,8 @@ export default function StockOutPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-invoice-stockout, #printable-invoice-stockout * {

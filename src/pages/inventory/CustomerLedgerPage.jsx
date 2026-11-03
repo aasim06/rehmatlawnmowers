@@ -905,7 +905,8 @@ export default function CustomerLedgerPage() {
                 size: A4 portrait;
                 margin: 6mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-customer-statement, #printable-customer-statement * {
@@ -1292,7 +1293,8 @@ export default function CustomerLedgerPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-machine-invoice, #printable-machine-invoice *,
@@ -1523,7 +1525,8 @@ export default function CustomerLedgerPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-ledger-repair-jobcard, #printable-ledger-repair-jobcard * {

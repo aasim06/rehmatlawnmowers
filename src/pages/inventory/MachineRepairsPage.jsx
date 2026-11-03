@@ -1529,7 +1529,8 @@ const STATUS_DESCRIPTIONS = {
                 height: 100% !important;
                 overflow: hidden !important;
               }
-              body * {
+            #root { display: none !important; }
+                body * {
                 visibility: hidden !important;
               }
               #printable-repair-jobcard, #printable-repair-jobcard * {
