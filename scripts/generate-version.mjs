@@ -23,3 +23,4 @@ fs.writeFileSync(
 );
 
 console.log('✅ Generated public/version.json:', versionData);
+
