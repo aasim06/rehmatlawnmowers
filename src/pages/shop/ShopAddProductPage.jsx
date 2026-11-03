@@ -336,18 +336,6 @@ export default function ShopAddProductPage() {
         </Box>
 
         <Stack direction="row" spacing={1} flexWrap="wrap">
-          {typeof seedShopDemoData === 'function' && (
-            <Button
-              variant="outlined"
-              color="secondary"
-              size="small"
-              onClick={seedShopDemoData}
-              startIcon={<ThunderboltOutlined />}
-              sx={{ fontWeight: 700, borderRadius: 1.5, height: 35, fontSize: '0.78rem' }}
-            >
-              Demo Setup
-            </Button>
-          )}
           <Button
             component={Link}
             to="/shop/mart"
@@ -716,22 +704,11 @@ export default function ShopAddProductPage() {
             <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.secondary' }}>
               No Products Found
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, mb: 2 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
               {items.length === 0
-                ? 'Your shop catalogue is currently empty. Use the form above or click below to load demo items.'
+                ? 'Your shop catalogue is currently empty. Use the form above to add products.'
                 : 'No products matched your search or category filter.'}
             </Typography>
-            {items.length === 0 && typeof seedShopDemoData === 'function' && (
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<ThunderboltOutlined />}
-                onClick={seedShopDemoData}
-                sx={{ fontWeight: 700, borderRadius: 1.5 }}
-              >
-                Load Demo Products (10 Items)
-              </Button>
-            )}
           </Box>
         ) : (
           <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5, maxHeight: 600 }}>

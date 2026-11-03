@@ -589,20 +589,6 @@ export default function ShopMartPage() {
 
         {/* Top Actions */}
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          {typeof seedShopDemoData === 'function' && (
-            <Button
-              variant="outlined"
-              color="secondary"
-              size="small"
-              onClick={seedShopDemoData}
-              startIcon={<ThunderboltOutlined />}
-              title="Reload complete 10 demo products with images"
-              sx={{ fontWeight: 700, borderRadius: 1.5, height: 35, fontSize: '0.78rem' }}
-            >
-              Demo Setup
-            </Button>
-          )}
-
           <Button
             variant="outlined"
             color="error"
@@ -682,22 +668,11 @@ export default function ShopMartPage() {
         <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
           <InboxOutlined style={{ fontSize: '3rem', opacity: 0.3, marginBottom: 12 }} />
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>No items found</Typography>
-          <Typography variant="body2" sx={{ mt: 0.5, mb: 2 }}>
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
             {items.length === 0
-              ? 'Click below to load the full demo mart showroom with lawn mower parts & pictures.'
+              ? 'No products in shop inventory yet. Add products from the Add Product page.'
               : 'Try a different search or category'}
           </Typography>
-          {items.length === 0 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={seedShopDemoData}
-              startIcon={<ThunderboltOutlined />}
-              sx={{ fontWeight: 700, borderRadius: 1.5, px: 2.5 }}
-            >
-              Load Demo Setup (10 Products with Photos)
-            </Button>
-          )}
         </Box>
       ) : (
         <Box
