@@ -27,7 +27,8 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      global: 'window'
+      global: 'window',
+      __APP_BUILD_TIME__: JSON.stringify(Date.now())
     },
     resolve: {
       alias: {

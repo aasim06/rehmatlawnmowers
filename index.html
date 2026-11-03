@@ -45,5 +45,16 @@
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
     <script type="module" src="/src/index.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('⚡ Offline cache service worker active');
+          }).catch(function(err) {
+            console.warn('SW registration notice:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

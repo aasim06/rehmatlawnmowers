@@ -12,7 +12,7 @@
     "start": "vite",
     "server": "node server/index.js",
     "seed": "node server/seed.js",
-    "build": "vite build",
+    "build": "node scripts/generate-version.mjs && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "powershell -Command \"$env:PATH += ';C:\\Users\\Asif Computer\\.cargo\\bin'; npx tauri dev\"",
