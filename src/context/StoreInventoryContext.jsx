@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { useAuth } from 'context/AuthContext';
 import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
 import { db } from 'api/firebase';
 import {
@@ -77,6 +78,8 @@ const normalizeCategories = (cats = []) => {
 const initialMasterItemNames = [];
 
 export function StoreInventoryProvider({ children }) {
+  const { user } = useAuth();
+
   // Clear old legacy demo cache on mount if present
   useEffect(() => {
     const legacyKeys = [
@@ -393,6 +396,9 @@ export function StoreInventoryProvider({ children }) {
   // Parallel Data Fetching via Firebase Firestore for zero-latency initial load & clean error handling
   const fetchFirebaseData = async () => {
     try {
+      const activeUser = sessionStorage.getItem('rehmat_erp_active_user');
+      if (!activeUser && !user) return;
+
       const deletedItemSet = new Set(safeParseJSON('rehmat_deleted_item_ids', []).map(String));
       const deletedLogSet = new Set(safeParseJSON('rehmat_deleted_log_ids', []).map(String));
       const deletedSaleSet = new Set(safeParseJSON('rehmat_deleted_sale_ids', []).map(String));
@@ -668,20 +674,22 @@ export function StoreInventoryProvider({ children }) {
   const fetchSupabaseData = fetchFirebaseData;
 
   useEffect(() => {
+    if (!user) return;
+
     fetchFirebaseData();
 
     // Auto-refetch on window focus for multi-device sync
     const handleFocus = () => fetchFirebaseData();
     window.addEventListener('focus', handleFocus);
 
-    // Periodic cloud poll every 15 seconds
+    // Periodic cloud poll every 90 seconds
     const interval = setInterval(fetchFirebaseData, 90000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
-  }, []);
+  }, [user]);
 
   // ==============================|| ACTIONS ||============================== //
 
