@@ -12,24 +12,10 @@ export default function LiveCloudStatusBadge() {
 
   const handleRefresh = async () => {
     setChecking(true);
-    if (!isCloud) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 3000);
-        await fetch('https://rehmatlawnmowers.vercel.app/favicon.svg', {
-          method: 'HEAD',
-          mode: 'no-cors',
-          cache: 'no-store',
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        window.location.href = 'https://rehmatlawnmowers.vercel.app/?platform=tauri';
-        return;
-      } catch {
-        alert('Live cloud is currently unreachable. Please check your internet connection.');
-        setChecking(false);
-      }
-    } else {
+    const ts = Date.now();
+    try {
+      window.location.href = `https://rehmatlawnmowers.vercel.app/?platform=tauri&_v=${ts}`;
+    } catch {
       window.location.reload();
     }
   };
