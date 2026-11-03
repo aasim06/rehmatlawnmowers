@@ -165,18 +165,8 @@ export const defaultShopItems = [
 ];
 
 export function ShopInventoryProvider({ children }) {
-  // 1. Shop Inventory Items State
-  const [items, setItems] = useState(() => {
-    const raw = localStorage.getItem('rehmat_shop_items_v2');
-    if (raw !== null) {
-      try {
-        return JSON.parse(raw);
-      } catch (e) {
-        return [];
-      }
-    }
-    return defaultShopItems;
-  });
+  // 1. Shop Inventory Items State (Clean Zero Start)
+  const [items, setItems] = useState(() => safeParseJSON('rehmat_shop_items_v2', []));
 
   // 2. Shop Usage & Stock Movement Logs State
   const [usageLogs, setUsageLogs] = useState(() => safeParseJSON('rehmat_shop_usage_logs_v2', []));
@@ -251,29 +241,35 @@ export function ShopInventoryProvider({ children }) {
 
         if (!isMounted) return;
 
-        if (itemsSnap.status === 'fulfilled' && !itemsSnap.value.empty) {
-          const fbItems = itemsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (itemsSnap.status === 'fulfilled') {
+          const fbItems = itemsSnap.value.docs ? itemsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
           setItems(fbItems);
+          localStorage.setItem('rehmat_shop_items_v2', JSON.stringify(fbItems));
         }
-        if (logsSnap.status === 'fulfilled' && !logsSnap.value.empty) {
-          const fbLogs = logsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (logsSnap.status === 'fulfilled') {
+          const fbLogs = logsSnap.value.docs ? logsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
           setUsageLogs(fbLogs);
+          localStorage.setItem('rehmat_shop_usage_logs_v2', JSON.stringify(fbLogs));
         }
-        if (vendorsSnap.status === 'fulfilled' && !vendorsSnap.value.empty) {
-          const fbVendors = vendorsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (vendorsSnap.status === 'fulfilled') {
+          const fbVendors = vendorsSnap.value.docs ? vendorsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
           setVendors(fbVendors);
+          localStorage.setItem('rehmat_shop_vendors_v2', JSON.stringify(fbVendors));
         }
         if (catsSnap.status === 'fulfilled' && !catsSnap.value.empty) {
           const fbCats = catsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
           setCategories(fbCats);
+          localStorage.setItem('rehmat_shop_categories_v2', JSON.stringify(fbCats));
         }
-        if (salesSnap && salesSnap.status === 'fulfilled' && !salesSnap.value.empty) {
-          const fbSales = salesSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (salesSnap && salesSnap.status === 'fulfilled') {
+          const fbSales = salesSnap.value.docs ? salesSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
           setShopSales(fbSales);
+          localStorage.setItem('rehmat_shop_sales_v2', JSON.stringify(fbSales));
         }
-        if (paySnap && paySnap.status === 'fulfilled' && !paySnap.value.empty) {
-          const fbPay = paySnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (paySnap && paySnap.status === 'fulfilled') {
+          const fbPay = paySnap.value.docs ? paySnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
           setShopCustomerPayments(fbPay);
+          localStorage.setItem('rehmat_shop_customer_payments_v2', JSON.stringify(fbPay));
         }
       } catch (err) {
         console.warn('Firebase Shop Data Sync notice (falling back to local data):', err);

@@ -151,7 +151,7 @@ export default function ShopDashboardPage() {
 
   const stockHealthPct = items.length > 0
     ? Math.round(((items.length - lowStockAlerts.length) / items.length) * 100)
-    : 100;
+    : 0;
 
   return (
     <Box sx={{ width: '100%', pb: 2 }}>
@@ -348,12 +348,12 @@ export default function ShopDashboardPage() {
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 0.6 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>Active Catalog</Typography>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#005F56' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: items.length === 0 ? 'text.secondary' : '#005F56' }}>
                   {items.length}&nbsp;SKUs
                 </Typography>
               </Box>
               <LinearProgress variant="determinate"
-                value={Math.min(100, Math.max(5, items.length * 10))}
+                value={items.length === 0 ? 0 : Math.min(100, items.length * 10)}
                 sx={{ height: 6, borderRadius: 3, bgcolor: 'divider', '& .MuiLinearProgress-bar': { bgcolor: '#005F56' } }}
               />
             </Box>
@@ -363,13 +363,20 @@ export default function ShopDashboardPage() {
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>Stock Health</Typography>
                 <Typography variant="subtitle2" sx={{
                   fontWeight: 800,
-                  color: stockHealthPct < 70 ? '#EF4444' : '#10B981'
+                  color: items.length === 0 ? 'text.secondary' : stockHealthPct < 70 ? '#EF4444' : '#10B981'
                 }}>
                   {stockHealthPct}&nbsp;%
                 </Typography>
               </Box>
               <LinearProgress variant="determinate" value={stockHealthPct}
-                sx={{ height: 6, borderRadius: 3, bgcolor: 'divider', '& .MuiLinearProgress-bar': { bgcolor: stockHealthPct < 70 ? '#EF4444' : '#10B981' } }}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  bgcolor: 'divider',
+                  '& .MuiLinearProgress-bar': {
+                    bgcolor: items.length === 0 ? 'transparent' : stockHealthPct < 70 ? '#EF4444' : '#10B981'
+                  }
+                }}
               />
               {lowStockAlerts.length > 0 && (
                 <Typography variant="caption" sx={{ color: '#EF4444', fontWeight: 600, mt: 0.5, display: 'block' }}>
