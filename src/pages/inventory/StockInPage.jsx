@@ -70,6 +70,7 @@ export default function StockInPage() {
     itemName: '',
     category: 'General',
     qty: 1,
+    totalBillAmount: '',
     unitPrice: 0,
     discount: 0,
     imageUrl: ''
@@ -126,19 +127,26 @@ export default function StockInPage() {
     const val = typeof newInputValue === 'string' ? newInputValue : (newInputValue?.name || '');
     const matchedItem = items.find((i) => i.name.toLowerCase() === val.toLowerCase());
     if (matchedItem) {
+      const q = parseInt(form.qty) || 1;
+      const uPrice = matchedItem.unitPrice || 0;
       setForm((prev) => ({
         ...prev,
         itemName: val,
         category: matchedItem.category || prev.category || 'General',
-        unitPrice: matchedItem.unitPrice || prev.unitPrice,
+        unitPrice: uPrice,
+        totalBillAmount: uPrice > 0 ? (uPrice * q) : prev.totalBillAmount,
         imageUrl: matchedItem.imageUrl || prev.imageUrl || ''
       }));
     } else {
       const matchedMaster = (masterItemNames || []).find((m) => m.name.toLowerCase() === val.toLowerCase());
+      const mPrice = matchedMaster?.unitPrice || 0;
+      const q = parseInt(form.qty) || 1;
       setForm((prev) => ({
         ...prev,
         itemName: val,
-        category: matchedMaster?.category || prev.category || 'General'
+        category: matchedMaster?.category || prev.category || 'General',
+        unitPrice: mPrice > 0 ? mPrice : prev.unitPrice,
+        totalBillAmount: mPrice > 0 ? (mPrice * q) : prev.totalBillAmount
       }));
     }
   };
@@ -149,9 +157,10 @@ export default function StockInPage() {
 
     const matchedItem = items.find((i) => i.name.toLowerCase() === form.itemName.trim().toLowerCase());
     const qtyVal = parseInt(form.qty) || 1;
-    const priceVal = parseFloat(form.unitPrice) || 0;
+    const billVal = form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : (qtyVal * (parseFloat(form.unitPrice) || 0));
+    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : billVal;
     const discountVal = parseFloat(form.discount) || 0;
-    const netTotal = Math.max(0, qtyVal * priceVal - discountVal);
+    const netTotal = Math.max(0, billVal - discountVal);
     const poCode = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
 
     if (matchedItem) {
@@ -166,6 +175,7 @@ export default function StockInPage() {
         totalStock: 0,
         minLevel: 10,
         unitPrice: priceVal,
+        totalBillAmount: billVal,
         rackLocation: isShop ? 'Shop Counter' : 'Main Store',
         imageUrl: form.imageUrl || ''
       });
@@ -177,6 +187,7 @@ export default function StockInPage() {
       itemName: '',
       qty: 1,
       unitPrice: 0,
+      totalBillAmount: '',
       discount: 0,
       imageUrl: ''
     }));
@@ -192,9 +203,10 @@ export default function StockInPage() {
   // Mouse Click Handler on Green Save Button (Triggers Print Vendor Invoice Modal)
   const handleSaveButtonClick = () => {
     const qtyVal = parseInt(form.qty) || 1;
-    const priceVal = parseFloat(form.unitPrice) || 0;
+    const billVal = form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : (qtyVal * (parseFloat(form.unitPrice) || 0));
+    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : billVal;
     const discountVal = parseFloat(form.discount) || 0;
-    const netTotal = Math.max(0, qtyVal * priceVal - discountVal);
+    const netTotal = Math.max(0, billVal - discountVal);
 
     if (form.itemName.trim()) {
       handleQuickAddToList();
@@ -205,8 +217,9 @@ export default function StockInPage() {
       type: 'Stock In (Receiving Invoice)',
       vendor: form.vendor,
       itemName: form.itemName,
-      qty: form.qty,
-      unitPrice: form.unitPrice,
+      qty: qtyVal,
+      unitPrice: priceVal,
+      totalBillAmount: billVal,
       discount: discountVal,
       lineTotal: netTotal,
       time: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -247,11 +260,16 @@ export default function StockInPage() {
 
   // Open Edit Drawer
   const handleOpenEdit = (log) => {
+    const qty = Number(log.qtyUsed) || 1;
+    const unitPrice = Number(log.unitPrice) || 0;
+    const totalBill = log.lineTotal !== undefined ? log.lineTotal : (qty * unitPrice);
+
     setEditingLog({
       ...log,
       vendor: log.usedBy || vendorList[0],
-      qty: log.qtyUsed || 1,
-      unitPrice: log.unitPrice || 0
+      qty: qty,
+      unitPrice: unitPrice,
+      totalBillAmount: Math.round(totalBill * 100) / 100
     });
     setEditDrawerOpen(true);
   };
@@ -261,14 +279,15 @@ export default function StockInPage() {
     e.preventDefault();
     if (!editingLog) return;
     const qtyVal = parseInt(editingLog.qty) || 1;
-    const priceVal = parseFloat(editingLog.unitPrice) || 0;
+    const billVal = parseFloat(editingLog.totalBillAmount) || 0;
+    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : (parseFloat(editingLog.unitPrice) || 0);
 
     updateLog(editingLog.id, {
       itemName: editingLog.itemName,
       usedBy: editingLog.vendor,
       qtyUsed: qtyVal,
       unitPrice: priceVal,
-      lineTotal: qtyVal * priceVal
+      lineTotal: billVal > 0 ? billVal : (qtyVal * priceVal)
     });
     setEditDrawerOpen(false);
   };
@@ -345,7 +364,7 @@ export default function StockInPage() {
 
   const isSelected = (id) => selected.indexOf(id) !== -1;
 
-  const lineTotal = (parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0);
+  const lineTotal = Math.max(0, (form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : ((parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0))) - (parseFloat(form.discount) || 0));
 
   return (
     <Stack spacing={3}>
@@ -477,7 +496,7 @@ export default function StockInPage() {
               />
             </Grid>
 
-            {/* ROW 2: QTY, Price, Discount, Line Total, and Save Button */}
+            {/* ROW 2: QTY, Total Bill Amount, Discount, Line Total, and Save Button */}
             {/* 3. QTY */}
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <TextField
@@ -488,7 +507,17 @@ export default function StockInPage() {
                 inputRef={qtyRef}
                 inputProps={{ min: 1 }}
                 value={form.qty}
-                onChange={(e) => setForm({ ...form, qty: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const qtyNum = parseInt(val) || 0;
+                  const billNum = parseFloat(form.totalBillAmount) || 0;
+                  const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
+                  setForm((prev) => ({
+                    ...prev,
+                    qty: val === '' ? '' : qtyNum,
+                    unitPrice
+                  }));
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -507,23 +536,38 @@ export default function StockInPage() {
               />
             </Grid>
 
-            {/* 4. UNIT PRICE (PKR) */}
+            {/* 4. TOTAL BILL AMOUNT (PKR) */}
             <Grid size={{ xs: 12, sm: 6, md: 2.2 }}>
               <TextField
-                label="UNIT PRICE (PKR)"
+                label="TOTAL BILL AMOUNT (PKR) *"
                 type="number"
                 fullWidth
                 disabled={!canEditPrice}
                 inputRef={priceRef}
                 inputProps={{ min: 0, step: 'any' }}
-                value={form.unitPrice}
-                onChange={(e) => setForm({ ...form, unitPrice: parseFloat(e.target.value) || 0 })}
+                value={form.totalBillAmount !== undefined ? form.totalBillAmount : (form.unitPrice ? ((parseInt(form.qty) || 1) * form.unitPrice) : '')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const billNum = parseFloat(val) || 0;
+                  const qtyNum = parseInt(form.qty) || 1;
+                  const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
+                  setForm((prev) => ({
+                    ...prev,
+                    totalBillAmount: val,
+                    unitPrice
+                  }));
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     handleQuickAddToList();
                   }
                 }}
+                helperText={
+                  Number(form.qty) > 0 && Number(form.totalBillAmount) > 0
+                    ? `Rate: Rs. ${(Number(form.totalBillAmount) / Number(form.qty)).toFixed(2)} / unit`
+                    : 'Calculates rate per unit automatically'
+                }
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '44px',
@@ -576,7 +620,7 @@ export default function StockInPage() {
                   LINE TOTAL (PKR)
                 </Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#10b981', mt: 0.2, lineHeight: 1.2 }}>
-                  Rs. {Math.max(0, (parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0) - (parseFloat(form.discount) || 0)).toLocaleString()}
+                  Rs. {Math.max(0, (form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : ((parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0))) - (parseFloat(form.discount) || 0)).toLocaleString()}
                 </Typography>
               </Box>
             </Grid>
@@ -771,7 +815,7 @@ export default function StockInPage() {
                   <TableCell>ITEM SELECT</TableCell>
                   <TableCell>CATEGORY</TableCell>
                   <TableCell align="center">QTY</TableCell>
-                  <TableCell align="right">UNIT PRICE</TableCell>
+                  <TableCell align="right">TOTAL BILL AMOUNT</TableCell>
                   <TableCell align="right">LINE TOTAL</TableCell>
                   <TableCell>VENDOR / SUPPLIER</TableCell>
                   <TableCell align="right">DATE & TIME</TableCell>
@@ -825,14 +869,17 @@ export default function StockInPage() {
                         </TableCell>
 
                         <TableCell align="right">
-                          <Typography variant="body2" fontWeight={600}>
-                            Rs. {(parseFloat(log.unitPrice) || 0).toLocaleString()}
+                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                            Rs. {((log.lineTotal && log.lineTotal > 0) ? log.lineTotal : ((log.qtyUsed || 1) * (parseFloat(log.unitPrice) || 0))).toLocaleString()}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary" display="block">
+                            Rs. {(parseFloat(log.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} / unit
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right">
                           <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                            Rs. {((log.qtyUsed || 1) * (parseFloat(log.unitPrice) || 0)).toLocaleString()}
+                            Rs. {((log.lineTotal && log.lineTotal > 0) ? log.lineTotal : ((log.qtyUsed || 1) * (parseFloat(log.unitPrice) || 0))).toLocaleString()}
                           </Typography>
                         </TableCell>
 
@@ -923,24 +970,49 @@ export default function StockInPage() {
                   required
                   inputProps={{ min: 1 }}
                   value={editingLog.qty}
-                  onChange={(e) => setEditingLog({ ...editingLog, qty: parseInt(e.target.value) || 1 })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const qtyNum = parseInt(val) || 0;
+                    const billNum = parseFloat(editingLog.totalBillAmount) || 0;
+                    const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
+                    setEditingLog((prev) => ({
+                      ...prev,
+                      qty: val === '' ? '' : qtyNum,
+                      unitPrice
+                    }));
+                  }}
                 />
 
                 <TextField
-                  label="UNIT PRICE"
+                  label="TOTAL BILL AMOUNT (RS) *"
                   type="number"
                   fullWidth
                   disabled={!canEditPrice}
-                  inputProps={{ min: 0 }}
-                  value={editingLog.unitPrice}
-                  onChange={(e) => setEditingLog({ ...editingLog, unitPrice: parseFloat(e.target.value) || 0 })}
+                  inputProps={{ min: 0, step: 'any' }}
+                  value={editingLog.totalBillAmount !== undefined ? editingLog.totalBillAmount : ((parseInt(editingLog.qty) || 1) * (parseFloat(editingLog.unitPrice) || 0))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const billNum = parseFloat(val) || 0;
+                    const qtyNum = parseInt(editingLog.qty) || 1;
+                    const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
+                    setEditingLog((prev) => ({
+                      ...prev,
+                      totalBillAmount: val,
+                      unitPrice
+                    }));
+                  }}
+                  helperText={
+                    Number(editingLog.qty) > 0 && Number(editingLog.totalBillAmount) > 0
+                      ? `Rate: Rs. ${(Number(editingLog.totalBillAmount) / Number(editingLog.qty)).toFixed(2)} / unit`
+                      : 'Calculates rate per unit automatically'
+                  }
                 />
 
                 <TextField
                   label="LINE TOTAL"
                   fullWidth
                   disabled
-                  value={`Rs. ${((parseInt(editingLog.qty) || 0) * (parseFloat(editingLog.unitPrice) || 0)).toLocaleString()}`}
+                  value={`Rs. ${(editingLog.totalBillAmount !== undefined && editingLog.totalBillAmount !== '' ? (parseFloat(editingLog.totalBillAmount) || 0) : ((parseInt(editingLog.qty) || 0) * (parseFloat(editingLog.unitPrice) || 0))).toLocaleString()}`}
                 />
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
