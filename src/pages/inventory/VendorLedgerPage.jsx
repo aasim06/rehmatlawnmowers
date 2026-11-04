@@ -165,8 +165,96 @@ export default function VendorLedgerPage() {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* Banner Header & Metric Summary Cards */}
+      <MainCard
+        sx={{
+          mb: 3,
+          background: (theme) => (theme.palette.mode === 'dark' ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : '#ffffff'),
+          borderLeft: '5px solid #a855f7'
+        }}
+      >
+        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+          <Grid item xs={12} md={6}>
+            <Typography variant="h3" fontWeight={800} color="textPrimary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TeamOutlined style={{ color: '#a855f7' }} /> Vendor Payables & Supplier Ledger
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+              Track raw material purchases from suppliers, log payment disbursements, and manage vendor balances.
+            </Typography>
+          </Grid>
+
+          {/* Metric Summary Cards */}
+          <Grid item xs={12} md={6}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5, width: '100%' }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'),
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0'),
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+              >
+                <Typography variant="caption" color="textSecondary" fontWeight={700} display="block" noWrap>
+                  TOTAL PURCHASES
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={800} color="primary.main">
+                  Rs. {grandTotalPurchases.toLocaleString()}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.5,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#f0fdf4'),
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.3)' : '#bbf7d0'),
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+              >
+                <Typography variant="caption" color="textSecondary" fontWeight={700} display="block" noWrap>
+                  PAID TO VENDORS
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={800} color="success.main">
+                  Rs. {grandTotalPaid.toLocaleString()}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.5,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'),
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'),
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+              >
+                <Typography variant="caption" color="error.main" fontWeight={700} display="block" noWrap>
+                  OUTSTANDING PAYABLE
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={800} color="error.main">
+                  Rs. {grandTotalPayables.toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </MainCard>
+
       {/* Main Ledger Card */}
-      <MainCard>
+      <MainCard title="Vendor Payables & Accounts Directory">
         {/* Search Bar */}
         <Box sx={{ mb: 2.5, maxWidth: 450 }}>
           <OutlinedInput

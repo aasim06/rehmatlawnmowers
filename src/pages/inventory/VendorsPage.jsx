@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -31,7 +32,7 @@ import {
 } from '@mui/material';
 
 // icons
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlined, MailOutlined, PayCircleOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
@@ -175,6 +176,15 @@ export default function VendorsPage() {
               Delete Selected ({selected.length})
             </Button>
           )}
+          <Button
+            variant="outlined"
+            color="primary"
+            component={Link}
+            to="/inventory/vendor-ledgers"
+            startIcon={<PayCircleOutlined />}
+          >
+            Vendor Payables
+          </Button>
           <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
             Add New Vendor / Party
           </Button>

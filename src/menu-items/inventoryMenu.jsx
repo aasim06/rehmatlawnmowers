@@ -161,6 +161,13 @@ const inventoryMenu = {
       ]
     },
     {
+      id: 'vendor-ledgers',
+      title: 'Vendor Payables',
+      type: 'item',
+      url: '/inventory/vendor-ledgers',
+      icon: icons.PayCircleOutlined
+    },
+    {
       id: 'vendors',
       title: 'Vendors & Parties',
       type: 'item',
