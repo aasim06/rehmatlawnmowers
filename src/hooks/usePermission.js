@@ -80,27 +80,46 @@ export function usePermission() {
       return isSuperAdmin;
     }
 
-    // Super Admin has zero restrictions anywhere else
-    if (isSuperAdmin) return true;
+    // 1. Root developer/system admin has unrestricted access
+    if (isMasterAdmin) return true;
 
-    // Direct role guard: user-management, backup-restore are strictly for authorized users
+    // 2. Direct role guard: user-management, backup-restore are strictly for authorized users
     if (itemId === 'user-management' && !canManageUsers) return false;
     if (itemId === 'backup-restore' && !canAccessBackup) return false;
 
-    // Check by item ID (e.g. 'stock-out', 'stock-in', 'items', 'machine-sales', 'dashboard')
-    if (itemId && userPerms[itemId] !== undefined) {
-      return Boolean(userPerms[itemId]);
+    // 3. Strict Check: If this item is explicitly disabled in user's permissions, ALWAYS deny access
+    if (itemId && userPerms[itemId] === false) {
+      return false;
     }
-
-    // URL mapping fallback
     const permKey = urlMap[item.url || item];
-    if (permKey && userPerms[permKey] !== undefined) {
-      return Boolean(userPerms[permKey]);
+    if (permKey && userPerms[permKey] === false) {
+      return false;
     }
 
-    // Default allow for shop items unless explicitly set to false
-    if (itemId === 'shop-management' || itemId === 'shop-dashboard' || itemId === 'shop-add-product' || itemId === 'shop-mart' || itemId === 'shop-ledger') {
+    // 4. Strict Check: If this item is explicitly enabled in user's permissions, ALWAYS allow access
+    if (itemId && userPerms[itemId] === true) {
       return true;
+    }
+    if (permKey && userPerms[permKey] === true) {
+      return true;
+    }
+
+    // 5. Super Admin role general fallback (if not explicitly disabled above)
+    if (isSuperAdmin) return true;
+
+    // 6. Shop management parent folder: allow if any child module is permitted
+    if (itemId === 'shop-management') {
+      return Boolean(
+        userPerms['shop-dashboard'] ||
+        userPerms['shop-mart'] ||
+        userPerms['shop-add-product'] ||
+        userPerms['shop-ledger']
+      );
+    }
+
+    // 7. By default, individual shop items must be enabled in userPerms
+    if (itemId === 'shop-dashboard' || itemId === 'shop-add-product' || itemId === 'shop-mart' || itemId === 'shop-ledger') {
+      return Boolean(userPerms[itemId]);
     }
 
     return false;

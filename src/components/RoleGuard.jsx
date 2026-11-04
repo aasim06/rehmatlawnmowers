@@ -22,7 +22,7 @@ import MainCard from 'components/MainCard';
 
 /**
  * ==============================================================================
- * 🛡️ RoleGuard Component
+ * ðŸ›¡ï¸ RoleGuard Component
  * ==============================================================================
  * Route-level & component-level access gatekeeper.
  * Ensures users without appropriate roles or permission flags cannot access
@@ -36,8 +36,18 @@ export default function RoleGuard({ permission, allowedRoles, children, fallback
   const navigate = useNavigate();
   const { role, userPerms, isMasterAdmin, isSuperAdmin } = usePermission();
 
-  // 1. Primary Root Super Admin has unrestricted access everywhere
-  if (isMasterAdmin || isSuperAdmin) {
+  // 1. Primary Root Developer/Master Admin has unrestricted access everywhere
+  if (isMasterAdmin) {
+    return children;
+  }
+
+  // 2. Explicitly disabled permission must ALWAYS be blocked (even for Super Admin / Admin accounts)
+  if (permission && userPerms && userPerms[permission] === false) {
+    return fallback || <AccessDeniedView role={role} permissionKey={permission} navigate={navigate} />;
+  }
+
+  // 3. Super Admin bypass (if not explicitly disabled above)
+  if (isSuperAdmin) {
     return children;
   }
 

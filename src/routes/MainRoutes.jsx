@@ -47,7 +47,21 @@ function RootIndexRoute() {
   if (hasAccessToItem({ id: 'categories' })) return <Navigate to="/inventory/categories" replace />;
   if (hasAccessToItem({ id: 'ledger' })) return <Navigate to="/inventory/ledger" replace />;
   if (hasAccessToItem({ id: 'reports' })) return <Navigate to="/inventory/reports" replace />;
+  if (hasAccessToItem({ id: 'shop-dashboard' })) return <Navigate to="/shop/dashboard" replace />;
+  if (hasAccessToItem({ id: 'shop-mart' })) return <Navigate to="/shop/mart" replace />;
+  if (hasAccessToItem({ id: 'shop-add-product' })) return <Navigate to="/shop/add-product" replace />;
+  if (hasAccessToItem({ id: 'shop-ledger' })) return <Navigate to="/shop/ledger" replace />;
 
+  return <Navigate to="/dashboard/default" replace />;
+}
+
+// Smart Shop Index component: opens Shop Dashboard if allowed, or gracefully forwards to permitted Shop module
+function ShopIndexRoute() {
+  const { hasAccessToItem, isMasterAdmin } = usePermission();
+  if (isMasterAdmin || hasAccessToItem({ id: 'shop-dashboard' })) return <Navigate to="/shop/dashboard" replace />;
+  if (hasAccessToItem({ id: 'shop-mart' })) return <Navigate to="/shop/mart" replace />;
+  if (hasAccessToItem({ id: 'shop-add-product' })) return <Navigate to="/shop/add-product" replace />;
+  if (hasAccessToItem({ id: 'shop-ledger' })) return <Navigate to="/shop/ledger" replace />;
   return <Navigate to="/dashboard/default" replace />;
 }
 
@@ -246,7 +260,7 @@ const MainRoutes = {
       children: [
         {
           index: true,
-          element: <Navigate to="/shop/dashboard" replace />
+          element: <ShopIndexRoute />
         },
         {
           path: 'dashboard',

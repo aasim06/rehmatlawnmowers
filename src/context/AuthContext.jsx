@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from 'api/firebase';
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -294,80 +294,114 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // Fetch staff users from Firebase Cloud Database on mount for instant multi-device / multi-browser sync
+  // Real-time multi-device synchronization of staff users and permissions from Firestore
   useEffect(() => {
+    let unsubscribeUsers;
     let isMounted = true;
-    const fetchCloudUsers = async () => {
-      try {
-        const [usersSnap, deletedSnap] = await Promise.all([
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'deleted_staff')).catch(() => ({ empty: true, docs: [] }))
-        ]);
 
-        const deletedIds = new Set(
+    const setupUsersSync = async () => {
+      try {
+        // Read deleted staff list once
+        let deletedIds = new Set(
           JSON.parse(localStorage.getItem('rehmat_deleted_staff_ids') || '[]').map((x) => String(x).toLowerCase())
         );
 
-        if (!deletedSnap.empty) {
-          deletedSnap.docs.forEach((docSnap) => {
-            const d = docSnap.data();
-            if (d.id) deletedIds.add(String(d.id).toLowerCase());
-            if (d.email) deletedIds.add(String(d.email).toLowerCase());
-          });
-          localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify([...deletedIds]));
+        try {
+          const deletedSnap = await getDocs(collection(db, 'deleted_staff'));
+          if (!deletedSnap.empty) {
+            deletedSnap.docs.forEach((docSnap) => {
+              const d = docSnap.data();
+              if (d.id) deletedIds.add(String(d.id).toLowerCase());
+              if (d.email) deletedIds.add(String(d.email).toLowerCase());
+            });
+            localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify([...deletedIds]));
+          }
+        } catch (e) {
+          console.warn('Deleted staff sync error:', e);
         }
 
-        if (isMounted && !usersSnap.empty) {
-          const mapped = usersSnap.docs
-            .map((docSnap) => {
-              const u = docSnap.data();
-              return {
-                id: docSnap.id || u.id || `USR-${u.email}`,
-                name: u.name,
-                email: u.email,
-                password: u.password,
-                role: u.role || 'Store Keeper',
-                status: u.status || 'Active',
-                permissions: (u.permissions && Object.keys(u.permissions).length > 0)
-                  ? u.permissions
-                  : getRoleDefaultPermissions(u.role || 'Store Keeper')
-              };
-            })
-            .filter(
-              (u) =>
-                (u.email || '').toLowerCase() === 'admin@rehmat.com' ||
-                (!deletedIds.has(String(u.id).toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase()))
-            );
+        // Real-time listener for users collection
+        unsubscribeUsers = onSnapshot(collection(db, 'users'), (usersSnap) => {
+          if (!isMounted) return;
 
-          setStaffUsers((prev) => {
-            const cleanPrev = prev.filter(
-              (p) =>
-                (p.email || '').toLowerCase() === 'admin@rehmat.com' ||
-                (!deletedIds.has(String(p.id).toLowerCase()) && !deletedIds.has((p.email || '').toLowerCase()))
-            );
+          if (!usersSnap.empty) {
+            const mapped = usersSnap.docs
+              .map((docSnap) => {
+                const u = docSnap.data();
+                return {
+                  id: docSnap.id || u.id || `USR-${u.email}`,
+                  name: u.name,
+                  email: u.email,
+                  password: u.password,
+                  role: u.role || 'Store Keeper',
+                  status: u.status || 'Active',
+                  permissions: (u.permissions && Object.keys(u.permissions).length > 0)
+                    ? u.permissions
+                    : getRoleDefaultPermissions(u.role || 'Store Keeper')
+                };
+              })
+              .filter(
+                (u) =>
+                  (u.email || '').toLowerCase() === 'admin@rehmat.com' ||
+                  (!deletedIds.has(String(u.id).toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase()))
+              );
 
-            const remoteMap = new Map(mapped.map((m) => [(m.email || '').toLowerCase(), m]));
-            const combined = [...mapped];
+            setStaffUsers((prev) => {
+              const cleanPrev = prev.filter(
+                (p) =>
+                  (p.email || '').toLowerCase() === 'admin@rehmat.com' ||
+                  (!deletedIds.has(String(p.id).toLowerCase()) && !deletedIds.has((p.email || '').toLowerCase()))
+              );
 
-            cleanPrev.forEach((p) => {
-              const emailKey = (p.email || '').toLowerCase();
-              if (!remoteMap.has(emailKey)) {
-                combined.push(p);
-              }
+              const remoteMap = new Map(mapped.map((m) => [(m.email || '').toLowerCase(), m]));
+              const combined = [...mapped];
+
+              cleanPrev.forEach((p) => {
+                const emailKey = (p.email || '').toLowerCase();
+                if (!remoteMap.has(emailKey)) {
+                  combined.push(p);
+                }
+              });
+
+              localStorage.setItem('rehmat_store_staff_users', JSON.stringify(combined));
+              return combined;
             });
 
-            localStorage.setItem('rehmat_store_staff_users', JSON.stringify(combined));
-            return combined;
-          });
-        }
+            // ⚡ Live instant update of the active logged-in user on this PC
+            setUser((currentUser) => {
+              if (!currentUser) return null;
+              const currentEmail = (currentUser.email || '').toLowerCase();
+              const currentId = String(currentUser.id || '');
+              const matchedRemote = mapped.find(
+                (m) => String(m.id) === currentId || (m.email || '').toLowerCase() === currentEmail
+              );
+              if (matchedRemote) {
+                const updatedUser = {
+                  ...currentUser,
+                  ...matchedRemote,
+                  permissions: (matchedRemote.permissions && Object.keys(matchedRemote.permissions).length > 0)
+                    ? matchedRemote.permissions
+                    : currentUser.permissions
+                };
+                sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(updatedUser));
+                return updatedUser;
+              }
+              return currentUser;
+            });
+          }
+        }, (err) => {
+          console.warn('Real-time users onSnapshot error:', err);
+        });
       } catch (err) {
-        console.warn('Firebase cloud user fetch failed, using local cache:', err);
+        console.warn('Firebase users sync setup failed:', err);
       }
     };
 
-    fetchCloudUsers();
+    setupUsersSync();
+
     return () => {
       isMounted = false;
+      if (unsubscribeUsers) unsubscribeUsers();
     };
   }, []);
 
