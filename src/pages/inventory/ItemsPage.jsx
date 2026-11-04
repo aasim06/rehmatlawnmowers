@@ -101,6 +101,7 @@ export default function ItemsPage() {
     category: 'Electrical & Motors',
     totalStock: 50,
     unit: 'PCS',
+    totalBillAmount: 1250,
     unitPrice: 25,
     minLevel: 10,
     rackLocation: 'Rack A-01'
@@ -182,7 +183,14 @@ export default function ItemsPage() {
   };
 
   const handleOpenEdit = (item) => {
-    setEditingItem({ ...item });
+    const stock = Number(item.totalStock) || Number(item.remainingStock) || 1;
+    const unitPrice = Number(item.unitPrice) || 0;
+    const totalBill = item.totalBillAmount !== undefined ? item.totalBillAmount : (stock * unitPrice);
+
+    setEditingItem({
+      ...item,
+      totalBillAmount: Math.round(totalBill * 100) / 100
+    });
     setEditDrawerOpen(true);
   };
 
@@ -231,7 +239,16 @@ export default function ItemsPage() {
       alert('Please select or type an item name.');
       return;
     }
-    addNewItem(newItem);
+    const finalStock = parseInt(newItem.totalStock) || 0;
+    const finalBill = parseFloat(newItem.totalBillAmount) || 0;
+    const computedUnitPrice = finalStock > 0 ? (finalBill / finalStock) : (parseFloat(newItem.unitPrice) || 0);
+
+    addNewItem({
+      ...newItem,
+      totalStock: finalStock,
+      totalBillAmount: finalBill,
+      unitPrice: computedUnitPrice
+    });
     setAddDrawerOpen(false);
     setNewItem({
       itemCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
@@ -239,6 +256,7 @@ export default function ItemsPage() {
       category: 'Electrical & Motors',
       totalStock: 50,
       unit: 'PCS',
+      totalBillAmount: 1250,
       unitPrice: 25,
       minLevel: 10,
       rackLocation: 'Rack A-01'
@@ -248,7 +266,16 @@ export default function ItemsPage() {
   const handleEditItemSubmit = (e) => {
     e.preventDefault();
     if (!editingItem || !editingItem.name) return;
-    updateItem(editingItem.id, editingItem);
+    const stock = parseInt(editingItem.totalStock) || 0;
+    const bill = parseFloat(editingItem.totalBillAmount) || 0;
+    const computedUnitPrice = stock > 0 ? (bill / stock) : (parseFloat(editingItem.unitPrice) || 0);
+
+    updateItem(editingItem.id, {
+      ...editingItem,
+      totalStock: stock,
+      totalBillAmount: bill,
+      unitPrice: computedUnitPrice
+    });
     setEditDrawerOpen(false);
     setEditingItem(null);
   };
@@ -295,11 +322,18 @@ export default function ItemsPage() {
                   value={newItem.name}
                   onInputChange={(event, newInputValue) => {
                     const matchedMaster = masterItemNames.find((m) => m.name.toLowerCase() === (newInputValue || '').toLowerCase());
-                    setNewItem({
-                      ...newItem,
-                      name: newInputValue || '',
-                      category: matchedMaster ? matchedMaster.category : newItem.category || 'General',
-                      unit: matchedMaster ? matchedMaster.defaultUnit : newItem.unit
+                    const masterUnitPrice = matchedMaster?.unitPrice || 0;
+                    setNewItem((prev) => {
+                      const stock = parseInt(prev.totalStock) || 50;
+                      const bill = masterUnitPrice > 0 ? (masterUnitPrice * stock) : prev.totalBillAmount;
+                      return {
+                        ...prev,
+                        name: newInputValue || '',
+                        category: matchedMaster ? matchedMaster.category : prev.category || 'General',
+                        unit: matchedMaster ? (matchedMaster.defaultUnit || prev.unit) : prev.unit,
+                        unitPrice: masterUnitPrice > 0 ? masterUnitPrice : prev.unitPrice,
+                        totalBillAmount: bill
+                      };
                     });
                   }}
                   renderInput={(params) => (
@@ -374,7 +408,7 @@ export default function ItemsPage() {
                 </TextField>
               </Grid>
 
-              {/* ROW 2: Stock, Price, Min Level & Save Action */}
+              {/* ROW 2: Stock, Total Bill, Min Level & Save Action */}
               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
                 <TextField
                   label="OPENING STOCK *"
@@ -383,19 +417,45 @@ export default function ItemsPage() {
                   required
                   inputProps={{ min: 0 }}
                   value={newItem.totalStock}
-                  onChange={(e) => setNewItem({ ...newItem, totalStock: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const stockNum = parseInt(val) || 0;
+                    const billNum = parseFloat(newItem.totalBillAmount) || 0;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setNewItem((prev) => ({
+                      ...prev,
+                      totalStock: val === '' ? '' : stockNum,
+                      unitPrice
+                    }));
+                  }}
+                  helperText="Initial inventory count"
                 />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
                 <TextField
-                  label="UNIT PRICE (RS) *"
+                  label="TOTAL BILL AMOUNT (RS) *"
                   type="number"
                   fullWidth
                   required
                   inputProps={{ min: 0, step: 'any' }}
-                  value={newItem.unitPrice}
-                  onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                  value={newItem.totalBillAmount !== undefined ? newItem.totalBillAmount : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const billNum = parseFloat(val) || 0;
+                    const stockNum = parseInt(newItem.totalStock) || 0;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setNewItem((prev) => ({
+                      ...prev,
+                      totalBillAmount: val,
+                      unitPrice
+                    }));
+                  }}
+                  helperText={
+                    Number(newItem.totalStock) > 0 && Number(newItem.totalBillAmount) > 0
+                      ? `Rate: Rs. ${(Number(newItem.totalBillAmount) / Number(newItem.totalStock)).toFixed(2)} / ${newItem.unit || 'PCS'}`
+                      : 'Calculates rate per unit automatically'
+                  }
                 />
               </Grid>
 
@@ -408,6 +468,7 @@ export default function ItemsPage() {
                   inputProps={{ min: 1 }}
                   value={newItem.minLevel}
                   onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
+                  helperText="Low stock alert trigger"
                 />
               </Grid>
 
@@ -510,7 +571,7 @@ export default function ItemsPage() {
                 <TableCell>Item Name</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>SKU Code</TableCell>
-                <TableCell align="right">Price Per Unit</TableCell>
+                <TableCell align="right">Total Bill Amount</TableCell>
                 <TableCell align="center">Units</TableCell>
                 <TableCell align="center">Stock Quantity</TableCell>
                 <TableCell align="center">Min Threshold</TableCell>
@@ -559,8 +620,13 @@ export default function ItemsPage() {
                       </TableCell>
 
                       <TableCell align="right">
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          Rs. {item.unitPrice?.toLocaleString()}
+                        <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                          Rs. {((item.totalBillAmount !== undefined && Number(item.totalBillAmount) > 0)
+                            ? Number(item.totalBillAmount)
+                            : ((Number(item.remainingStock || item.totalStock || 0)) * (Number(item.unitPrice) || 0))).toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          Rs. {(Number(item.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} / {item.unit || 'PCS'}
                         </Typography>
                       </TableCell>
 
@@ -597,7 +663,7 @@ export default function ItemsPage() {
                           </Tooltip>
 
                           <Tooltip title="Edit Item">
-                            <IconButton color="primary" size="small" onClick={() => handleOpenEditItem(item)}>
+                            <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
                               <EditOutlined />
                             </IconButton>
                           </Tooltip>
@@ -741,15 +807,30 @@ export default function ItemsPage() {
                   onChange={(e) => setEditingItem({ ...editingItem, itemCode: e.target.value })}
                 />
 
-                {/* 3. Price Per Unit */}
+                {/* 3. Total Bill Amount */}
                 <TextField
-                  label="Price Per Unit"
+                  label="Total Bill Amount (Rs.) *"
                   type="number"
                   fullWidth
                   required
                   inputProps={{ min: 0, step: 'any' }}
-                  value={editingItem.unitPrice}
-                  onChange={(e) => setEditingItem({ ...editingItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                  value={editingItem.totalBillAmount !== undefined ? editingItem.totalBillAmount : ((Number(editingItem.totalStock) || 1) * (Number(editingItem.unitPrice) || 0))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const billNum = parseFloat(val) || 0;
+                    const stockNum = parseInt(editingItem.totalStock) || 1;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setEditingItem((prev) => ({
+                      ...prev,
+                      totalBillAmount: val,
+                      unitPrice
+                    }));
+                  }}
+                  helperText={
+                    Number(editingItem.totalStock) > 0 && Number(editingItem.totalBillAmount) > 0
+                      ? `Rate: Rs. ${(Number(editingItem.totalBillAmount) / Number(editingItem.totalStock)).toFixed(2)} / ${editingItem.unit || 'PCS'}`
+                      : 'Calculates rate per unit automatically'
+                  }
                 />
 
                 {/* 4. Category */}
@@ -793,7 +874,17 @@ export default function ItemsPage() {
                   required
                   inputProps={{ min: 0 }}
                   value={editingItem.totalStock}
-                  onChange={(e) => setEditingItem({ ...editingItem, totalStock: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const stockNum = parseInt(val) || 0;
+                    const billNum = parseFloat(editingItem.totalBillAmount) || 0;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setEditingItem((prev) => ({
+                      ...prev,
+                      totalStock: val === '' ? '' : stockNum,
+                      unitPrice
+                    }));
+                  }}
                 />
 
                 {/* 7. Min Threshold */}

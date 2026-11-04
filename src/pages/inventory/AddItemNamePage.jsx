@@ -58,6 +58,7 @@ export default function AddItemNamePage() {
   const [newItemName, setNewItemName] = useState({
     name: '',
     skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+    totalBillAmount: 1250,
     unitPrice: 25,
     category: 'Electrical & Motors',
     defaultUnit: 'PCS',
@@ -117,10 +118,20 @@ export default function AddItemNamePage() {
   const handleAddSubmit = (e) => {
     e.preventDefault();
     if (!newItemName.name.trim()) return;
-    addMasterItemName(newItemName);
+    const stock = parseInt(newItemName.initialStock) || 0;
+    const bill = parseFloat(newItemName.totalBillAmount) || 0;
+    const computedUnitPrice = stock > 0 ? (bill / stock) : (parseFloat(newItemName.unitPrice) || 0);
+
+    addMasterItemName({
+      ...newItemName,
+      initialStock: stock,
+      totalBillAmount: bill,
+      unitPrice: computedUnitPrice
+    });
     setNewItemName({
       name: '',
       skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      totalBillAmount: 1250,
       unitPrice: 25,
       category: 'Electrical & Motors',
       defaultUnit: 'PCS',
@@ -134,7 +145,16 @@ export default function AddItemNamePage() {
   const handleEditSubmit = (e) => {
     e.preventDefault();
     if (!editingItemName || !editingItemName.name.trim()) return;
-    updateMasterItemName(editingItemName.id, editingItemName);
+    const stock = parseInt(editingItemName.initialStock) || 0;
+    const bill = parseFloat(editingItemName.totalBillAmount) || 0;
+    const computedUnitPrice = stock > 0 ? (bill / stock) : (parseFloat(editingItemName.unitPrice) || 0);
+
+    updateMasterItemName(editingItemName.id, {
+      ...editingItemName,
+      initialStock: stock,
+      totalBillAmount: bill,
+      unitPrice: computedUnitPrice
+    });
     setEditDrawerOpen(false);
     setEditingItemName(null);
   };
@@ -312,7 +332,20 @@ export default function AddItemNamePage() {
                     <TableCell align="center">
                       <Stack direction="row" spacing={1} justifyContent="center">
                         <Tooltip title="Edit Item Name">
-                          <IconButton color="primary" size="small" onClick={() => { setEditingItemName({ ...master }); setEditDrawerOpen(true); }}>
+                          <IconButton
+                            color="primary"
+                            size="small"
+                            onClick={() => {
+                              const stock = Number(master.initialStock) || 50;
+                              const unitPrice = Number(master.unitPrice) || 0;
+                              const totalBill = master.totalBillAmount !== undefined ? master.totalBillAmount : (stock * unitPrice);
+                              setEditingItemName({
+                                ...master,
+                                totalBillAmount: Math.round(totalBill * 100) / 100
+                              });
+                              setEditDrawerOpen(true);
+                            }}
+                          >
                             <EditOutlined />
                           </IconButton>
                         </Tooltip>
@@ -361,15 +394,30 @@ export default function AddItemNamePage() {
                 onChange={(e) => setNewItemName({ ...newItemName, skuCode: e.target.value })}
               />
 
-              {/* 3. Price Per Unit */}
+              {/* 3. Total Bill Amount */}
               <TextField
-                label="Price Per Unit"
+                label="Total Bill Amount (Rs.) *"
                 type="number"
                 fullWidth
                 required
                 inputProps={{ min: 0, step: 'any' }}
-                value={newItemName.unitPrice}
-                onChange={(e) => setNewItemName({ ...newItemName, unitPrice: parseFloat(e.target.value) || 0 })}
+                value={newItemName.totalBillAmount !== undefined ? newItemName.totalBillAmount : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const billNum = parseFloat(val) || 0;
+                  const stockNum = parseInt(newItemName.initialStock) || 0;
+                  const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                  setNewItemName((prev) => ({
+                    ...prev,
+                    totalBillAmount: val,
+                    unitPrice
+                  }));
+                }}
+                helperText={
+                  Number(newItemName.initialStock) > 0 && Number(newItemName.totalBillAmount) > 0
+                    ? `Rate: Rs. ${(Number(newItemName.totalBillAmount) / Number(newItemName.initialStock)).toFixed(2)} / ${newItemName.defaultUnit || 'PCS'}`
+                    : 'Calculates rate per unit automatically'
+                }
               />
 
               {/* 4. Category */}
@@ -413,7 +461,17 @@ export default function AddItemNamePage() {
                 required
                 inputProps={{ min: 0 }}
                 value={newItemName.initialStock}
-                onChange={(e) => setNewItemName({ ...newItemName, initialStock: parseInt(e.target.value) || 0 })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const stockNum = parseInt(val) || 0;
+                  const billNum = parseFloat(newItemName.totalBillAmount) || 0;
+                  const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                  setNewItemName((prev) => ({
+                    ...prev,
+                    initialStock: val === '' ? '' : stockNum,
+                    unitPrice
+                  }));
+                }}
               />
 
               {/* 7. Min Threshold */}
@@ -473,11 +531,26 @@ export default function AddItemNamePage() {
                 />
 
                 <TextField
-                  label="Price Per Unit"
+                  label="Total Bill Amount (Rs.) *"
                   type="number"
                   fullWidth
-                  value={editingItemName.unitPrice || 0}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, unitPrice: parseFloat(e.target.value) || 0 })}
+                  value={editingItemName.totalBillAmount !== undefined ? editingItemName.totalBillAmount : ((Number(editingItemName.initialStock) || 1) * (Number(editingItemName.unitPrice) || 0))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const billNum = parseFloat(val) || 0;
+                    const stockNum = parseInt(editingItemName.initialStock) || 1;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setEditingItemName((prev) => ({
+                      ...prev,
+                      totalBillAmount: val,
+                      unitPrice
+                    }));
+                  }}
+                  helperText={
+                    Number(editingItemName.initialStock) > 0 && Number(editingItemName.totalBillAmount) > 0
+                      ? `Rate: Rs. ${(Number(editingItemName.totalBillAmount) / Number(editingItemName.initialStock)).toFixed(2)} / ${editingItemName.defaultUnit || 'PCS'}`
+                      : 'Calculates rate per unit automatically'
+                  }
                 />
 
                 <TextField
@@ -514,7 +587,17 @@ export default function AddItemNamePage() {
                   type="number"
                   fullWidth
                   value={editingItemName.initialStock || 0}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, initialStock: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const stockNum = parseInt(val) || 0;
+                    const billNum = parseFloat(editingItemName.totalBillAmount) || 0;
+                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
+                    setEditingItemName((prev) => ({
+                      ...prev,
+                      initialStock: val === '' ? '' : stockNum,
+                      unitPrice
+                    }));
+                  }}
                 />
 
                 <TextField
