@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
@@ -25,6 +25,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -44,6 +45,23 @@ export default function VendorsPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // Add Vendor / Party Drawer State
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
@@ -249,7 +267,9 @@ export default function VendorsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredVendors.map((vendor) => {
+              filteredVendors
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((vendor) => {
                 const isVendorSelected = isSelected(vendor.id);
                 const partyTypeLabel = vendor.partyType || vendor.category || 'Supplier (Vendor)';
 
@@ -308,6 +328,16 @@ export default function VendorsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        component="div"
+        count={filteredVendors.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
 
       {/* Drawer 1: Add New Vendor / Party */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
@@ -464,7 +494,7 @@ export default function VendorsPage() {
       {/* Modal 3: Confirm Single Delete Vendor Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete Vendor Confirmation
+          Delete Vendor Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -484,7 +514,7 @@ export default function VendorsPage() {
       {/* Modal 4: Confirm Bulk Delete Multiple Vendors Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete All Selected Vendors Confirmation
+          Delete All Selected Vendors Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>

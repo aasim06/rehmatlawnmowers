@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
@@ -8,6 +8,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Dialog from '@mui/material/Dialog';
@@ -49,6 +50,23 @@ export default function MachineBOMPage() {
 
   // Search Filter State
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // View Details Modal State
   const [viewRecipeModalOpen, setViewRecipeModalOpen] = useState(false);
@@ -266,7 +284,9 @@ export default function MachineBOMPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRecipes.map((recipe, idx) => {
+                filteredRecipes
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((recipe, idx) => {
                   const maxBuildable = getMaxManufacturableQty(recipe.ingredients);
 
                   return (
@@ -346,6 +366,16 @@ export default function MachineBOMPage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredRecipes.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </MainCard>
 
       {/* VIEW RECIPE PARTS FORMULA MODAL DIALOG */}
@@ -374,7 +404,7 @@ export default function MachineBOMPage() {
                     severity={maxBuildable >= 5 ? 'success' : maxBuildable > 0 ? 'warning' : 'error'}
                     sx={{ mb: 2, fontWeight: 700 }}
                   >
-                    ⚡ Factory Production Capacity: Current store stock allows assembling up to <strong>{maxBuildable} full machines</strong> before reordering raw materials.
+                    Factory Production Capacity: Current store stock allows assembling up to <strong>{maxBuildable} full machines</strong> before reordering raw materials.
                   </Alert>
                 );
               })()}
@@ -664,7 +694,7 @@ export default function MachineBOMPage() {
             disabled={Boolean(buildSuccessAlert)}
             sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 700, px: 2.5 }}
           >
-            ⚡ Confirm & Deduct Stock
+            Confirm & Deduct Stock
           </Button>
         </DialogActions>
       </Dialog>

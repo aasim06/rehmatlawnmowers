@@ -296,13 +296,13 @@ export function StoreInventoryProvider({ children }) {
     setAuditLogs([]);
   };
 
-  // 🔔 Real-time Super Admin Notifications State
+  // Real-time Super Admin Notifications State
   const initialNotifications = [
     {
       id: 'notif-1',
       senderName: 'Store Keeper Ali',
       senderRole: 'Store Keeper',
-      title: '📦 Stock Out Issued',
+      title: 'Stock Out Issued',
       message: 'Issued 25x SKF Ball Bearings for Worker Aslam',
       type: 'stock-out',
       timestamp: '10 mins ago',
@@ -312,7 +312,7 @@ export function StoreInventoryProvider({ children }) {
       id: 'notif-2',
       senderName: 'Store Keeper Ali',
       senderRole: 'Store Keeper',
-      title: '⚠️ Low Stock Reorder Request',
+      title: 'Low Stock Reorder Request',
       message: '3HP Electric Motor stock is below 5 units. Please reorder.',
       type: 'alert',
       timestamp: '1 hour ago',
@@ -474,21 +474,52 @@ export function StoreInventoryProvider({ children }) {
           (l) => !deletedLogSet.has(String(l.id))
         );
         cleanLogsData.sort((a, b) => new Date(b.created_at || b.date_iso || b.dateISO || 0) - new Date(a.created_at || a.date_iso || a.dateISO || 0));
-        const mappedLogs = cleanLogsData.map((l) => ({
-          id: l.id,
-          type: l.type || 'Stock Out',
-          itemCode: l.item_code || l.itemCode || 'N/A',
-          itemName: l.item_name || l.itemName || 'Item',
-          qtyUsed: parseFloat(l.qty_used !== undefined ? l.qty_used : l.qtyUsed) || 1,
-          unitPrice: parseFloat(l.unit_price !== undefined ? l.unit_price : l.unitPrice) || 0,
-          discountAmount: parseFloat(l.discount_amount !== undefined ? l.discount_amount : l.discountAmount) || 0,
-          lineTotal: parseFloat(l.line_total !== undefined ? l.line_total : l.lineTotal) || 0,
-          usedBy: l.used_by || l.usedBy || 'Store',
-          department: l.department || 'Store',
-          issuedBy: l.issued_by || l.issuedBy || 'Store Manager',
-          time: l.time || (l.created_at ? new Date(l.created_at).toLocaleString() : new Date().toLocaleString()),
-          dateISO: l.created_at || l.date_iso || l.dateISO || new Date().toISOString()
-        }));
+
+        // Preserve currently held logs in memory or localStorage to protect exact timestamps
+        const localLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
+        const localLogMap = new Map();
+        localLogs.forEach((el) => {
+          if (el.id && el.time) localLogMap.set(String(el.id), el);
+        });
+
+        const mappedLogs = cleanLogsData.map((l) => {
+          const localItem = localLogMap.get(String(l.id));
+          const isoTimestamp = l.created_at || l.date_iso || l.dateISO || localItem?.dateISO;
+
+          let resolvedTime = l.time || localItem?.time;
+          if (!resolvedTime) {
+            if (isoTimestamp && !isoTimestamp.endsWith('T00:00:00.000Z')) {
+              resolvedTime = new Date(isoTimestamp).toLocaleString();
+            } else if (isoTimestamp) {
+              resolvedTime = new Date(isoTimestamp).toLocaleDateString();
+            } else {
+              resolvedTime = new Date().toLocaleString();
+            }
+          }
+
+          return {
+            id: l.id,
+            type: l.type || localItem?.type || 'Stock Out',
+            itemCode: l.item_code || l.itemCode || localItem?.itemCode || 'N/A',
+            itemName: l.item_name || l.itemName || localItem?.itemName || 'Item',
+            category: l.category || localItem?.category || 'General',
+            qtyUsed: parseFloat(l.qty_used !== undefined ? l.qty_used : (l.qtyUsed !== undefined ? l.qtyUsed : localItem?.qtyUsed)) || 1,
+            unitPrice: parseFloat(l.unit_price !== undefined ? l.unit_price : (l.unitPrice !== undefined ? l.unitPrice : localItem?.unitPrice)) || 0,
+            discountAmount: parseFloat(l.discount_amount !== undefined ? l.discount_amount : (l.discountAmount !== undefined ? l.discountAmount : localItem?.discountAmount)) || 0,
+            lineTotal: parseFloat(l.line_total !== undefined ? l.line_total : (l.lineTotal !== undefined ? l.lineTotal : localItem?.lineTotal)) || 0,
+            usedBy: (l.used_by || l.usedBy || localItem?.usedBy || 'Store').trim(),
+            department: l.department || localItem?.department || 'Store',
+            issuedBy: l.issued_by || l.issuedBy || localItem?.issuedBy || 'Store Manager',
+            time: resolvedTime,
+            dateISO: isoTimestamp || new Date().toISOString(),
+            biltyNo: l.bilty_no || l.biltyNo || localItem?.biltyNo || '',
+            amountPaid: parseFloat(l.amount_paid !== undefined ? l.amount_paid : (l.amountPaid !== undefined ? l.amountPaid : localItem?.amountPaid)) || 0,
+            remainingBalance: parseFloat(l.remaining_balance !== undefined ? l.remaining_balance : (l.remainingBalance !== undefined ? l.remainingBalance : localItem?.remainingBalance)) || 0,
+            paymentMethod: l.payment_method || l.paymentMethod || localItem?.paymentMethod || 'Cash',
+            remainingStockAfter: l.remaining_stock_after !== undefined ? l.remaining_stock_after : (l.remainingStockAfter !== undefined ? l.remainingStockAfter : (localItem?.remainingStockAfter !== undefined ? localItem.remainingStockAfter : null)),
+            notes: l.notes || localItem?.notes || ''
+          };
+        });
         if (mappedLogs.length > 0 || logsList.length === 0) {
           setUsageLogs(mappedLogs);
           localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
@@ -502,7 +533,7 @@ export function StoreInventoryProvider({ children }) {
         cleanVendorsData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const mappedVendors = cleanVendorsData.map((v) => ({
           id: v.id,
-          name: v.name,
+          name: (v.name || '').trim(),
           contactPerson: v.company_name || v.contact_person || v.contactPerson || v.name,
           companyName: v.company_name || v.companyName || v.name,
           phone: v.phone || 'N/A',
@@ -597,9 +628,11 @@ export function StoreInventoryProvider({ children }) {
       }
 
       if (vendPaySnap.status === 'fulfilled') {
-        const mappedVendPay = vendPayList.map((p) => ({
+        const deletedVendPaySet = new Set(safeParseJSON('rehmat_deleted_vendor_payment_ids', []).map(String));
+        const cleanVendPay = vendPayList.filter((p) => !deletedVendPaySet.has(String(p.id)));
+        const mappedVendPay = cleanVendPay.map((p) => ({
           id: p.id,
-          vendorName: p.vendor_name || p.vendorName,
+          vendorName: (p.vendor_name || p.vendorName || '').trim(),
           amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
           paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
           referenceNo: p.reference_no || p.referenceNo || '',
@@ -821,6 +854,9 @@ export function StoreInventoryProvider({ children }) {
     // Record Usage Log Entry
     const now = new Date();
     const logId = generateUUID();
+    const dateISO = now.toISOString();
+    const formattedTime = now.toLocaleString();
+
     const newLog = {
       id: logId,
       itemCode: targetItem.itemCode,
@@ -832,8 +868,9 @@ export function StoreInventoryProvider({ children }) {
       usedBy,
       department,
       issuedBy,
-      time: `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      dateISO: now.toISOString(),
+      time: formattedTime,
+      dateISO: dateISO,
+      created_at: dateISO,
       type: 'OUT (Daily Usage)',
       remainingStockAfter: newRemainingStock,
       status: 1,
@@ -861,7 +898,9 @@ export function StoreInventoryProvider({ children }) {
         used_by: usedBy,
         department: department || 'Production',
         issued_by: issuedBy || 'Store Keeper',
-        date_iso: now.toISOString(),
+        date_iso: dateISO,
+        created_at: dateISO,
+        time: formattedTime,
         remaining_stock_after: newRemainingStock,
         status: 1,
         notes: notes || ''
@@ -875,7 +914,7 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // 2. Receive Stock / Store IN Action
-  const receiveStock = async (itemIdOrObj, qtyReceivedParam, supplierNameParam = 'Vendor Shipment', refNoParam = '', unitPriceParam = 0) => {
+  const receiveStock = async (itemIdOrObj, qtyReceivedParam, supplierNameParam = 'Vendor Shipment', refNoParam = '', unitPriceParam = 0, categoryParam = 'General', imageUrlParam = '', extraData = {}) => {
     let targetItem = null;
     let itemId = itemIdOrObj;
     let qtyReceived = qtyReceivedParam;
@@ -941,22 +980,45 @@ export function StoreInventoryProvider({ children }) {
 
     const now = new Date();
     const logId = generateUUID();
+    const paidVal = parseFloat(extraData?.amountPaid) || 0;
+    const balanceVal = extraData?.remainingBalance !== undefined ? parseFloat(extraData?.remainingBalance) : Math.max(0, lineTotal - paidVal);
+
+    // Compute exact timestamp down to the second
+    let logDate = new Date();
+    if (extraData?.receivedDate) {
+      const parts = extraData.receivedDate.split('-');
+      if (parts.length === 3) {
+        const yr = parseInt(parts[0], 10);
+        const mo = parseInt(parts[1], 10) - 1;
+        const da = parseInt(parts[2], 10);
+        logDate = new Date(yr, mo, da, now.getHours(), now.getMinutes(), now.getSeconds());
+      }
+    }
+    const dateISO = logDate.toISOString();
+    const formattedTime = logDate.toLocaleString(); // e.g. "11/5/2026, 9:05:36 PM"
+
     const newLog = {
       id: logId,
       itemCode: targetItem.itemCode || 'N/A',
       itemName: targetItem.name || 'Item',
+      category: targetItem.category || categoryParam || 'General',
       qtyUsed: actualQty,
       unitPrice: price,
       lineTotal: lineTotal,
       usedBy: supplierName,
       department: 'Store Inward',
       issuedBy: 'Store Manager',
-      time: `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      dateISO: now.toISOString(),
+      time: formattedTime,
+      dateISO: dateISO,
+      created_at: dateISO,
       type: 'IN (Shipment Received)',
       remainingStockAfter: newRemainingStock,
       status: 1,
-      notes: `Shipment Ref: ${refNo}`
+      notes: extraData?.biltyNo ? `Bill #${extraData.biltyNo} (${refNo})` : `Shipment Ref: ${refNo}`,
+      biltyNo: extraData?.biltyNo || '',
+      amountPaid: paidVal,
+      remainingBalance: balanceVal,
+      paymentMethod: extraData?.paymentMethod || 'Cash'
     };
 
     setUsageLogs((prev) => [newLog, ...prev]);
@@ -966,7 +1028,7 @@ export function StoreInventoryProvider({ children }) {
         id: targetItem.id,
         name: targetItem.name,
         item_code: targetItem.itemCode,
-        category: targetItem.category || 'General',
+        category: targetItem.category || categoryParam || 'General',
         unit: targetItem.unit || 'PCS',
         total_stock: newTotalStock,
         used_today: targetItem.usedToday || 0,
@@ -979,17 +1041,35 @@ export function StoreInventoryProvider({ children }) {
         type: 'Stock In',
         item_code: targetItem.itemCode || 'N/A',
         item_name: targetItem.name || 'Item',
+        category: targetItem.category || categoryParam || 'General',
         qty_used: actualQty,
         unit_price: price,
         line_total: lineTotal,
         used_by: supplierName,
         department: 'Store Inward',
         issued_by: 'Store Manager',
-        date_iso: now.toISOString(),
+        date_iso: dateISO,
+        created_at: dateISO,
+        time: formattedTime,
         remaining_stock_after: newRemainingStock,
         status: 1,
-        notes: `Shipment Ref: ${refNo}`
+        notes: extraData?.biltyNo ? `Bill #${extraData.biltyNo} (${refNo})` : `Shipment Ref: ${refNo}`,
+        bilty_no: extraData?.biltyNo || '',
+        amount_paid: paidVal,
+        remaining_balance: balanceVal,
+        payment_method: extraData?.paymentMethod || 'Cash'
       }, { merge: true });
+
+      if (paidVal > 0 && supplierName && supplierName !== 'Vendor Shipment' && supplierName !== 'Direct Supplier') {
+        await addVendorPayment({
+          vendorName: supplierName,
+          amountPaid: paidVal,
+          paymentMethod: extraData?.paymentMethod || 'Cash',
+          referenceNo: extraData?.biltyNo ? `Bill #${extraData.biltyNo}` : refNo,
+          notes: `Paid at Stock In (${targetItem.name || 'Goods'})`
+        });
+      }
+
       fetchFirebaseData();
     } catch (e) {
       console.error('receiveStock exception:', e);
@@ -1426,36 +1506,79 @@ export function StoreInventoryProvider({ children }) {
   };
 
   const updateLog = async (logId, updatedData) => {
-    const targetLog = usageLogs.find((l) => l.id === logId);
-    setUsageLogs((prev) =>
-      prev.map((l) => (l.id === logId ? { ...l, ...updatedData } : l))
-    );
+    const stringId = String(logId);
+    const targetLog = usageLogs.find((l) => String(l.id) === stringId);
+    const activeUser = user || safeParseJSON('rehmat_erp_active_user', null) || safeParseJSON('service_pos_user', null) || { name: 'Admin', role: 'Super Admin' };
 
-    logActivity(
-      'Stock Log Edited',
-      `Updated voucher #${logId} (${targetLog?.itemName || 'Item'} -> ${updatedData.itemName || targetLog?.itemName}, Qty: ${updatedData.qtyUsed || targetLog?.qtyUsed})`,
-      activeUser
-    );
+    // 1. Immediately update React State AND LocalStorage
+    setUsageLogs((prev) => {
+      const updated = prev.map((l) => (String(l.id) === stringId ? { ...l, ...updatedData } : l));
+      localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(updated));
+      return updated;
+    });
 
-    if (activeUser?.role === 'Store Keeper') {
-      addNotification({
-        title: '✏️ Record Edited by Store Keeper',
-        message: `${activeUser.name || 'Store Keeper'} edited voucher #${logId} (${updatedData.itemName || targetLog?.itemName}).`,
-        type: 'request',
-        senderName: activeUser.name || 'Store Keeper Ali',
-        senderRole: 'Store Keeper'
-      });
+    // 2. Log Activity and notifications safely
+    try {
+      logActivity(
+        'Stock Log Edited',
+        `Updated voucher #${logId} (${targetLog?.itemName || 'Item'} -> ${updatedData.itemName || targetLog?.itemName}, Qty: ${updatedData.qtyUsed || targetLog?.qtyUsed})`,
+        activeUser
+      );
+
+      if (activeUser?.role === 'Store Keeper') {
+        addNotification({
+          title: 'Record Edited by Store Keeper',
+          message: `${activeUser.name || 'Store Keeper'} edited voucher #${logId} (${updatedData.itemName || targetLog?.itemName}).`,
+          type: 'request',
+          senderName: activeUser.name || 'Store Keeper Ali',
+          senderRole: 'Store Keeper'
+        });
+      }
+    } catch (actErr) {
+      console.warn('logActivity warning in updateLog:', actErr);
     }
 
+    // 3. Save directly to Firestore usage_logs collection
     try {
-      await setDoc(doc(db, 'usage_logs', String(logId)), {
-        item_name: updatedData.itemName,
-        used_by: updatedData.usedBy,
-        qty_used: updatedData.qtyUsed,
-        unit_price: updatedData.unitPrice,
-        line_total: updatedData.lineTotal
-      }, { merge: true });
-      fetchFirebaseData();
+      const payload = {};
+      if (updatedData.itemName !== undefined) payload.item_name = updatedData.itemName;
+      if (updatedData.usedBy !== undefined) payload.used_by = updatedData.usedBy;
+      if (updatedData.qtyUsed !== undefined) payload.qty_used = Number(updatedData.qtyUsed);
+      if (updatedData.unitPrice !== undefined) payload.unit_price = Number(updatedData.unitPrice);
+      if (updatedData.lineTotal !== undefined) payload.line_total = Number(updatedData.lineTotal);
+      if (updatedData.biltyNo !== undefined) payload.bilty_no = updatedData.biltyNo;
+      if (updatedData.amountPaid !== undefined) payload.amount_paid = Number(updatedData.amountPaid);
+      if (updatedData.remainingBalance !== undefined) payload.remaining_balance = Number(updatedData.remainingBalance);
+      if (updatedData.paymentMethod !== undefined) payload.payment_method = updatedData.paymentMethod;
+
+      await setDoc(doc(db, 'usage_logs', stringId), payload, { merge: true });
+
+      // 4. Update the item stock in store_items if qty changed
+      if (targetLog && updatedData.qtyUsed !== undefined) {
+        const oldQty = Number(targetLog.qtyUsed) || 0;
+        const newQty = Number(updatedData.qtyUsed) || 0;
+        const isStockIn = (targetLog.type || '').toUpperCase().includes('IN');
+        const qtyDiff = isStockIn ? (newQty - oldQty) : (oldQty - newQty);
+
+        if (qtyDiff !== 0) {
+          const matchedItem = items.find(
+            (it) => it.id === targetLog.itemCode || it.itemCode === targetLog.itemCode || (it.name || '').toLowerCase() === (targetLog.itemName || '').toLowerCase()
+          );
+          if (matchedItem) {
+            const updatedStock = Math.max(0, (matchedItem.totalStock || 0) + qtyDiff);
+            const updatedRemaining = Math.max(0, (matchedItem.remainingStock || 0) + qtyDiff);
+            setItems((prev) =>
+              prev.map((it) => (it.id === matchedItem.id ? { ...it, totalStock: updatedStock, remainingStock: updatedRemaining } : it))
+            );
+            await setDoc(doc(db, 'store_items', String(matchedItem.id)), {
+              total_stock: updatedStock,
+              remaining_stock: updatedRemaining
+            }, { merge: true });
+          }
+        }
+      }
+
+      await fetchFirebaseData();
     } catch (e) {
       console.error('Firebase updateLog error:', e);
     }
@@ -1758,13 +1881,14 @@ export function StoreInventoryProvider({ children }) {
   // VENDOR LEDGER & PAYABLE ACTIONS
   // ----------------------------------------------------
   const addVendorPayment = async (paymentData) => {
-    const paymentId = generateUUID();
+    const paymentId = paymentData.id || generateUUID();
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    const cleanVendorName = (paymentData.vendorName || 'Supplier').trim();
 
     const newPayment = {
       id: paymentId,
-      vendorName: paymentData.vendorName || 'Supplier',
+      vendorName: cleanVendorName,
       amountPaid: parseFloat(paymentData.amountPaid) || 0,
       paymentMethod: paymentData.paymentMethod || 'Cash',
       referenceNo: paymentData.referenceNo || '',
@@ -1773,7 +1897,13 @@ export function StoreInventoryProvider({ children }) {
       createdAt: now.toISOString()
     };
 
-    setVendorPayments((prev) => [newPayment, ...prev]);
+    setVendorPayments((prev) => {
+      const exists = prev.some((p) => String(p.id) === String(paymentId));
+      if (exists) {
+        return prev.map((p) => (String(p.id) === String(paymentId) ? newPayment : p));
+      }
+      return [newPayment, ...prev];
+    });
 
     try {
       await setDoc(doc(db, 'vendor_payments', String(paymentId)), {
@@ -1788,6 +1918,21 @@ export function StoreInventoryProvider({ children }) {
       fetchFirebaseData();
     } catch (e) {
       console.error('Firebase addVendorPayment Exception:', e);
+    }
+  };
+
+  const deleteVendorPayment = async (paymentId) => {
+    const stringId = String(paymentId);
+    const existingDeleted = safeParseJSON('rehmat_deleted_vendor_payment_ids', []);
+    const updatedDeleted = Array.from(new Set([...existingDeleted, stringId]));
+    localStorage.setItem('rehmat_deleted_vendor_payment_ids', JSON.stringify(updatedDeleted));
+
+    setVendorPayments((prev) => prev.filter((p) => String(p.id) !== stringId));
+
+    try {
+      await deleteDoc(doc(db, 'vendor_payments', stringId));
+    } catch (e) {
+      console.error('Firebase deleteVendorPayment error:', e);
     }
   };
 
@@ -2165,6 +2310,7 @@ export function StoreInventoryProvider({ children }) {
       assembleMachine,
       addCustomerPayment,
       addVendorPayment,
+      deleteVendorPayment,
       exportFullBackupData,
       importFullBackupData,
       resetAllDataToZero,

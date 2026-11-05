@@ -3,7 +3,7 @@ import { ShopInventoryProvider } from 'context/ShopInventoryContext';
 
 /**
  * ==============================================================================
- * 🏪 ShopRouteWrapper Component
+ * ShopRouteWrapper Component
  * ==============================================================================
  * Encapsulates the entire `/shop/*` sub-system with its own isolated
  * ShopInventoryProvider.

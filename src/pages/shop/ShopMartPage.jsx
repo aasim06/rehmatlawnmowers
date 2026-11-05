@@ -238,7 +238,7 @@ export default function ShopMartPage() {
       totalAmount: cartTotal
     };
 
-    // ⚡ INSTANT ZERO-LATENCY DISPLAY
+    // INSTANT ZERO-LATENCY DISPLAY
     setInvoiceData(invoicePayload);
     setInvoiceModalOpen(true);
     const checkoutCartSnapshot = [...cart];
@@ -246,7 +246,7 @@ export default function ShopMartPage() {
     setDrawerOpen(false);
     setCheckoutLoading(false);
 
-    // ⚡ CONCURRENT BACKGROUND EXECUTION
+    // CONCURRENT BACKGROUND EXECUTION
     try {
       if (typeof addShopSale === 'function') {
         addShopSale(invoicePayload);
@@ -1343,7 +1343,7 @@ export default function ShopMartPage() {
         </Box>
       </Drawer>
 
-      {/* 📄 Print Invoice Receipt Modal Dialog */}
+      {/* Print Invoice Receipt Modal Dialog */}
       <Dialog open={invoiceModalOpen} onClose={() => setInvoiceModalOpen(false)} maxWidth="md" fullWidth>
         <style>
           {`
@@ -1553,7 +1553,7 @@ export default function ShopMartPage() {
       {/* Confirm Reset Dialog */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
         <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
-          ⚠️ Confirm Factory Reset Shop Data?
+          Confirm Factory Reset Shop Data?
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

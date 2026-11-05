@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -18,6 +18,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Typography
 } from '@mui/material';
@@ -38,6 +39,23 @@ export default function ReportsPage() {
 
   const [reportType, setReportType] = useState('inventory-valuation');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [reportType]);
 
   const handlePrint = () => {
     window.print();
@@ -164,7 +182,8 @@ export default function ReportsPage() {
         >
           {/* Report 1: Valuation Report */}
           {reportType === 'inventory-valuation' && (
-            <TableContainer>
+            <>
+              <TableContainer>
               <Table sx={{ minWidth: 700 }}>
                 <TableHead>
                   <TableRow>
@@ -195,7 +214,9 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    items.map((item) => {
+                    items
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((item) => {
                       const isItemSelected = isSelected(item.id);
                       const itemValue = item.remainingStock * item.unitPrice;
 
@@ -236,155 +257,191 @@ export default function ReportsPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={items.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </>
           )}
 
           {/* Report 2: Low Stock Report */}
           {reportType === 'low-stock' && (
-            <TableContainer>
-              <Table sx={{ minWidth: 700 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        indeterminate={selected.length > 0 && selected.length < (lowStockAlerts?.length || 0)}
-                        checked={(lowStockAlerts?.length || 0) > 0 && selected.length === lowStockAlerts.length}
-                        onChange={(e) => handleSelectAllClick(e, lowStockAlerts || [])}
-                      />
-                    </TableCell>
-                    <TableCell>Item SKU</TableCell>
-                    <TableCell>Item Name</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell align="center">Remaining Stock</TableCell>
-                    <TableCell align="center">Reorder Threshold</TableCell>
-                    <TableCell align="center">Deficit Qty</TableCell>
-                    <TableCell>Location</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {!lowStockAlerts || lowStockAlerts.length === 0 ? (
+            <>
+              <TableContainer>
+                <Table sx={{ minWidth: 700 }}>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="success.main">
-                          🎉 All store inventory levels are optimal! No low stock reorder alerts.
-                        </Typography>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          indeterminate={selected.length > 0 && selected.length < (lowStockAlerts?.length || 0)}
+                          checked={(lowStockAlerts?.length || 0) > 0 && selected.length === lowStockAlerts.length}
+                          onChange={(e) => handleSelectAllClick(e, lowStockAlerts || [])}
+                        />
                       </TableCell>
+                      <TableCell>Item SKU</TableCell>
+                      <TableCell>Item Name</TableCell>
+                      <TableCell>Category</TableCell>
+                      <TableCell align="center">Remaining Stock</TableCell>
+                      <TableCell align="center">Reorder Threshold</TableCell>
+                      <TableCell align="center">Deficit Qty</TableCell>
+                      <TableCell>Location</TableCell>
                     </TableRow>
-                  ) : (
-                    lowStockAlerts.map((item) => {
-                      const isItemSelected = isSelected(item.id);
-                      const deficit = item.minLevel - item.remainingStock;
+                  </TableHead>
+                  <TableBody>
+                    {!lowStockAlerts || lowStockAlerts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                          <Typography variant="body2" color="success.main">
+                            All store inventory levels are optimal! No low stock reorder alerts.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      (lowStockAlerts || [])
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((item) => {
+                        const isItemSelected = isSelected(item.id);
+                        const deficit = item.minLevel - item.remainingStock;
 
-                      return (
-                        <TableRow key={item.id} hover selected={isItemSelected}>
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              color="primary"
-                              checked={isItemSelected}
-                              onChange={(e) => handleSelectOne(e, item.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={600}>{item.itemCode}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={700}>{item.name}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip label={item.category} size="small" variant="light" color="primary" />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="subtitle1" fontWeight={700} color="error.main">
-                              {item.remainingStock} {item.unit}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">{item.minLevel} {item.unit}</TableCell>
-                          <TableCell align="center">
-                            <Chip icon={<WarningOutlined />} label={`Reorder +${deficit > 0 ? deficit : 5}`} color="warning" size="small" />
-                          </TableCell>
-                          <TableCell>{item.rackLocation}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                        return (
+                          <TableRow key={item.id} hover selected={isItemSelected}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                color="primary"
+                                checked={isItemSelected}
+                                onChange={(e) => handleSelectOne(e, item.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="subtitle2" fontWeight={600}>{item.itemCode}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="subtitle2" fontWeight={700}>{item.name}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={item.category} size="small" variant="light" color="primary" />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="subtitle1" fontWeight={700} color="error.main">
+                                {item.remainingStock} {item.unit}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">{item.minLevel} {item.unit}</TableCell>
+                            <TableCell align="center">
+                              <Chip icon={<WarningOutlined />} label={`Reorder +${deficit > 0 ? deficit : 5}`} color="warning" size="small" />
+                            </TableCell>
+                            <TableCell>{item.rackLocation}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={(lowStockAlerts || []).length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+              />
+            </>
           )}
 
           {/* Report 3: Operator & Department Usage Report */}
           {reportType === 'operator-usage' && (
-            <TableContainer>
-              <Table sx={{ minWidth: 700 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        indeterminate={selected.length > 0 && selected.length < usageLogs.length}
-                        checked={usageLogs.length > 0 && selected.length === usageLogs.length}
-                        onChange={(e) => handleSelectAllClick(e, usageLogs)}
-                      />
-                    </TableCell>
-                    <TableCell>Log ID / Time</TableCell>
-                    <TableCell>Item Issued</TableCell>
-                    <TableCell align="center">Qty Used</TableCell>
-                    <TableCell>Operator Name (Who Used)</TableCell>
-                    <TableCell>Department</TableCell>
-                    <TableCell align="right">Stock Level After</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {usageLogs.length === 0 ? (
+            <>
+              <TableContainer>
+                <Table sx={{ minWidth: 700 }}>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="textSecondary">
-                          No store transaction logs recorded.
-                        </Typography>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          indeterminate={selected.length > 0 && selected.length < usageLogs.length}
+                          checked={usageLogs.length > 0 && selected.length === usageLogs.length}
+                          onChange={(e) => handleSelectAllClick(e, usageLogs)}
+                        />
                       </TableCell>
+                      <TableCell>Log ID / Time</TableCell>
+                      <TableCell>Item Issued</TableCell>
+                      <TableCell align="center">Qty Used</TableCell>
+                      <TableCell>Operator Name (Who Used)</TableCell>
+                      <TableCell>Department</TableCell>
+                      <TableCell align="right">Stock Level After</TableCell>
                     </TableRow>
-                  ) : (
-                    usageLogs.map((log) => {
-                      const isLogSelected = isSelected(log.id);
+                  </TableHead>
+                  <TableBody>
+                    {usageLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                          <Typography variant="body2" color="textSecondary">
+                            No store transaction logs recorded.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      usageLogs
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((log) => {
+                        const isLogSelected = isSelected(log.id);
 
-                      return (
-                        <TableRow key={log.id} hover selected={isLogSelected}>
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              color="primary"
-                              checked={isLogSelected}
-                              onChange={(e) => handleSelectOne(e, log.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={600}>{log.id}</Typography>
-                            <Typography variant="caption" color="textSecondary">{log.time}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={600}>{log.itemName}</Typography>
-                            <Typography variant="caption" color="textSecondary">{log.itemCode}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="subtitle1" fontWeight={700} color="error.main">
-                              -{log.qtyUsed}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip label={log.usedBy} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
-                          </TableCell>
-                          <TableCell>{log.department}</TableCell>
-                          <TableCell align="right">
-                            <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                              {log.remainingStockAfter} available
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                        return (
+                          <TableRow key={log.id} hover selected={isLogSelected}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                color="primary"
+                                checked={isLogSelected}
+                                onChange={(e) => handleSelectOne(e, log.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="subtitle2" fontWeight={600}>{log.id}</Typography>
+                              <Typography variant="caption" color="textSecondary">{log.time}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="subtitle2" fontWeight={600}>{log.itemName}</Typography>
+                              <Typography variant="caption" color="textSecondary">{log.itemCode}</Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="subtitle1" fontWeight={700} color="error.main">
+                                -{log.qtyUsed}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={log.usedBy} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+                            </TableCell>
+                            <TableCell>{log.department}</TableCell>
+                            <TableCell align="right">
+                              <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                                {log.remainingStockAfter} available
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={usageLogs.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+              />
+            </>
           )}
         </MainCard>
       </Grid>

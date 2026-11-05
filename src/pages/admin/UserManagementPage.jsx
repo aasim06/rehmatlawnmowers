@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { isTauriApp } from 'utils/platform';
 import {
@@ -39,6 +39,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -105,6 +106,22 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [logSearchTerm, setLogSearchTerm] = useState('');
+
+  // Staff Pagination State
+  const [staffPage, setStaffPage] = useState(0);
+  const [staffRowsPerPage, setStaffRowsPerPage] = useState(10);
+
+  // Audit Logs Pagination State
+  const [auditPage, setAuditPage] = useState(0);
+  const [auditRowsPerPage, setAuditRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setStaffPage(0);
+  }, [searchTerm, roleFilter]);
+
+  useEffect(() => {
+    setAuditPage(0);
+  }, [logSearchTerm]);
 
   // Add Staff Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -777,7 +794,9 @@ export default function UserManagementPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStaff.map((staff) => {
+                      filteredStaff
+                        .slice(staffPage * staffRowsPerPage, staffPage * staffRowsPerPage + staffRowsPerPage)
+                        .map((staff) => {
                         const perms = staff.permissions || getRoleDefaultPermissions(staff.role);
                         const enabledCount = MODULE_LIST.filter((m) => Boolean(perms[m.key])).length;
                         const isProtected = staff.email?.toLowerCase() === 'admin@rehmat.com';
@@ -892,6 +911,19 @@ export default function UserManagementPage() {
                   </TableBody>
                 </Table>
               </TableContainer>
+
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={filteredStaff.length}
+                rowsPerPage={staffRowsPerPage}
+                page={staffPage}
+                onPageChange={(e, p) => setStaffPage(p)}
+                onRowsPerPageChange={(e) => {
+                  setStaffRowsPerPage(parseInt(e.target.value, 10));
+                  setStaffPage(0);
+                }}
+              />
             </Box>
           </Stack>
         )}
@@ -917,7 +949,7 @@ export default function UserManagementPage() {
               <Grid size={{ xs: 12, sm: 5 }} textAlign={{ xs: 'left', sm: 'right' }}>
                 <Chip
                   icon={<LockOutlined />}
-                  label="🔒 Immutable Audit Trail (Tamper-Proof)"
+                  label="Immutable Audit Trail (Tamper-Proof)"
                   color="success"
                   variant="outlined"
                   sx={{ fontWeight: 700, p: 1 }}
@@ -946,7 +978,9 @@ export default function UserManagementPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAuditLogs.map((log) => (
+                    filteredAuditLogs
+                      .slice(auditPage * auditRowsPerPage, auditPage * auditRowsPerPage + auditRowsPerPage)
+                      .map((log) => (
                       <TableRow key={log.id} hover>
                         <TableCell whiteSpace="nowrap">
                           <Typography variant="caption" fontWeight={600} color="textSecondary">
@@ -1002,15 +1036,28 @@ export default function UserManagementPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={filteredAuditLogs.length}
+              rowsPerPage={auditRowsPerPage}
+              page={auditPage}
+              onPageChange={(e, p) => setAuditPage(p)}
+              onRowsPerPageChange={(e) => {
+                setAuditRowsPerPage(parseInt(e.target.value, 10));
+                setAuditPage(0);
+              }}
+            />
           </Stack>
         )}
       </MainCard>
 
-      {/* 🎛️ MANAGE PERMISSIONS TOGGLES DRAWER */}
+      {/* MANAGE PERMISSIONS TOGGLES DRAWER */}
       <Drawer anchor="right" open={permsDrawerOpen} onClose={() => setPermsDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 500 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 0.5 }}>
-            🎛️ Customize Access Toggles
+            Customize Access Toggles
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
             Turn ON or OFF specific pages & actions for <strong>{targetStaffPerms?.name}</strong> ({targetStaffPerms?.role}).
@@ -1106,7 +1153,7 @@ export default function UserManagementPage() {
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 440 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
-            👤 Add New Staff Member
+            Add New Staff Member
           </Typography>
 
           <form onSubmit={handleCreateStaff}>
@@ -1157,11 +1204,11 @@ export default function UserManagementPage() {
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
-                <MenuItem value="Store Keeper">👷 Store Keeper (Stock In/Out & Catalog Only)</MenuItem>
-                <MenuItem value="Admin">🛡️ Admin (Store Manager - Operational Access)</MenuItem>
-                <MenuItem value="Super Admin">👑 Super Admin (Full Control & Users)</MenuItem>
-                <MenuItem value="Sales Manager">💼 Sales Manager (Sales Access)</MenuItem>
-                <MenuItem value="Technician">🔧 Workshop Technician (Repairs Access)</MenuItem>
+                <MenuItem value="Store Keeper">Store Keeper (Stock In/Out & Catalog Only)</MenuItem>
+                <MenuItem value="Admin">Admin (Store Manager - Operational Access)</MenuItem>
+                <MenuItem value="Super Admin">Super Admin (Full Control & Users)</MenuItem>
+                <MenuItem value="Sales Manager">Sales Manager (Sales Access)</MenuItem>
+                <MenuItem value="Technician">Workshop Technician (Repairs Access)</MenuItem>
               </TextField>
 
               <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
@@ -1181,7 +1228,7 @@ export default function UserManagementPage() {
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 440 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
-            ✏️ Edit Staff Account
+            Edit Staff Account
           </Typography>
 
           {editingStaff && (
@@ -1230,11 +1277,11 @@ export default function UserManagementPage() {
                   value={editingStaff.role}
                   onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
                 >
-                  <MenuItem value="Store Keeper">👷 Store Keeper (Stock In/Out & Catalog)</MenuItem>
-                  <MenuItem value="Admin">🛡️ Admin (Store Manager - Operational Access)</MenuItem>
-                  <MenuItem value="Super Admin">👑 Super Admin (Full Control & Users)</MenuItem>
-                  <MenuItem value="Sales Manager">💼 Sales Manager (Sales Access)</MenuItem>
-                  <MenuItem value="Technician">🔧 Workshop Technician (Repairs Access)</MenuItem>
+                  <MenuItem value="Store Keeper">Store Keeper (Stock In/Out & Catalog)</MenuItem>
+                  <MenuItem value="Admin">Admin (Store Manager - Operational Access)</MenuItem>
+                  <MenuItem value="Super Admin">Super Admin (Full Control & Users)</MenuItem>
+                  <MenuItem value="Sales Manager">Sales Manager (Sales Access)</MenuItem>
+                  <MenuItem value="Technician">Workshop Technician (Repairs Access)</MenuItem>
                 </TextField>
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>

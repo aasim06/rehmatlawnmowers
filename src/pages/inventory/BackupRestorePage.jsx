@@ -241,7 +241,7 @@ export default function BackupRestorePage() {
       {/* Confirm Reset Dialog */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} paperProps={{ sx: { borderRadius: 2 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: 'error.main' }}>
-          ⚠️ Confirm Reset All Data to Zero?
+          Confirm Reset All Data to Zero?
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary">

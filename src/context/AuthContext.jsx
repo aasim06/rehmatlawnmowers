@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 const AuthContext = createContext();
 
 // ==============================================================================
-// 👑 3-TIER ROLE PERMISSIONS DEFINITION
+// 3-TIER ROLE PERMISSIONS DEFINITION
 // ==============================================================================
 
 /**
@@ -367,7 +367,7 @@ export function AuthProvider({ children }) {
               return combined;
             });
 
-            // ⚡ Live instant update of the active logged-in user on this PC
+            // Live instant update of the active logged-in user on this PC
             setUser((currentUser) => {
               if (!currentUser) return null;
               const currentEmail = (currentUser.email || '').toLowerCase();

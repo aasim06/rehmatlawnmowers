@@ -21,7 +21,7 @@ export default function LiveCloudStatusBadge() {
 
   if (hasUpdate) {
     return (
-      <Tooltip title="🚀 A new version of the app was published! Click to apply updates instantly.">
+      <Tooltip title="A new version of the app was published! Click to apply updates instantly.">
         <Chip
           icon={checking ? <CircularProgress size={13} color="inherit" /> : <RocketOutlined style={{ fontSize: 13 }} />}
           label={checking ? 'Updating...' : 'New Update Available! (Click)'}

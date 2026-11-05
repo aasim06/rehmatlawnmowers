@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -22,6 +22,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -41,6 +42,23 @@ export default function CategoriesPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // Add Category Drawer State
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
@@ -250,7 +268,9 @@ export default function CategoriesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCategories.map((c) => {
+              filteredCategories
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((c) => {
                 const isCategorySelected = isSelected(c.id);
 
                 return (
@@ -272,7 +292,7 @@ export default function CategoriesPage() {
 
                     <TableCell>
                       <Typography variant="subtitle1" fontWeight={700} color="primary.main">
-                        🏷️ {c.name}
+                        {c.name}
                       </Typography>
                     </TableCell>
 
@@ -321,11 +341,21 @@ export default function CategoriesPage() {
         </Table>
       </TableContainer>
 
+      <TablePagination
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        component="div"
+        count={filteredCategories.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
+
       {/* Drawer 1: Add Category */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 3 }}>
-            🏷️ Add New Category
+            Add New Category
           </Typography>
 
           <form onSubmit={handleAddSubmit}>
@@ -413,7 +443,7 @@ export default function CategoriesPage() {
       {/* Modal 3: Confirm Single Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete Category Confirmation
+          Delete Category Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -433,7 +463,7 @@ export default function CategoriesPage() {
       {/* Modal 4: Confirm Bulk Delete Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete All Selected Categories Confirmation
+          Delete All Selected Categories Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>

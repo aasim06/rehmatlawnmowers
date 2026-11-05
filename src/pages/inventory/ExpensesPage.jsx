@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 // material-ui
 import {
@@ -24,6 +24,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -125,6 +126,23 @@ export default function ExpensesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [dateFilter, setDateFilter] = useState('today'); // 'today', 'month', 'all'
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, selectedCategory, dateFilter]);
 
   // Print Dialog State
   const [printOpen, setPrintOpen] = useState(false);
@@ -702,7 +720,9 @@ export default function ExpensesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredExpenses.map((exp, idx) => {
+                filteredExpenses
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((exp, idx) => {
                   const isItemSelected = isSelected(exp.id);
                   return (
                     <TableRow
@@ -834,6 +854,16 @@ export default function ExpensesPage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredExpenses.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </MainCard>
 
       {/* 4. PRINTABLE VOUCHER / STATEMENT DIALOG */}

@@ -3,7 +3,7 @@ import { isTauriApp } from 'utils/platform';
 
 /**
  * ==============================================================================
- * 🔐 usePermission Hook
+ * usePermission Hook
  * ==============================================================================
  * Central permission and authorization hook for the 3-tier RBAC system:
  * - Master Admin (admin@rehmat.com) / Super Admin: Absolute root access to all modules and system controls.
@@ -72,7 +72,7 @@ export function usePermission() {
 
     const itemId = item.id || (item.url ? urlMap[item.url] : null);
 
-    // 🔒 REMOTE SOFTWARE BLOCK & LICENSE CONTROL:
+    // REMOTE SOFTWARE BLOCK & LICENSE CONTROL:
     // Strictly available ONLY on the Web Administration URL (Vercel).
     // NEVER available inside the Desktop (.exe) application under any circumstances.
     if (itemId === 'app-security' || item.url === '/admin/security' || item.url === '/inventory/security') {

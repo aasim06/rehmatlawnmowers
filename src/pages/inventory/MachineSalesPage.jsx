@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
 import CeoSignature from 'components/CeoSignature';
@@ -29,6 +29,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -102,6 +103,23 @@ export default function MachineSalesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter]);
 
   // New Machine Model Dialog State
   const [newModelDialogOpen, setNewModelDialogOpen] = useState(false);
@@ -770,7 +788,7 @@ export default function MachineSalesPage() {
 
                       <Box sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 1.5 }}>
                         <Typography variant="subtitle2" fontWeight={700}>
-                          📦 {sale.machineName}
+                          {sale.machineName}
                         </Typography>
                         <Typography variant="caption" color="textSecondary" display="block">
                           Qty: {sale.qty || 1} {sale.serialNo ? `| S/N: ${sale.serialNo}` : ''}
@@ -850,7 +868,9 @@ export default function MachineSalesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSales.map((sale) => {
+                  filteredSales
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((sale) => {
                     const isItemSel = isSelected(sale.id);
                     return (
                       <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => canDelete && handleSelectOne(e, sale.id)}>
@@ -947,10 +967,20 @@ export default function MachineSalesPage() {
               </TableBody>
             </Table>
           </TableContainer>
+
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={filteredSales.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </Box>
       </MainCard>
 
-      {/* ✏️ Edit Machine Sale Drawer */}
+      {/* Edit Machine Sale Drawer */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 520 }, p: 3 }}>
           <Typography variant="h4" fontWeight={700} sx={{ mb: 3, color: 'primary.main' }}>
@@ -1082,7 +1112,7 @@ export default function MachineSalesPage() {
         </Box>
       </Drawer>
 
-      {/* 🗑️ Single Delete Dialog */}
+      {/* Single Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Confirm Delete Sale Record</DialogTitle>
         <DialogContent>
@@ -1098,7 +1128,7 @@ export default function MachineSalesPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 🗑️ Bulk Delete Dialog */}
+      {/* Bulk Delete Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Bulk Delete Selected Sales Records</DialogTitle>
         <DialogContent>
@@ -1117,7 +1147,7 @@ export default function MachineSalesPage() {
       {/* Add New Machine Model Dialog */}
       <Dialog open={newModelDialogOpen} onClose={() => setNewModelDialogOpen(false)} maxWidth="xs" fullWidth>
         <form onSubmit={handleAddNewModelSubmit}>
-          <DialogTitle sx={{ fontWeight: 700 }}>⚙️ Add New Machine Model</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Add New Machine Model</DialogTitle>
           <DialogContent>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
               Add a new machine model to your master catalog dropdown list for quick invoice generation.
@@ -1141,7 +1171,7 @@ export default function MachineSalesPage() {
         </form>
       </Dialog>
 
-      {/* 📄 Printable Machine Sale Invoice Dialog */}
+      {/* Printable Machine Sale Invoice Dialog */}
       <Dialog open={printModalOpen} onClose={() => setPrintModalOpen(false)} maxWidth="md" fullWidth>
         <style>
           {`
@@ -1188,7 +1218,7 @@ export default function MachineSalesPage() {
         </style>
 
         <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>📄 Official Customer Machine Sale Invoice</Typography>
+          <Typography variant="h5" fontWeight={700}>Official Customer Machine Sale Invoice</Typography>
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 

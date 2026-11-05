@@ -365,7 +365,7 @@ export default function AppSecurityPage() {
                   {formData.contactPerson || 'Software Developer'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#e2e8f0', fontWeight: 600 }}>
-                  📞 {formData.contactPhone}
+                  {formData.contactPhone}
                 </Typography>
               </Box>
 
@@ -386,7 +386,7 @@ export default function AppSecurityPage() {
       {/* Confirmation Dialog: LOCK */}
       <Dialog open={confirmLockOpen} onClose={() => setConfirmLockOpen(false)} maxWidth="xs">
         <DialogTitle sx={{ color: 'error.main', fontWeight: 700 }}>
-          ⚠️ Confirm Remote Lock
+          Confirm Remote Lock
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -406,7 +406,7 @@ export default function AppSecurityPage() {
       {/* Confirmation Dialog: UNLOCK */}
       <Dialog open={confirmUnlockOpen} onClose={() => setConfirmUnlockOpen(false)} maxWidth="xs">
         <DialogTitle sx={{ color: 'success.main', fontWeight: 700 }}>
-          ✅ Confirm Remote Unlock
+          Confirm Remote Unlock
         </DialogTitle>
         <DialogContent>
           <DialogContentText>

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import { useDebounce } from 'hooks/useDebounce';
 import CeoSignature from 'components/CeoSignature';
@@ -28,6 +28,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -120,6 +121,23 @@ export default function MachineRepairsPage() {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState('All');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
 
   // Available Specifications / Parts list for auto-complete
   const availablePartNames = Array.from(
@@ -1150,7 +1168,9 @@ const STATUS_DESCRIPTIONS = {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRepairs.map((repair) => {
+                filteredRepairs
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((repair) => {
                   const isItemSelected = isSelected(repair.id);
                   const itemsList = repair.repairItems && Array.isArray(repair.repairItems) ? repair.repairItems : [];
                   const displayedParts = itemsList.slice(0, 3);
@@ -1401,6 +1421,16 @@ const STATUS_DESCRIPTIONS = {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredRepairs.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </MainCard>
 
       {/* EDIT DRAWER */}

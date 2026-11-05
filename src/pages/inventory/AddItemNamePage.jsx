@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -24,6 +24,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -44,6 +45,23 @@ export default function AddItemNamePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, selectedCategory]);
 
   // Category options list from StoreInventoryContext
   const categoryOptions = Array.from(
@@ -202,7 +220,7 @@ export default function AddItemNamePage() {
       {/* Description Banner */}
       <Box sx={{ p: 2, mb: 3, bgcolor: 'primary.lighter', borderRadius: 1, border: '1px dashed', borderColor: 'primary.main' }}>
         <Typography variant="subtitle2" color="primary.main" fontWeight={700}>
-          💡 Quick Setup: Master Item Names
+          Quick Setup: Master Item Names
         </Typography>
         <Typography variant="caption" color="textSecondary">
           Yahan aap apne factory store ke items ke naam 1 dafa save kar lein. Jab aap store mein naya item add karenge ya stock receive/issue karenge to aapko baar baar naam type nahi karna parega!
@@ -286,7 +304,9 @@ export default function AddItemNamePage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredMasterNames.map((master) => {
+              filteredMasterNames
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((master) => {
                 const isMasterSelected = isSelected(master.id);
                 const countUsed = items.filter((i) => i.name.toLowerCase() === master.name.toLowerCase()).length;
 
@@ -365,11 +385,21 @@ export default function AddItemNamePage() {
         </Table>
       </TableContainer>
 
+      <TablePagination
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        component="div"
+        count={filteredMasterNames.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
+
       {/* Drawer 1: Add New Master Item Name (7 Inputs) */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 2.5 }}>
-            ➕ Add Master Item Name
+            Add Master Item Name
           </Typography>
 
           <form onSubmit={handleAddSubmit}>
@@ -625,7 +655,7 @@ export default function AddItemNamePage() {
       {/* Modal 3: Confirm Single Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete Item Name Confirmation
+          Delete Item Name Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -645,7 +675,7 @@ export default function AddItemNamePage() {
       {/* Modal 4: Confirm Bulk Delete Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete All Selected Item Names Confirmation
+          Delete All Selected Item Names Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>

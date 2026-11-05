@@ -300,7 +300,7 @@ export default function ItemsPage() {
   return (
     <Box>
       {/* 1. TOP SECTION: Add New Store Inventory Item Card */}
-      <MainCard title="➕ Add New Store Inventory Item" sx={{ mb: 3 }}>
+      <MainCard title="Add New Store Inventory Item" sx={{ mb: 3 }}>
         <form onSubmit={handleAddItemSubmit} onKeyDown={handleFormKeyDown}>
           <Box
             sx={{
@@ -695,7 +695,7 @@ export default function ItemsPage() {
 
       {/* Modal 1: Stock Out */}
       <Dialog open={stockOutOpen} onClose={() => setStockOutOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📤 Stock Out (Usage): {targetItem?.name}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Stock Out (Usage): {targetItem?.name}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
@@ -749,7 +749,7 @@ export default function ItemsPage() {
 
       {/* Modal 2: Stock In */}
       <Dialog open={stockInOpen} onClose={() => setStockInOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📥 Stock In: {targetItem?.name}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Stock In: {targetItem?.name}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
@@ -922,7 +922,7 @@ export default function ItemsPage() {
       {/* Modal 5: Confirm Single Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete Item Confirmation
+          Delete Item Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -942,7 +942,7 @@ export default function ItemsPage() {
       {/* Modal 6: Confirm Bulk Delete Multiple Items Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          🗑️ Delete All Selected Items Confirmation
+          Delete All Selected Items Confirmation
         </DialogTitle>
         <DialogContent>
           <DialogContentText>

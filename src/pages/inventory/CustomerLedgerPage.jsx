@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CeoSignature from 'components/CeoSignature';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -10,6 +10,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Dialog from '@mui/material/Dialog';
@@ -74,6 +75,23 @@ export default function CustomerLedgerPage() {
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // Expand Customer Invoices Row State
   const [expandedCustomer, setExpandedCustomer] = useState(null);
@@ -504,7 +522,9 @@ export default function CustomerLedgerPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((cust, idx) => {
+                filteredCustomers
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((cust, idx) => {
                   const isExpanded = expandedCustomer === cust.customerName;
 
                   return (
@@ -592,7 +612,7 @@ export default function CustomerLedgerPage() {
                           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                             <Box sx={{ margin: 2, p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f1f5f9'), borderRadius: 2, border: '1px solid #cbd5e1' }}>
                               <Typography variant="subtitle2" fontWeight={800} color="primary.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                📄 Customer Transactions & Invoices Breakdown ({cust.invoices.length})
+                                Customer Transactions & Invoices Breakdown ({cust.invoices.length})
                               </Typography>
                               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5 }}>
                                 <Table size="small">
@@ -731,6 +751,16 @@ export default function CustomerLedgerPage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredCustomers.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </MainCard>
 
       {/* RECORD CUSTOMER PAYMENT MODAL */}
@@ -943,7 +973,7 @@ export default function CustomerLedgerPage() {
         </style>
 
         <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>📄 Customer Account Ledger Statement</Typography>
+          <Typography variant="h5" fontWeight={700}>Customer Account Ledger Statement</Typography>
           <Chip label="Statement Receipt" color="success" size="small" />
         </DialogTitle>
 
@@ -1047,7 +1077,7 @@ export default function CustomerLedgerPage() {
       <Drawer anchor="right" open={editInvoiceDrawerOpen} onClose={() => setEditInvoiceDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 620 }, p: { xs: 2, sm: 3 } }}>
           <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-            ✏️ Edit Machine Sale Record
+            Edit Machine Sale Record
           </Typography>
           {editingInvoice && (() => {
             const editItemsList = editingInvoice.items && editingInvoice.items.length > 0 ? editingInvoice.items : [
@@ -1333,7 +1363,7 @@ export default function CustomerLedgerPage() {
         </style>
 
         <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>📄 Official Customer Machine Sale Invoice</Typography>
+          <Typography variant="h5" fontWeight={700}>Official Customer Machine Sale Invoice</Typography>
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 
@@ -1516,7 +1546,7 @@ export default function CustomerLedgerPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 📄 PRINT REPAIR JOB CARD INVOICE RECEIPT MODAL */}
+      {/* PRINT REPAIR JOB CARD INVOICE RECEIPT MODAL */}
       <Dialog open={printRepairModalOpen} onClose={() => setPrintRepairModalOpen(false)} maxWidth="md" fullWidth>
         <style>
           {`
@@ -1563,7 +1593,7 @@ export default function CustomerLedgerPage() {
         </style>
 
         <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>📄 Machine Repairing Job Card Invoice Receipt</Typography>
+          <Typography variant="h5" fontWeight={700}>Machine Repairing Job Card Invoice Receipt</Typography>
           <Chip label="Repair Receipt" color="success" size="small" />
         </DialogTitle>
 

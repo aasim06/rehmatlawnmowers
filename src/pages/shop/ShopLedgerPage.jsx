@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import { useTheme } from '@mui/material/styles';
 
@@ -22,6 +22,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography
@@ -55,6 +56,23 @@ export default function ShopLedgerPage() {
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedPerson, setExpandedPerson] = useState(null);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // Factory Reset Dialog State
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -302,7 +320,9 @@ export default function ShopLedgerPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPersons.map((person) => {
+                filteredPersons
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((person) => {
                   const isExpanded = expandedPerson === person.key;
 
                   return (
@@ -409,6 +429,16 @@ export default function ShopLedgerPage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredPersons.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </MainCard>
 
       {/* 5. PRINT OFFICIAL PERSON ISSUE STATEMENT DIALOG */}
@@ -615,7 +645,7 @@ export default function ShopLedgerPage() {
       {/* Confirm Reset Dialog */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
         <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
-          ⚠️ Confirm Factory Reset Shop Data?
+          Confirm Factory Reset Shop Data?
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

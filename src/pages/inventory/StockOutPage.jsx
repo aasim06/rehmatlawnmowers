@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import CeoSignature from 'components/CeoSignature';
 
@@ -28,6 +28,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -48,6 +49,23 @@ export default function StockOutPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, selectedCategory]);
   const itemSelectRef = useRef(null);
   const qtyRef = useRef(null);
 
@@ -88,7 +106,7 @@ export default function StockOutPage() {
   // Send Alert / Request to Admin State
   const [notifDialogOpen, setNotifDialogOpen] = useState(false);
   const [notifForm, setNotifForm] = useState({
-    type: '⚠️ Low Stock Reorder Alert',
+    type: 'Low Stock Reorder Alert',
     message: ''
   });
   const [notifSuccess, setNotifSuccess] = useState(false);
@@ -111,7 +129,7 @@ export default function StockOutPage() {
     setTimeout(() => {
       setNotifSuccess(false);
       setNotifDialogOpen(false);
-      setNotifForm({ type: '⚠️ Low Stock Reorder Alert', message: '' });
+      setNotifForm({ type: 'Low Stock Reorder Alert', message: '' });
     }, 1000);
   };
 
@@ -741,7 +759,9 @@ export default function StockOutPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  stockOutLogs.map((log) => {
+                  stockOutLogs
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((log) => {
                     const isItemSelected = isSelected(log.id);
 
                     return (
@@ -814,6 +834,16 @@ export default function StockOutPage() {
               </TableBody>
             </Table>
           </TableContainer>
+
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={stockOutLogs.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </Box>
       </MainCard>
 
@@ -821,7 +851,7 @@ export default function StockOutPage() {
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: 440, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
-            ✏️ Edit Stock Out Record
+            Edit Stock Out Record
           </Typography>
 
           {editingLog && (
@@ -926,7 +956,7 @@ export default function StockOutPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 📄 Print Invoice Receipt Modal Dialog */}
+      {/* Print Invoice Receipt Modal Dialog */}
       <Dialog open={printModalOpen} onClose={handleClosePrintModal} maxWidth="md" fullWidth>
         <style>
           {`
@@ -973,7 +1003,7 @@ export default function StockOutPage() {
         </style>
 
         <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>📄 Stock Out Sales Invoice & Statement</Typography>
+          <Typography variant="h5" fontWeight={700}>Stock Out Sales Invoice & Statement</Typography>
           <Chip label={printData?.type || 'Stock Out Receipt'} color="success" size="small" />
         </DialogTitle>
 
@@ -1157,7 +1187,7 @@ export default function StockOutPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 📨 SEND ALERT / REQUEST TO SUPER ADMIN DIALOG */}
+      {/* SEND ALERT / REQUEST TO SUPER ADMIN DIALOG */}
       <Dialog open={notifDialogOpen} onClose={() => setNotifDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
           <SendOutlined style={{ color: '#fa8c16' }} /> Send Alert / Request to Admin
@@ -1180,10 +1210,10 @@ export default function StockOutPage() {
                 value={notifForm.type}
                 onChange={(e) => setNotifForm({ ...notifForm, type: e.target.value })}
               >
-                <MenuItem value="⚠️ Low Stock Reorder Alert">⚠️ Low Stock Reorder Alert</MenuItem>
-                <MenuItem value="📦 Stock Out / Issuance Note">📦 Stock Out / Issuance Note</MenuItem>
-                <MenuItem value="📝 Urgent Purchase Order Request">📝 Urgent Purchase Order Request</MenuItem>
-                <MenuItem value="💬 General Note / Alert to Admin">💬 General Note / Alert to Admin</MenuItem>
+                <MenuItem value="Low Stock Reorder Alert">Low Stock Reorder Alert</MenuItem>
+                <MenuItem value="Stock Out / Issuance Note">Stock Out / Issuance Note</MenuItem>
+                <MenuItem value="Urgent Purchase Order Request">Urgent Purchase Order Request</MenuItem>
+                <MenuItem value="General Note / Alert to Admin">General Note / Alert to Admin</MenuItem>
               </TextField>
 
               <TextField

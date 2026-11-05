@@ -26,6 +26,7 @@ import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
 import IconButton from 'components/@extended/IconButton';
 import { useAuth } from 'context/AuthContext';
+import usePermission from 'hooks/usePermission';
 
 // assets
 import LogoutOutlined from '@ant-design/icons/LogoutOutlined';
@@ -43,6 +44,7 @@ export default function Profile() {
   const theme = useTheme();
   const navigate = useNavigate();
   const { user, logout, switchUserRole } = useAuth();
+  const { hasAccessToItem, isSuperAdmin } = usePermission();
 
   const anchorRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -230,20 +232,22 @@ export default function Profile() {
 
                   {/* Clean ERP Navigation Quick Links */}
                   <List component="nav" sx={{ p: 0.75, '& .MuiListItemIcon-root': { minWidth: 32 } }}>
-                    <ListItemButton
-                      sx={{ borderRadius: 1.5, py: 0.75 }}
-                      onClick={() => {
-                        navigate('/dashboard/default');
-                        setOpen(false);
-                      }}
-                    >
-                      <ListItemIcon>
-                        <DashboardOutlined style={{ fontSize: 16 }} />
-                      </ListItemIcon>
-                      <ListItemText primary={<Typography variant="body2" fontWeight={600}>Main Dashboard</Typography>} />
-                    </ListItemButton>
+                    {hasAccessToItem({ id: 'dashboard' }) && (
+                      <ListItemButton
+                        sx={{ borderRadius: 1.5, py: 0.75 }}
+                        onClick={() => {
+                          navigate('/dashboard/default');
+                          setOpen(false);
+                        }}
+                      >
+                        <ListItemIcon>
+                          <DashboardOutlined style={{ fontSize: 16 }} />
+                        </ListItemIcon>
+                        <ListItemText primary={<Typography variant="body2" fontWeight={600}>Main Dashboard</Typography>} />
+                      </ListItemButton>
+                    )}
 
-                    {userRole === 'Super Admin' && (
+                    {isSuperAdmin && (
                       <ListItemButton
                         sx={{ borderRadius: 1.5, py: 0.75 }}
                         onClick={() => {
@@ -258,18 +262,20 @@ export default function Profile() {
                       </ListItemButton>
                     )}
 
-                    <ListItemButton
-                      sx={{ borderRadius: 1.5, py: 0.75 }}
-                      onClick={() => {
-                        navigate('/inventory/backup-restore');
-                        setOpen(false);
-                      }}
-                    >
-                      <ListItemIcon>
-                        <CloudSyncOutlined style={{ fontSize: 16 }} />
-                      </ListItemIcon>
-                      <ListItemText primary={<Typography variant="body2" fontWeight={600}>Data Backup & Cloud</Typography>} />
-                    </ListItemButton>
+                    {hasAccessToItem({ id: 'backup-restore' }) && (
+                      <ListItemButton
+                        sx={{ borderRadius: 1.5, py: 0.75 }}
+                        onClick={() => {
+                          navigate('/inventory/backup-restore');
+                          setOpen(false);
+                        }}
+                      >
+                        <ListItemIcon>
+                          <CloudSyncOutlined style={{ fontSize: 16 }} />
+                        </ListItemIcon>
+                        <ListItemText primary={<Typography variant="body2" fontWeight={600}>Data Backup & Cloud</Typography>} />
+                      </ListItemButton>
+                    )}
                   </List>
 
                   <Divider />

@@ -882,7 +882,7 @@ export default function ShopAddProductPage() {
       {/* ── FACTORY RESET CONFIRMATION DIALOG ── */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
         <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
-          ⚠️ Confirm Factory Reset Shop Data?
+          Confirm Factory Reset Shop Data?
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

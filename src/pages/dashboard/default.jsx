@@ -192,7 +192,7 @@ export default function DashboardDefault() {
               </Button>
             }
           >
-            ⚠️ Low Stock Warning: {lowStockAlerts.length} raw material spare parts are below minimum threshold! Reorder soon to prevent machine production delays.
+            Low Stock Warning: {lowStockAlerts.length} raw material spare parts are below minimum threshold! Reorder soon to prevent machine production delays.
           </Alert>
         </Grid>
       )}
@@ -466,7 +466,7 @@ export default function DashboardDefault() {
 
       {/* DIALOG 1: Issue Item / Store OUT */}
       <Dialog open={issueDialogOpen} onClose={() => setIssueDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📤 Issue Inventory Item (Store OUT)</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Issue Inventory Item (Store OUT)</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <FormControl fullWidth>
@@ -527,7 +527,7 @@ export default function DashboardDefault() {
 
       {/* DIALOG 2: Receive Stock / Store IN */}
       <Dialog open={receiveDialogOpen} onClose={() => setReceiveDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📦 Receive Stock Shipment (Store IN)</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Receive Stock Shipment (Store IN)</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <FormControl fullWidth>
