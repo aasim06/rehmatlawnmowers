@@ -4,6 +4,7 @@ import CeoSignature from 'components/CeoSignature';
 
 // material-ui
 import {
+  Alert,
   Autocomplete,
   Box,
   Button,
@@ -24,6 +25,7 @@ import {
   OutlinedInput,
   Paper,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -31,6 +33,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tabs,
   TextField,
   Tooltip,
   Typography
@@ -51,7 +54,9 @@ import {
   RightOutlined,
   ShopOutlined,
   FolderOutlined,
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  CheckOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 
 // project imports
@@ -82,9 +87,12 @@ export default function StockInPage() {
   useEffect(() => {
     setPage(0);
   }, [searchTerm, selectedCategory]);
+  const vendorRef = useRef(null);
   const itemSelectRef = useRef(null);
+  const categoryRef = useRef(null);
   const qtyRef = useRef(null);
   const priceRef = useRef(null);
+  const discountRef = useRef(null);
 
   // Vendor options list (Only from real Vendors & Parties added by user)
   const vendorList = (vendors || []).map((v) => v.name).filter(Boolean);
@@ -96,6 +104,37 @@ export default function StockInPage() {
       ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
     ])
   );
+
+  // Active Tab State: 0 = Stock In Entry, 1 = Stock In History (Receiving Logs)
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Current Stock In Invoice Session (Voucher and Items for Pic 2 Table)
+  const [currentVoucherNo, setCurrentVoucherNo] = useState(() => {
+    try {
+      return localStorage.getItem('current_stock_in_voucher_no') || ('SKU-' + Math.floor(10000000 + Math.random() * 90000000));
+    } catch {
+      return 'SKU-' + Math.floor(10000000 + Math.random() * 90000000);
+    }
+  });
+
+  const [currentInvoiceItems, setCurrentInvoiceItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('current_stock_in_session_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Keep Session in localStorage so it persists safely
+  useEffect(() => {
+    try {
+      localStorage.setItem('current_stock_in_session_items', JSON.stringify(currentInvoiceItems));
+      localStorage.setItem('current_stock_in_voucher_no', currentVoucherNo);
+    } catch (e) {
+      console.warn('Could not save session to localStorage', e);
+    }
+  }, [currentInvoiceItems, currentVoucherNo]);
 
   // Add Drawer Form State
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -109,6 +148,20 @@ export default function StockInPage() {
     discount: 0,
     imageUrl: ''
   });
+
+  // Auto-focus Item Select (or Vendor) on initial mount or tab change
+  useEffect(() => {
+    if (activeTab === 0) {
+      const timer = setTimeout(() => {
+        if (!form.vendor && vendorRef.current) {
+          vendorRef.current.focus();
+        } else if (itemSelectRef.current) {
+          itemSelectRef.current.focus();
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
 
   // Cash Payment Popup State (Triggered on "+ Save Stock In Invoice")
   const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
@@ -197,7 +250,7 @@ export default function StockInPage() {
     }
   };
 
-  // Add Quick Item to Table below (triggered when pressing Enter on QTY field)
+  // Add Quick Item to Table below (triggered when pressing Enter on QTY / Bill field or clicking Add)
   const handleQuickAddToList = async () => {
     if (!form.itemName.trim()) return;
 
@@ -207,12 +260,15 @@ export default function StockInPage() {
     const priceVal = qtyVal > 0 ? (billVal / qtyVal) : billVal;
     const discountVal = parseFloat(form.discount) || 0;
     const netTotal = Math.max(0, billVal - discountVal);
-    const poCode = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
+    const poCode = currentVoucherNo || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const activeVendor = form.vendor || (vendorList[0] || 'Market');
 
+    let createdCode = matchedItem?.itemCode || '';
     if (matchedItem) {
-      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal, form.category || matchedItem.category || 'General', form.imageUrl || matchedItem.imageUrl || '');
+      await receiveStock(matchedItem, qtyVal, activeVendor, poCode, priceVal, form.category || matchedItem.category || 'General', form.imageUrl || matchedItem.imageUrl || '', { biltyNo: '' });
     } else {
       const newCode = isShop ? `SHP-${Math.floor(100 + Math.random() * 900)}` : `RM-${Math.floor(100 + Math.random() * 900)}`;
+      createdCode = newCode;
       const createdItem = await addNewItem({
         name: form.itemName.trim(),
         itemCode: newCode,
@@ -225,8 +281,23 @@ export default function StockInPage() {
         rackLocation: isShop ? 'Shop Counter' : 'Main Store',
         imageUrl: form.imageUrl || ''
       });
-      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal, form.category || 'General', form.imageUrl || '');
+      await receiveStock(createdItem || newCode, qtyVal, activeVendor, poCode, priceVal, form.category || 'General', form.imageUrl || '', { biltyNo: '' });
     }
+
+    const newItemEntry = {
+      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      itemName: form.itemName.trim(),
+      itemCode: createdCode || matchedItem?.itemCode || poCode,
+      category: form.category || matchedItem?.category || 'General',
+      qtyUsed: qtyVal,
+      unitPrice: priceVal,
+      lineTotal: netTotal,
+      vendor: activeVendor,
+      poCode: poCode,
+      time: new Date().toLocaleString()
+    };
+
+    setCurrentInvoiceItems((prev) => [...prev, newItemEntry]);
 
     setForm((prev) => ({
       ...prev,
@@ -246,29 +317,81 @@ export default function StockInPage() {
     }, 50);
   };
 
-  // Mouse Click Handler on Green "+ Save Stock In Invoice" Button (Adds item & opens Print Invoice Modal directly)
+  // Mouse Click Handler on Green "+ Save Stock In Invoice" / "Update Stock In" Button
   const handleSaveButtonClick = async () => {
-    const qtyVal = parseInt(form.qty) || 1;
-    const billVal = form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : (qtyVal * (parseFloat(form.unitPrice) || 0));
-    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : billVal;
-    const discountVal = parseFloat(form.discount) || 0;
-    const netTotal = Math.max(0, billVal - discountVal);
-    const activeVendor = form.vendor || stockInLogs[0]?.usedBy || 'Vendor Shipment';
-
-    if (form.itemName.trim()) {
-      await handleQuickAddToList();
+    if (editingLog) {
+      await handleUpdateSubmit();
+      return;
     }
 
+    let updatedSessionItems = [...currentInvoiceItems];
+    if (form.itemName.trim()) {
+      const matchedItem = items.find((i) => i.name.toLowerCase() === form.itemName.trim().toLowerCase());
+      const qtyVal = parseInt(form.qty) || 1;
+      const billVal = form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : (qtyVal * (parseFloat(form.unitPrice) || 0));
+      const priceVal = qtyVal > 0 ? (billVal / qtyVal) : billVal;
+      const discountVal = parseFloat(form.discount) || 0;
+      const netTotal = Math.max(0, billVal - discountVal);
+      const poCode = currentVoucherNo || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
+      const activeVendor = form.vendor || (vendorList[0] || 'Market');
+
+      let createdCode = matchedItem?.itemCode || '';
+      if (matchedItem) {
+        await receiveStock(matchedItem, qtyVal, activeVendor, poCode, priceVal, form.category || matchedItem.category || 'General', form.imageUrl || matchedItem.imageUrl || '', { biltyNo: '' });
+      } else {
+        const newCode = isShop ? `SHP-${Math.floor(100 + Math.random() * 900)}` : `RM-${Math.floor(100 + Math.random() * 900)}`;
+        createdCode = newCode;
+        const createdItem = await addNewItem({
+          name: form.itemName.trim(),
+          itemCode: newCode,
+          category: form.category || 'General',
+          unit: 'PCS',
+          totalStock: 0,
+          minLevel: 10,
+          unitPrice: priceVal,
+          totalBillAmount: billVal,
+          rackLocation: isShop ? 'Shop Counter' : 'Main Store',
+          imageUrl: form.imageUrl || ''
+        });
+        await receiveStock(createdItem || newCode, qtyVal, activeVendor, poCode, priceVal, form.category || 'General', form.imageUrl || '', { biltyNo: '' });
+      }
+
+      const newItemEntry = {
+        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        itemName: form.itemName.trim(),
+        itemCode: createdCode || matchedItem?.itemCode || poCode,
+        category: form.category || matchedItem?.category || 'General',
+        qtyUsed: qtyVal,
+        unitPrice: priceVal,
+        lineTotal: netTotal,
+        vendor: activeVendor,
+        poCode: poCode,
+        time: new Date().toLocaleString()
+      };
+
+      updatedSessionItems.push(newItemEntry);
+      setCurrentInvoiceItems(updatedSessionItems);
+
+      setForm((prev) => ({
+        ...prev,
+        itemName: '',
+        qty: 1,
+        unitPrice: 0,
+        totalBillAmount: '',
+        discount: 0,
+        imageUrl: ''
+      }));
+    }
+
+    const activeVendor = form.vendor || updatedSessionItems[0]?.vendor || (vendorList[0] || 'Market');
+    const grandTotal = updatedSessionItems.reduce((acc, curr) => acc + (Number(curr.lineTotal) || 0), 0);
+
     setPrintData({
-      id: `PO-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: currentVoucherNo,
       type: 'Stock In (Receiving Invoice)',
       vendor: activeVendor,
-      itemName: form.itemName,
-      qty: qtyVal,
-      unitPrice: priceVal,
-      totalBillAmount: billVal,
-      discount: discountVal,
-      lineTotal: netTotal,
+      items: updatedSessionItems,
+      lineTotal: grandTotal,
       time: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     });
 
@@ -366,6 +489,17 @@ export default function StockInPage() {
       });
     }
 
+    // Also update current active session items
+    setCurrentInvoiceItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        amountPaid: totalPaidCombined,
+        remainingBalance: remaining,
+        biltyNo: paymentPopupData.biltyNo || '',
+        paymentMethod: paymentPopupData.paymentMethod || 'Cash'
+      }))
+    );
+
     setPaymentPopupOpen(false);
 
     if (shouldPrint) {
@@ -385,17 +519,20 @@ export default function StockInPage() {
   };
 
   // Open Print Modal for Row Log
-  const handleOpenPrint = (log) => {
+  const handleOpenPrint = (log, groupItems = null) => {
+    const itemsList = groupItems && groupItems.length > 0 ? groupItems : [log];
+    const grandTotal = itemsList.reduce((sum, it) => sum + (it.lineTotal || (it.qtyUsed * (it.unitPrice || 0))), 0);
     setPrintData({
       id: log.itemCode || `INV-${log.id}`,
       type: 'Stock In Receipt',
       vendor: log.usedBy || 'Vendor',
       biltyNo: log.biltyNo || '',
       receivedDate: log.time || '',
+      items: itemsList,
       itemName: log.itemName,
       qty: log.qtyUsed,
       unitPrice: log.unitPrice || 0,
-      lineTotal: log.lineTotal || log.qtyUsed * (log.unitPrice || 0),
+      lineTotal: grandTotal,
       amountPaid: log.amountPaid,
       remainingBalance: log.remainingBalance,
       paymentMethod: log.paymentMethod || 'Cash',
@@ -419,40 +556,185 @@ export default function StockInPage() {
     window.print();
   };
 
-  // Open Edit Drawer
+  // Open Edit in Main Stock In Form (Switches Tab to 0 and pre-fills form)
   const handleOpenEdit = (log) => {
     const qty = Number(log.qtyUsed) || 1;
     const unitPrice = Number(log.unitPrice) || 0;
     const totalBill = log.lineTotal !== undefined ? log.lineTotal : (qty * unitPrice);
 
-    setEditingLog({
-      ...log,
-      vendor: log.usedBy || vendorList[0],
+    setEditingLog(log);
+    setForm({
+      vendor: log.usedBy || log.vendor || log.department || vendorList[0] || '',
+      itemName: log.itemName || '',
+      category: log.category || 'General',
       qty: qty,
       unitPrice: unitPrice,
       totalBillAmount: Math.round(totalBill * 100) / 100,
-      biltyNo: log.biltyNo || ''
+      discount: log.discount || 0,
+      imageUrl: log.imageUrl || ''
     });
-    setEditDrawerOpen(true);
+
+    setActiveTab(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      if (qtyRef.current) {
+        qtyRef.current.focus();
+        qtyRef.current.select();
+      }
+    }, 150);
   };
 
-  // Edit Submit Handler
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
+  // Submit Update for Line Item
+  const handleUpdateSubmit = async () => {
     if (!editingLog) return;
-    const qtyVal = parseInt(editingLog.qty) || 1;
-    const billVal = parseFloat(editingLog.totalBillAmount) || 0;
-    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : (parseFloat(editingLog.unitPrice) || 0);
+    const qtyVal = parseInt(form.qty) || 1;
+    const billVal = parseFloat(form.totalBillAmount) || 0;
+    const priceVal = qtyVal > 0 ? (billVal / qtyVal) : (parseFloat(form.unitPrice) || 0);
+    const discountVal = parseFloat(form.discount) || 0;
+    const netTotal = Math.max(0, billVal - discountVal);
 
     await updateLog(editingLog.id, {
-      itemName: editingLog.itemName,
-      usedBy: editingLog.vendor,
+      itemName: form.itemName,
+      usedBy: form.vendor,
+      category: form.category || 'General',
       qtyUsed: qtyVal,
       unitPrice: priceVal,
-      lineTotal: billVal > 0 ? billVal : (qtyVal * priceVal),
-      biltyNo: (editingLog.biltyNo || '').trim()
+      lineTotal: netTotal,
+      discount: discountVal,
+      imageUrl: form.imageUrl || ''
     });
-    setEditDrawerOpen(false);
+
+    // Also update in currentInvoiceItems if present
+    setCurrentInvoiceItems((prev) =>
+      prev.map((it) =>
+        it.id === editingLog.id
+          ? {
+              ...it,
+              itemName: form.itemName,
+              qtyUsed: qtyVal,
+              unitPrice: priceVal,
+              lineTotal: netTotal,
+              category: form.category || 'General',
+              vendor: form.vendor
+            }
+          : it
+      )
+    );
+
+    setEditingLog(null);
+    setForm((prev) => ({
+      vendor: prev.vendor,
+      itemName: '',
+      category: 'General',
+      qty: 1,
+      totalBillAmount: '',
+      unitPrice: 0,
+      discount: 0,
+      imageUrl: ''
+    }));
+
+    setTimeout(() => {
+      if (itemSelectRef.current) {
+        itemSelectRef.current.focus();
+      }
+    }, 50);
+  };
+
+  // Cancel Edit
+  const handleCancelEdit = () => {
+    setEditingLog(null);
+    setForm((prev) => ({
+      ...prev,
+      itemName: '',
+      category: 'General',
+      qty: 1,
+      totalBillAmount: '',
+      unitPrice: 0,
+      discount: 0,
+      imageUrl: ''
+    }));
+  };
+
+  // Session / Pic 2 Table Item Handlers
+  const handleEditSessionItem = (item) => {
+    handleOpenEdit(item);
+  };
+
+  const handleDeleteSessionItem = (itemId) => {
+    const matchedLog = usageLogs.find((l) => l.id === itemId);
+    if (matchedLog) {
+      deleteLog(itemId);
+    }
+    setCurrentInvoiceItems((prev) => prev.filter((it) => it.id !== itemId));
+  };
+
+  const handleStartNewInvoice = () => {
+    const newVoucher = 'SKU-' + Math.floor(10000000 + Math.random() * 90000000);
+    setCurrentVoucherNo(newVoucher);
+    setCurrentInvoiceItems([]);
+    try {
+      localStorage.removeItem('current_stock_in_session_items');
+      localStorage.removeItem('current_stock_in_voucher_no');
+    } catch (e) {
+      console.warn(e);
+    }
+    setEditingLog(null);
+    setForm((prev) => ({
+      ...prev,
+      itemName: '',
+      qty: 1,
+      totalBillAmount: '',
+      unitPrice: 0,
+      discount: 0,
+      imageUrl: ''
+    }));
+  };
+
+  const handlePrintCurrentInvoice = () => {
+    const activeVendor = form.vendor || currentInvoiceItems[0]?.vendor || (vendorList[0] || 'Market');
+    const grandTotal = currentInvoiceItems.reduce((acc, curr) => acc + (Number(curr.lineTotal) || 0), 0);
+    setPrintData({
+      id: currentVoucherNo,
+      type: 'Stock In (Receiving Invoice)',
+      vendor: activeVendor,
+      items: currentInvoiceItems,
+      lineTotal: grandTotal,
+      time: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    });
+    setPrintModalOpen(true);
+  };
+
+  // Open Cash Payment Popup for Current Live Invoice
+  const handleOpenPaymentPopupForCurrentInvoice = () => {
+    const targetVendor = (form.vendor || currentInvoiceItems[0]?.vendor || (vendorList[0] || 'Market')).trim();
+    const grandTotal = currentInvoiceItems.reduce((acc, curr) => acc + (Number(curr.lineTotal) || 0), 0);
+
+    // Look up ALL payments recorded for this vendor
+    const matchingPayments = vendorPayments.filter(
+      (p) => (p.vendorName || '').trim().toLowerCase() === targetVendor.toLowerCase()
+    );
+    const sumAlreadyPaid = matchingPayments.reduce(
+      (sum, p) => sum + (parseFloat(p.amountPaid) || 0),
+      0
+    );
+
+    const invoicePaidVal = currentInvoiceItems.reduce((max, it) => Math.max(max, parseFloat(it.amountPaid) || 0), 0);
+    const paidVal = matchingPayments.length > 0 ? sumAlreadyPaid : invoicePaidVal;
+    const currentRemaining = Math.max(0, grandTotal - paidVal);
+
+    setPaymentPopupData({
+      logId: currentVoucherNo,
+      vendor: targetVendor,
+      items: currentInvoiceItems,
+      totalAmount: grandTotal,
+      alreadyPaid: paidVal,
+      cashPaid: currentRemaining > 0 ? String(currentRemaining) : '',
+      paymentMethod: 'Cash',
+      biltyNo: '',
+      notes: '',
+      itemsCount: currentInvoiceItems.length
+    });
+    setPaymentPopupOpen(true);
   };
 
   // Single Delete Handlers
@@ -646,56 +928,158 @@ export default function StockInPage() {
   const lineTotal = Math.max(0, (form.totalBillAmount !== undefined && form.totalBillAmount !== '' ? (parseFloat(form.totalBillAmount) || 0) : ((parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0))) - (parseFloat(form.discount) || 0));
 
   return (
-    <Stack spacing={3}>
-      {/* 1. TOP SECTION: Record Stock In Form Card */}
-      <MainCard
-        title={isShop ? "Shop - Record Stock In (Receiving Invoice)" : "Record Stock In (Receiving Invoice)"}
-        sx={{
-          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
-          borderRadius: 2
-        }}
-      >
-        <form onSubmit={(e) => { e.preventDefault(); handleQuickAddToList(); }}>
-          <Grid container spacing={2.5} alignItems="center">
-            {/* ROW 1: Vendor, Item Select, Category, Image */}
-            {/* 1. SELECT VENDOR / SUPPLIER */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Autocomplete
-                freeSolo
-                options={vendorList}
-                value={form.vendor}
-                onChange={(event, newValue) => {
-                  const val = typeof newValue === 'string' ? newValue : (newValue || '');
-                  setForm((prev) => ({ ...prev, vendor: val }));
-                }}
-                onInputChange={(event, newInputValue) => {
-                  setForm((prev) => ({ ...prev, vendor: newInputValue }));
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px',
-                    py: 0
-                  }
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="SELECT VENDOR / SUPPLIER *"
-                    required
-                    placeholder="Select or Type Vendor"
+    <Stack spacing={2.5}>
+      {/* TABS NAVIGATION */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, val) => setActiveTab(val)}
+          aria-label="Stock In Navigation Tabs"
+          textColor="primary"
+          indicatorColor="primary"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              minHeight: 48,
+              px: { xs: 1.5, sm: 3 }
+            }
+          }}
+        >
+          <Tab
+            icon={<ImportOutlined style={{ fontSize: '1.1rem' }} />}
+            iconPosition="start"
+            label="Stock In (Receiving Invoice)"
+          />
+          <Tab
+            icon={<FolderOpenOutlined style={{ fontSize: '1.1rem' }} />}
+            iconPosition="start"
+            label={`Stock In History (Receiving Logs) (${stockInLogs.length})`}
+          />
+        </Tabs>
+      </Box>
+
+      {/* TAB 0: STOCK IN ENTRY & PIC 2 STYLE LIVE INVOICE TABLE */}
+      {activeTab === 0 && (
+        <Stack spacing={3}>
+          {/* 1. TOP SECTION: Record Stock In Form Card */}
+          <MainCard
+            title={
+              editingLog ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <EditOutlined style={{ color: '#096dd9' }} />
+                  <span>Edit Stock In Entry</span>
+                </Stack>
+              ) : isShop ? (
+                "Shop - Record Stock In (Receiving Invoice)"
+              ) : (
+                "Record Stock In (Receiving Invoice)"
+              )
+            }
+            sx={{
+              boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
+              borderRadius: 2
+            }}
+          >
+            {editingLog && (
+              <Alert
+                severity="info"
+                icon={<EditOutlined />}
+                sx={{ mb: 2.5, fontWeight: 600, alignItems: 'center' }}
+                action={
+                  <Button color="inherit" size="small" onClick={handleCancelEdit} sx={{ fontWeight: 700 }}>
+                    Cancel Edit
+                  </Button>
+                }
+              >
+                You are editing record <strong>&quot;{editingLog.itemName}&quot;</strong>. Update the details and click <strong>&quot;Update Stock In&quot;</strong> below.
+              </Alert>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (editingLog) handleUpdateSubmit();
+                else handleQuickAddToList();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && editingLog) {
+                  handleCancelEdit();
+                }
+              }}
+            >
+              <Grid container spacing={2.5} alignItems="center">
+                {/* ROW 1: Vendor, Item Select, Category */}
+                {/* 1. SELECT VENDOR / SUPPLIER */}
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Autocomplete
+                    freeSolo
+                    options={vendorList}
+                    value={form.vendor}
+                    onChange={(event, newValue) => {
+                      const val = typeof newValue === 'string' ? newValue : (newValue || '');
+                      setForm((prev) => ({ ...prev, vendor: val }));
+                      if (val) {
+                        setTimeout(() => {
+                          if (itemSelectRef.current) {
+                            itemSelectRef.current.focus();
+                            itemSelectRef.current.select?.();
+                          }
+                        }, 50);
+                      }
+                    }}
+                    onInputChange={(event, newInputValue) => {
+                      setForm((prev) => ({ ...prev, vendor: newInputValue }));
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '44px',
+                        minHeight: '44px',
+                        py: 0
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        inputRef={vendorRef}
+                        label="SELECT VENDOR / SUPPLIER *"
+                        required
+                        placeholder="Select or Type Vendor"
+                        onFocus={(e) => e.target.select?.()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setTimeout(() => {
+                              if (itemSelectRef.current) {
+                                itemSelectRef.current.focus();
+                                itemSelectRef.current.select?.();
+                              }
+                            }, 50);
+                          }
+                        }}
+                      />
+                    )}
                   />
-                )}
-              />
-            </Grid>
+                </Grid>
 
             {/* 2. ITEM SELECT */}
-            <Grid size={{ xs: 12, md: 3.5 }}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Autocomplete
                 freeSolo
                 options={existingNamesList}
                 value={form.itemName}
-                onChange={(event, newValue) => handleItemNameChange(event, newValue)}
+                onChange={(event, newValue) => {
+                  handleItemNameChange(event, newValue);
+                  if (newValue) {
+                    setTimeout(() => {
+                      if (qtyRef.current) {
+                        qtyRef.current.focus();
+                        qtyRef.current.select?.();
+                      }
+                    }, 50);
+                  }
+                }}
                 onInputChange={(event, newInputValue) => handleItemNameChange(event, newInputValue)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -711,13 +1095,25 @@ export default function StockInPage() {
                     label="ITEM SELECT *"
                     required
                     placeholder="Select Item"
+                    onFocus={(e) => e.target.select?.()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setTimeout(() => {
+                          if (qtyRef.current) {
+                            qtyRef.current.focus();
+                            qtyRef.current.select?.();
+                          }
+                        }, 50);
+                      }
+                    }}
                   />
                 )}
               />
             </Grid>
 
             {/* 3. CATEGORY SELECT */}
-            <Grid size={{ xs: 12, md: 2.5 }}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Autocomplete
                 freeSolo
                 options={categoryOptions}
@@ -739,39 +1135,23 @@ export default function StockInPage() {
                 renderInput={(params) => (
                   <TextField
                     {...params}
+                    inputRef={categoryRef}
                     label="CATEGORY"
                     placeholder="Category"
+                    onFocus={(e) => e.target.select?.()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setTimeout(() => {
+                          if (qtyRef.current) {
+                            qtyRef.current.focus();
+                            qtyRef.current.select?.();
+                          }
+                        }, 50);
+                      }
+                    }}
                   />
                 )}
-              />
-            </Grid>
-
-            {/* 4. IMAGE URL / UPLOAD FROM PC */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="IMAGE (URL OR PC UPLOAD)"
-                placeholder="Paste link or click icon ->"
-                value={form.imageUrl ? (form.imageUrl.startsWith('data:') ? 'Local file selected' : form.imageUrl) : ''}
-                onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Tooltip title="Upload local image from computer">
-                        <IconButton component="label" size="small" edge="end">
-                          <UploadOutlined style={{ fontSize: '1rem', color: '#005F56' }} />
-                          <input type="file" hidden accept="image/*" onChange={handleLocalImageUpload} />
-                        </IconButton>
-                      </Tooltip>
-                    </InputAdornment>
-                  )
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
               />
             </Grid>
 
@@ -786,6 +1166,7 @@ export default function StockInPage() {
                 inputRef={qtyRef}
                 inputProps={{ min: 1 }}
                 value={form.qty}
+                onFocus={(e) => e.target.select?.()}
                 onChange={(e) => {
                   const val = e.target.value;
                   const qtyNum = parseInt(val) || 0;
@@ -800,10 +1181,12 @@ export default function StockInPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (priceRef.current) {
-                      priceRef.current.focus();
-                      priceRef.current.select();
-                    }
+                    setTimeout(() => {
+                      if (priceRef.current) {
+                        priceRef.current.focus();
+                        priceRef.current.select?.();
+                      }
+                    }, 50);
                   }
                 }}
                 sx={{
@@ -825,6 +1208,7 @@ export default function StockInPage() {
                 inputRef={priceRef}
                 inputProps={{ min: 0, step: 'any' }}
                 value={form.totalBillAmount !== undefined ? form.totalBillAmount : (form.unitPrice ? ((parseInt(form.qty) || 1) * form.unitPrice) : '')}
+                onFocus={(e) => e.target.select?.()}
                 onChange={(e) => {
                   const val = e.target.value;
                   const billNum = parseFloat(val) || 0;
@@ -839,7 +1223,17 @@ export default function StockInPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    handleQuickAddToList();
+                    if (e.ctrlKey) {
+                      if (editingLog) handleUpdateSubmit();
+                      else handleQuickAddToList();
+                    } else {
+                      setTimeout(() => {
+                        if (discountRef.current) {
+                          discountRef.current.focus();
+                          discountRef.current.select?.();
+                        }
+                      }, 50);
+                    }
                   }
                 }}
                 helperText={
@@ -862,13 +1256,16 @@ export default function StockInPage() {
                 label="DISCOUNT (PKR)"
                 type="number"
                 fullWidth
+                inputRef={discountRef}
                 inputProps={{ min: 0, step: 'any' }}
                 value={form.discount}
+                onFocus={(e) => e.target.select?.()}
                 onChange={(e) => setForm({ ...form, discount: parseFloat(e.target.value) || 0 })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    handleQuickAddToList();
+                    if (editingLog) handleUpdateSubmit();
+                    else handleQuickAddToList();
                   }
                 }}
                 sx={{
@@ -904,34 +1301,383 @@ export default function StockInPage() {
               </Box>
             </Grid>
 
-            {/* 9. SAVE BUTTON */}
+            {/* 9. SAVE / UPDATE BUTTON */}
             <Grid size={{ xs: 12, sm: 12, md: 3.2 }}>
-              <Button
-                variant="contained"
-                type="button"
-                onClick={handleSaveButtonClick}
-                fullWidth
-                startIcon={<PlusOutlined />}
-                sx={{
-                  height: '44px',
-                  bgcolor: '#10b981',
-                  '&:hover': { bgcolor: '#059669' },
-                  fontSize: '0.88rem',
-                  fontWeight: 700,
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                + Save Stock In Invoice
-              </Button>
+              {editingLog ? (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="contained"
+                    type="button"
+                    onClick={handleUpdateSubmit}
+                    fullWidth
+                    startIcon={<CheckOutlined />}
+                    sx={{
+                      height: '44px',
+                      bgcolor: '#096dd9',
+                      '&:hover': { bgcolor: '#0050b3' },
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      boxShadow: '0 4px 14px rgba(9, 109, 217, 0.3)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Update Stock In
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    type="button"
+                    onClick={handleCancelEdit}
+                    sx={{ height: '44px', fontWeight: 700, px: 2 }}
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              ) : (
+                <Button
+                  variant="contained"
+                  type="button"
+                  onClick={handleSaveButtonClick}
+                  fullWidth
+                  startIcon={<PlusOutlined />}
+                  sx={{
+                    height: '44px',
+                    bgcolor: '#10b981',
+                    '&:hover': { bgcolor: '#059669' },
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  + Save Stock In Invoice
+                </Button>
+              )}
             </Grid>
           </Grid>
         </form>
       </MainCard>
 
-      {/* 2. BOTTOM SECTION: Stock In Logs Table Card */}
-      <MainCard
-        title={isShop ? "Shop Stock In (Receiving Logs)" : "Stock In (Receiving Logs)"}
+          {/* 2. PIC 2 LIVE RECEIVING INVOICE TABLE CARD */}
+          <MainCard
+            title="Stock In (Receiving Logs)"
+            secondary={
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<PlusOutlined />}
+                  onClick={handleStartNewInvoice}
+                  sx={{ fontWeight: 700 }}
+                >
+                  New Invoice
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<DollarOutlined />}
+                  disabled={currentInvoiceItems.length === 0}
+                  onClick={handleOpenPaymentPopupForCurrentInvoice}
+                  sx={{ fontWeight: 700 }}
+                >
+                  Pay Vendor (Cash / Bilty)
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<PrinterOutlined />}
+                  disabled={currentInvoiceItems.length === 0}
+                  onClick={handlePrintCurrentInvoice}
+                  sx={{ fontWeight: 700, bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+                >
+                  Print Invoice
+                </Button>
+              </Stack>
+            }
+            sx={{
+              boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
+              borderRadius: 2
+            }}
+          >
+            <Box sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+              {/* Vendor & Voucher Header Details Box (Exact Pic 2 layout) */}
+              <div
+                style={{
+                  border: '1.5px solid #111827',
+                  borderRadius: '4px',
+                  marginBottom: '10px',
+                  backgroundColor: '#ffffff',
+                  color: '#111827'
+                }}
+              >
+                <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid #111827' }}>
+                  {/* Left Column: Vendor Details */}
+                  <div
+                    style={{
+                      flex: '1.2',
+                      minWidth: '240px',
+                      padding: '8px 12px',
+                      borderRight: '1.5px solid #111827'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      VENDOR / SUPPLIER DETAILS
+                    </div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
+                      {form.vendor || currentInvoiceItems[0]?.vendor || (vendorList[0] || 'Market')}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#374151', lineHeight: '1.4' }}>
+                      <div><strong>Stock In Entry Type:</strong> Stock In Receipt</div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: PO Meta */}
+                  <div
+                    style={{
+                      flex: '1',
+                      minWidth: '220px',
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(249, 250, 251, 0.65)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.82rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 700 }}>PO / Voucher No:</span>
+                      <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.90rem' }}>{currentVoucherNo}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.82rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                      <span style={{ fontWeight: 700, color: '#374151' }}>
+                        {currentInvoiceItems[0]?.time || new Date().toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.82rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Status:</span>
+                      <span style={{ fontWeight: 800, color: '#16a34a' }}>Received</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment:</span>
+                      {(() => {
+                        const totalInv = currentInvoiceItems.reduce((acc, curr) => acc + (Number(curr.lineTotal) || 0), 0);
+                        const paidInv = currentInvoiceItems.reduce((acc, curr) => Math.max(acc, Number(curr.amountPaid) || 0), 0);
+                        if (totalInv > 0 && paidInv >= totalInv) {
+                          return <span style={{ fontWeight: 800, color: '#16a34a' }}>Paid (Rs. {paidInv.toLocaleString()})</span>;
+                        } else if (paidInv > 0) {
+                          return <span style={{ fontWeight: 800, color: '#d97706' }}>Partial: Rs. {paidInv.toLocaleString()} (Due: Rs. {(totalInv - paidInv).toLocaleString()})</span>;
+                        }
+                        return <span style={{ fontWeight: 800, color: '#dc2626' }}>Full Credit (Unpaid)</span>;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Exact Table As Shown in Pic 2 */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  border: '1.5px solid #111827',
+                  marginBottom: '10px',
+                  backgroundColor: '#ffffff',
+                  color: '#111827'
+                }}
+              >
+                <thead>
+                  <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                    <th
+                      style={{
+                        width: '8%',
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <strong>Sr</strong>
+                    </th>
+                    <th
+                      style={{
+                        width: '56%',
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 10px',
+                        textAlign: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <strong>Specification / Item Name</strong>
+                    </th>
+                    <th
+                      style={{
+                        width: '14%',
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <strong>QTY</strong>
+                    </th>
+                    <th
+                      style={{
+                        width: '14%',
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 8px',
+                        textAlign: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <strong>Total Amount</strong>
+                    </th>
+                    <th
+                      style={{
+                        width: '8%',
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <strong>Actions</strong>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentInvoiceItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '24px 12px', textAlign: 'center', color: '#6b7280', fontSize: '0.88rem' }}>
+                        No items added yet. Select and add items using the form above to populate this receiving table.
+                      </td>
+                    </tr>
+                  ) : (
+                    currentInvoiceItems.map((item, idx) => {
+                      const itemQty = item.qtyUsed || 1;
+                      const itemLineTotal = item.lineTotal !== undefined ? item.lineTotal : itemQty * (item.unitPrice || 0);
+
+                      return (
+                        <tr key={item.id || idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                          <td
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '6px 4px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {String(idx + 1).padStart(2, '0')}
+                          </td>
+                          <td
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '6px 10px',
+                              textAlign: 'left',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              lineHeight: 1.3
+                            }}
+                          >
+                            {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                          </td>
+                          <td
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '6px 4px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {String(itemQty).padStart(2, '0')}
+                          </td>
+                          <td
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '6px 10px',
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {Number(itemLineTotal).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '4px', textAlign: 'center' }}>
+                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                              <Tooltip title="Edit this item">
+                                <IconButton size="small" color="primary" onClick={() => handleEditSessionItem(item)}>
+                                  <EditOutlined style={{ fontSize: '0.85rem' }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete item">
+                                <IconButton size="small" color="error" onClick={() => handleDeleteSessionItem(item.id)}>
+                                  <DeleteOutlined style={{ fontSize: '0.85rem' }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+
+                  {/* Total Amount Bottom Row */}
+                  <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                    <td
+                      colSpan={2}
+                      style={{
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 10px',
+                        textAlign: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.90rem'
+                      }}
+                    >
+                      Total amount
+                    </td>
+                    <td
+                      style={{
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {currentInvoiceItems.reduce((acc, curr) => acc + (Number(curr.qtyUsed) || 0), 0)}
+                    </td>
+                    <td
+                      style={{
+                        borderRight: '1.5px solid #111827',
+                        padding: '6px 10px',
+                        textAlign: 'right',
+                        fontWeight: 900,
+                        fontSize: '0.95rem',
+                        color: '#111827'
+                      }}
+                    >
+                      {currentInvoiceItems.reduce((acc, curr) => acc + (Number(curr.lineTotal) || 0), 0).toLocaleString()}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </Box>
+          </MainCard>
+        </Stack>
+      )}
+
+      {/* TAB 1: STOCK IN HISTORY (RECEIVING LOGS) */}
+      {activeTab === 1 && (
+        <MainCard
+          title={isShop ? "Shop Stock In (Receiving Logs)" : "Stock In (Receiving Logs)"}
         secondary={
           selected.length > 0 && canDelete && (
             <Button
@@ -1147,7 +1893,7 @@ export default function StockInPage() {
                             </>
                           ) : (
                             <Chip
-                              label="Udhaar (Unpaid)"
+                              label="Unpaid (Credit)"
                               size="small"
                               color="error"
                               variant="outlined"
@@ -1172,7 +1918,7 @@ export default function StockInPage() {
                             color="success"
                             size="small"
                             startIcon={<PrinterOutlined />}
-                            onClick={() => handleOpenPrint(group.items[0])}
+                            onClick={() => handleOpenPrint(group.items[0], group.items)}
                             sx={{ fontWeight: 700, borderRadius: 1.5 }}
                           >
                             Print Invoice
@@ -1440,7 +2186,7 @@ export default function StockInPage() {
                               </Stack>
                             ) : (
                               <Chip
-                                label="Udhaar (Unpaid)"
+                                label="Unpaid (Credit)"
                                 size="small"
                                 color="error"
                                 variant="outlined"
@@ -1475,7 +2221,7 @@ export default function StockInPage() {
                               <Tooltip title={`Print Combined Invoice (${group.items.length} items)`}>
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleOpenPrint(group.items[0])}
+                                  onClick={() => handleOpenPrint(group.items[0], group.items)}
                                   sx={{
                                     color: '#1890ff',
                                     bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(24, 144, 255, 0.2)' : '#f0f5ff'),
@@ -1648,113 +2394,8 @@ export default function StockInPage() {
           />
         </Box>
       </MainCard>
+      )}
 
-      {/* Edit Stock In Drawer */}
-      <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 440 }, p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
-            Edit Stock In Record
-          </Typography>
-
-          {editingLog && (
-            <form onSubmit={handleEditSubmit}>
-              <Stack spacing={2.5}>
-                <TextField
-                  select
-                  label="SELECT VENDOR / SUPPLIER *"
-                  fullWidth
-                  required
-                  value={editingLog.vendor}
-                  onChange={(e) => setEditingLog({ ...editingLog, vendor: e.target.value })}
-                >
-                  {vendorList.map((v) => (
-                    <MenuItem key={v} value={v}>
-                      {v}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  label="ITEM SELECT *"
-                  fullWidth
-                  required
-                  value={editingLog.itemName}
-                  onChange={(e) => setEditingLog({ ...editingLog, itemName: e.target.value })}
-                />
-
-                <TextField
-                  label="QTY *"
-                  type="number"
-                  fullWidth
-                  required
-                  inputProps={{ min: 1 }}
-                  value={editingLog.qty}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const qtyNum = parseInt(val) || 0;
-                    const billNum = parseFloat(editingLog.totalBillAmount) || 0;
-                    const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
-                    setEditingLog((prev) => ({
-                      ...prev,
-                      qty: val === '' ? '' : qtyNum,
-                      unitPrice
-                    }));
-                  }}
-                />
-
-                <TextField
-                  label="TOTAL BILL AMOUNT (RS) *"
-                  type="number"
-                  fullWidth
-                  disabled={!canEditPrice}
-                  inputProps={{ min: 0, step: 'any' }}
-                  value={editingLog.totalBillAmount !== undefined ? editingLog.totalBillAmount : ((parseInt(editingLog.qty) || 1) * (parseFloat(editingLog.unitPrice) || 0))}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const billNum = parseFloat(val) || 0;
-                    const qtyNum = parseInt(editingLog.qty) || 1;
-                    const unitPrice = qtyNum > 0 ? (billNum / qtyNum) : billNum;
-                    setEditingLog((prev) => ({
-                      ...prev,
-                      totalBillAmount: val,
-                      unitPrice
-                    }));
-                  }}
-                  helperText={
-                    Number(editingLog.qty) > 0 && Number(editingLog.totalBillAmount) > 0
-                      ? `Rate: Rs. ${(Number(editingLog.totalBillAmount) / Number(editingLog.qty)).toFixed(2)} / unit`
-                      : 'Calculates rate per unit automatically'
-                  }
-                />
-
-                <TextField
-                  label="LINE TOTAL"
-                  fullWidth
-                  disabled
-                  value={`Rs. ${(editingLog.totalBillAmount !== undefined && editingLog.totalBillAmount !== '' ? (parseFloat(editingLog.totalBillAmount) || 0) : ((parseInt(editingLog.qty) || 0) * (parseFloat(editingLog.unitPrice) || 0))).toLocaleString()}`}
-                />
-
-                <TextField
-                  label="BILTY / REF NO"
-                  fullWidth
-                  placeholder="e.g. 4550, BL-1092"
-                  value={editingLog.biltyNo || ''}
-                  onChange={(e) => setEditingLog({ ...editingLog, biltyNo: e.target.value })}
-                />
-
-                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="contained" color="primary" type="submit">
-                    Update Record
-                  </Button>
-                </Stack>
-              </Stack>
-            </form>
-          )}
-        </Box>
-      </Drawer>
 
       {/* Single Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
@@ -2004,7 +2645,7 @@ export default function StockInPage() {
                       Payment Status
                     </Typography>
                     <Typography variant="subtitle1" fontWeight={800} color={remaining > 0 ? 'error.dark' : 'success.dark'}>
-                      {remaining === 0 ? 'Fully Cleared (Rs. 0 Balance)' : isCredit ? 'Full Credit (Udhaar)' : 'Partial Payment'}
+                      {remaining === 0 ? 'Fully Cleared (Rs. 0 Balance)' : isCredit ? 'Full Credit (Unpaid)' : 'Partial Payment'}
                     </Typography>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -2118,16 +2759,20 @@ export default function StockInPage() {
               (log) => (log.usedBy || '').toLowerCase() === (printData.vendor || '').toLowerCase()
             );
 
-            const displayLogs = activeVendorLogs.length > 0 ? activeVendorLogs : [
-              {
-                id: printData.id,
-                itemName: printData.itemName,
-                itemCode: printData.id,
-                qtyUsed: printData.qty,
-                unitPrice: printData.unitPrice,
-                lineTotal: printData.lineTotal
-              }
-            ];
+            const displayLogs = (printData.items && printData.items.length > 0)
+              ? printData.items
+              : (activeVendorLogs.length > 0
+                  ? activeVendorLogs
+                  : [
+                      {
+                        id: printData.id,
+                        itemName: printData.itemName,
+                        itemCode: printData.id,
+                        qtyUsed: printData.qty,
+                        unitPrice: printData.unitPrice,
+                        lineTotal: printData.lineTotal
+                      }
+                    ]);
 
             const grandTotalSum = displayLogs.reduce((sum, item) => {
               const total = item.lineTotal || (item.qtyUsed * (item.unitPrice || 0));
@@ -2251,7 +2896,7 @@ export default function StockInPage() {
                           </Typography>
                         ) : (
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', display: 'block', mt: 0.3 }}>
-                            Payment: Full Udhaar (Credit Purchase)
+                            Payment: Full Credit Purchase (Unpaid)
                           </Typography>
                         )}
                       </div>
@@ -2300,7 +2945,7 @@ export default function StockInPage() {
             className="no-print"
             sx={{ px: 3, fontWeight: 700 }}
           >
-            Print Vendor Invoice ({stockInLogs.filter(log => (log.usedBy || '').toLowerCase() === (printData?.vendor || '').toLowerCase()).length || 1} Items)
+            Print Vendor Invoice ({printData?.items?.length || stockInLogs.filter(log => (log.usedBy || '').toLowerCase() === (printData?.vendor || '').toLowerCase()).length || 1} Items)
           </Button>
         </DialogActions>
       </Dialog>

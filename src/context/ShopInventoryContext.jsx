@@ -190,10 +190,10 @@ export function ShopInventoryProvider({ children }) {
   // 5. Shop Master Item Names
   const [masterItemNames, setMasterItemNames] = useState(() => safeParseJSON('rehmat_shop_master_item_names_v2', []));
 
-  // 6. Shop Sales & Invoices State (for Shop Ledger & Udhaar Tracking)
+  // 6. Shop Sales & Invoices State (for Shop Ledger & Credit Tracking)
   const [shopSales, setShopSales] = useState(() => safeParseJSON('rehmat_shop_sales_v2', []));
 
-  // 7. Shop Customer Payments State (for Khata Wasooli / Recovery)
+  // 7. Shop Customer Payments State (for Customer Payment Collections)
   const [shopCustomerPayments, setShopCustomerPayments] = useState(() => safeParseJSON('rehmat_shop_customer_payments_v2', []));
 
   // 6. Persistence to localStorage
@@ -675,10 +675,42 @@ export function ShopInventoryProvider({ children }) {
     return newSale;
   };
 
+  const updateShopSale = async (saleId, updatedData) => {
+    const stringId = String(saleId);
+    let updatedRecord = null;
+    const now = new Date();
+
+    setShopSales((prev) =>
+      prev.map((s) => {
+        if (String(s.id) === stringId) {
+          updatedRecord = {
+            ...s,
+            ...updatedData,
+            id: s.id,
+            updatedAt: now.toISOString()
+          };
+          return updatedRecord;
+        }
+        return s;
+      })
+    );
+
+    if (updatedRecord) {
+      try {
+        setDoc(doc(db, 'shop_sales', stringId), updatedRecord, { merge: true })
+          .catch((err) => console.warn('Firebase updateShopSale sync warning:', err));
+      } catch (e) {
+        console.warn('Firebase updateShopSale exception:', e);
+      }
+    }
+    return updatedRecord;
+  };
+
   const deleteShopSale = async (saleId) => {
-    setShopSales((prev) => prev.filter((s) => s.id !== saleId));
+    const stringId = String(saleId);
+    setShopSales((prev) => prev.filter((s) => String(s.id) !== stringId));
     try {
-      deleteDoc(doc(db, 'shop_sales', String(saleId))).catch(() => {});
+      deleteDoc(doc(db, 'shop_sales', stringId)).catch(() => {});
     } catch (e) {
       console.warn('deleteShopSale error:', e);
     }
@@ -828,6 +860,8 @@ export function ShopInventoryProvider({ children }) {
       resetShopDataToZero,
       resetAllDataToZero: resetShopDataToZero,
       addShopSale,
+      updateShopSale,
+      editShopSale: updateShopSale,
       deleteShopSale,
       addShopCustomerPayment,
       deleteShopCustomerPayment,

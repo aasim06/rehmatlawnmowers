@@ -1,20 +1,42 @@
+import { useState, useEffect } from 'react';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 import CloudSyncOutlined from '@ant-design/icons/CloudSyncOutlined';
 import DisconnectOutlined from '@ant-design/icons/DisconnectOutlined';
 import RocketOutlined from '@ant-design/icons/RocketOutlined';
-import { isLiveCloudMode } from 'utils/platform';
 import { useAppUpdate } from 'hooks/useAppUpdate';
+import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function LiveCloudStatusBadge() {
-  const isCloud = isLiveCloudMode();
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const { hasUpdate, checking, applyUpdate, checkForUpdate } = useAppUpdate();
+  const { fetchFirebaseData } = useStoreInventory();
 
-  const handleClick = () => {
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleClick = async () => {
     if (hasUpdate) {
       applyUpdate();
     } else {
+      if (fetchFirebaseData) {
+        try {
+          await fetchFirebaseData();
+        } catch (err) {
+          console.warn('Manual cloud sync failed:', err);
+        }
+      }
       checkForUpdate();
     }
   };
@@ -54,12 +76,14 @@ export default function LiveCloudStatusBadge() {
     );
   }
 
+  const isCloud = isOnline;
+
   return (
     <Tooltip
       title={
         isCloud
-          ? 'Live Cloud Active: Connected to live cloud. Click to check for updates.'
-          : 'Offline Fast Mode: Running cached local copy. Click to check for live updates.'
+          ? 'Live Cloud Active: Connected to Firebase Cloud Database. Click to sync now.'
+          : 'Offline Mode: No internet connection. Click to retry connection.'
       }
     >
       <Chip
@@ -72,7 +96,7 @@ export default function LiveCloudStatusBadge() {
             <DisconnectOutlined style={{ fontSize: 13 }} />
           )
         }
-        label={checking ? 'Checking...' : isCloud ? 'Cloud Live' : 'Offline'}
+        label={checking ? 'Syncing...' : isCloud ? 'Cloud Live' : 'Offline'}
         size="small"
         color={isCloud ? 'success' : 'default'}
         variant="outlined"

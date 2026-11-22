@@ -90,7 +90,7 @@ export default function ShopLedgerPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printData, setPrintData] = useState(null);
 
-  // Group Shop Issues by Person Name ("Kon Le Gaya")
+  // Group Shop Issues by Person Name (Recipient)
   const personLedgers = useMemo(() => {
     const personMap = {};
 

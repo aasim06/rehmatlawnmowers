@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '@mui/material/styles';
 import CeoSignature from 'components/CeoSignature';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -17,6 +18,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import Drawer from '@mui/material/Drawer';
 import Chip from '@mui/material/Chip';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -26,7 +28,6 @@ import Divider from '@mui/material/Divider';
 import Collapse from '@mui/material/Collapse';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
-import Drawer from '@mui/material/Drawer';
 import Autocomplete from '@mui/material/Autocomplete';
 import Tooltip from '@mui/material/Tooltip';
 
@@ -40,6 +41,7 @@ import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import DownOutlined from '@ant-design/icons/DownOutlined';
 import UpOutlined from '@ant-design/icons/UpOutlined';
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
+import CloseOutlined from '@ant-design/icons/CloseOutlined';
 
 import MainCard from 'components/MainCard';
 import { useStoreInventory } from 'context/StoreInventoryContext';
@@ -61,6 +63,8 @@ const formatFullDate = (timeStr, dateISO) => {
 };
 
 export default function CustomerLedgerPage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const {
     machineSales = [],
     machineRepairs = [],
@@ -69,8 +73,7 @@ export default function CustomerLedgerPage() {
     addCustomerPayment,
     updateMachineSale,
     deleteMachineSale,
-    deleteMachineRepair,
-    updateMachineRepair
+    deleteMachineRepair
   } = useStoreInventory();
 
   // Search & Filter State
@@ -260,15 +263,18 @@ export default function CustomerLedgerPage() {
 
   // Open Edit Invoice Drawer
   const handleOpenEditInvoice = (inv) => {
-    const itemsArray = (inv.items && inv.items.length > 0) ? inv.items : [
-      {
-        machineName: inv.machineName,
-        serialNo: inv.serialNo,
-        qty: inv.qty,
-        unitPrice: inv.unitPrice,
-        discount: inv.discount || 0
-      }
-    ];
+    const itemsArray =
+      inv.items && inv.items.length > 0
+        ? inv.items
+        : [
+            {
+              machineName: inv.machineName,
+              serialNo: inv.serialNo,
+              qty: inv.qty,
+              unitPrice: inv.unitPrice,
+              discount: inv.discount || 0
+            }
+          ];
 
     setEditingInvoice({ ...inv, items: itemsArray });
     setEditInvoiceDrawerOpen(true);
@@ -278,33 +284,47 @@ export default function CustomerLedgerPage() {
     e.preventDefault();
     if (!editingInvoice) return;
 
-    const itemsList = (editingInvoice.items && editingInvoice.items.length > 0)
-      ? editingInvoice.items.map((i) => {
-          const q = parseInt(i.qty) || 1;
-          const p = parseFloat(i.unitPrice) || 0;
-          const discPercent = parseFloat(i.discount) || 0;
-          const gross = q * p;
-          const discAmount = (gross * discPercent) / 100;
-          const lineTotal = Math.max(0, gross - discAmount);
-          return {
-            machineName: i.machineName || 'Machine',
-            serialNo: i.serialNo || '',
-            qty: q,
-            unitPrice: p,
-            discount: discPercent,
-            discountAmount: discAmount,
-            lineTotal
-          };
-        })
-      : [{
-          machineName: editingInvoice.machineName,
-          serialNo: editingInvoice.serialNo,
-          qty: parseInt(editingInvoice.qty) || 1,
-          unitPrice: parseFloat(editingInvoice.unitPrice) || 0,
-          discount: parseFloat(editingInvoice.discount) || 0,
-          discountAmount: (((parseInt(editingInvoice.qty) || 1) * (parseFloat(editingInvoice.unitPrice) || 0)) * (parseFloat(editingInvoice.discount) || 0)) / 100,
-          lineTotal: Math.max(0, ((parseInt(editingInvoice.qty) || 1) * (parseFloat(editingInvoice.unitPrice) || 0)) - ((((parseInt(editingInvoice.qty) || 1) * (parseFloat(editingInvoice.unitPrice) || 0)) * (parseFloat(editingInvoice.discount) || 0)) / 100))
-        }];
+    const itemsList =
+      editingInvoice.items && editingInvoice.items.length > 0
+        ? editingInvoice.items.map((i) => {
+            const q = parseInt(i.qty) || 1;
+            const p = parseFloat(i.unitPrice) || 0;
+            const discPercent = parseFloat(i.discount) || 0;
+            const gross = q * p;
+            const discAmount = (gross * discPercent) / 100;
+            const lineTotal = Math.max(0, gross - discAmount);
+            return {
+              machineName: i.machineName || 'Machine',
+              serialNo: i.serialNo || '',
+              qty: q,
+              unitPrice: p,
+              discount: discPercent,
+              discountAmount: discAmount,
+              lineTotal
+            };
+          })
+        : [
+            {
+              machineName: editingInvoice.machineName,
+              serialNo: editingInvoice.serialNo,
+              qty: parseInt(editingInvoice.qty) || 1,
+              unitPrice: parseFloat(editingInvoice.unitPrice) || 0,
+              discount: parseFloat(editingInvoice.discount) || 0,
+              discountAmount:
+                ((parseInt(editingInvoice.qty) || 1) *
+                  (parseFloat(editingInvoice.unitPrice) || 0) *
+                  (parseFloat(editingInvoice.discount) || 0)) /
+                100,
+              lineTotal: Math.max(
+                0,
+                (parseInt(editingInvoice.qty) || 1) * (parseFloat(editingInvoice.unitPrice) || 0) -
+                  ((parseInt(editingInvoice.qty) || 1) *
+                    (parseFloat(editingInvoice.unitPrice) || 0) *
+                    (parseFloat(editingInvoice.discount) || 0)) /
+                    100
+              )
+            }
+          ];
 
     const subTotal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
     const discSum = itemsList.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
@@ -350,10 +370,7 @@ export default function CustomerLedgerPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        items: [
-          ...(prev.items || []),
-          { machineName: '', serialNo: '', qty: 1, unitPrice: 0, discount: 0 }
-        ]
+        items: [...(prev.items || []), { machineName: '', serialNo: '', qty: 1, unitPrice: 0, discount: 0 }]
       };
     });
   };
@@ -381,9 +398,7 @@ export default function CustomerLedgerPage() {
     }
   };
   const handlePrintStatement = (cust) => {
-    const custPaymentsList = customerPayments.filter(
-      (p) => p.customerName.toLowerCase() === cust.customerName.toLowerCase()
-    );
+    const custPaymentsList = customerPayments.filter((p) => p.customerName.toLowerCase() === cust.customerName.toLowerCase());
     setPrintCustomerData({
       ...cust,
       payments: custPaymentsList
@@ -503,13 +518,27 @@ export default function CustomerLedgerPage() {
           <Table>
             <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
               <TableRow>
-                <TableCell><strong>CUSTOMER NAME & CITY</strong></TableCell>
-                <TableCell align="center"><strong>PHONE NO</strong></TableCell>
-                <TableCell align="center"><strong>INVOICES</strong></TableCell>
-                <TableCell align="right"><strong>TOTAL PURCHASES</strong></TableCell>
-                <TableCell align="right"><strong>AMOUNT PAID</strong></TableCell>
-                <TableCell align="right"><strong>PENDING BALANCE</strong></TableCell>
-                <TableCell align="center"><strong>ACTIONS</strong></TableCell>
+                <TableCell>
+                  <strong>CUSTOMER NAME & CITY</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>PHONE NO</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>INVOICES</strong>
+                </TableCell>
+                <TableCell align="right">
+                  <strong>TOTAL PURCHASES</strong>
+                </TableCell>
+                <TableCell align="right">
+                  <strong>AMOUNT PAID</strong>
+                </TableCell>
+                <TableCell align="right">
+                  <strong>PENDING BALANCE</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>ACTIONS</strong>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -522,14 +551,19 @@ export default function CustomerLedgerPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((cust, idx) => {
+                filteredCustomers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((cust, idx) => {
                   const isExpanded = expandedCustomer === cust.customerName;
 
                   return (
                     <React.Fragment key={idx}>
-                      <TableRow hover sx={{ bgcolor: isExpanded ? (theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc') : 'inherit' }}>
+                      <TableRow
+                        hover
+                        sx={{
+                          bgcolor: isExpanded
+                            ? (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc')
+                            : 'inherit'
+                        }}
+                      >
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <IconButton
@@ -610,45 +644,90 @@ export default function CustomerLedgerPage() {
                       <TableRow>
                         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
                           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ margin: 2, p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f1f5f9'), borderRadius: 2, border: '1px solid #cbd5e1' }}>
-                              <Typography variant="subtitle2" fontWeight={800} color="primary.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                margin: 2,
+                                p: 2,
+                                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f1f5f9'),
+                                borderRadius: 2,
+                                border: '1px solid #cbd5e1'
+                              }}
+                            >
+                              <Typography
+                                variant="subtitle2"
+                                fontWeight={800}
+                                color="primary.main"
+                                gutterBottom
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                              >
                                 Customer Transactions & Invoices Breakdown ({cust.invoices.length})
                               </Typography>
                               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5 }}>
                                 <Table size="small">
-                                  <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#e2e8f0') }}>
+                                  <TableHead
+                                    sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#e2e8f0') }}
+                                  >
                                     <TableRow>
-                                      <TableCell><strong>TYPE</strong></TableCell>
-                                      <TableCell><strong>REF NO / DATE</strong></TableCell>
-                                      <TableCell><strong>MACHINE / SERVICE DETAILS</strong></TableCell>
-                                      <TableCell align="center"><strong>QTY</strong></TableCell>
-                                      <TableCell align="right"><strong>NET BILL</strong></TableCell>
-                                      <TableCell align="right"><strong>PAID</strong></TableCell>
-                                      <TableCell align="right"><strong>BALANCE</strong></TableCell>
-                                      <TableCell align="center"><strong>STATUS</strong></TableCell>
-                                      <TableCell align="center"><strong>ACTIONS</strong></TableCell>
+                                      <TableCell>
+                                        <strong>TYPE</strong>
+                                      </TableCell>
+                                      <TableCell>
+                                        <strong>REF NO / DATE</strong>
+                                      </TableCell>
+                                      <TableCell>
+                                        <strong>MACHINE / SERVICE DETAILS</strong>
+                                      </TableCell>
+                                      <TableCell align="center">
+                                        <strong>QTY</strong>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <strong>NET BILL</strong>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <strong>PAID</strong>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <strong>BALANCE</strong>
+                                      </TableCell>
+                                      <TableCell align="center">
+                                        <strong>STATUS</strong>
+                                      </TableCell>
+                                      <TableCell align="center">
+                                        <strong>ACTIONS</strong>
+                                      </TableCell>
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
                                     {cust.invoices.map((inv) => {
                                       const isRepair = inv.recordType === 'Repair';
                                       const invItemsList = isRepair
-                                        ? (inv.repairItems || [{ model: inv.machineName, specification: inv.faultDescription }])
-                                        : ((inv.items && inv.items.length > 0) ? inv.items : [{ machineName: inv.machineName, serialNo: inv.serialNo, qty: inv.qty, unitPrice: inv.unitPrice }]);
+                                        ? inv.repairItems || [{ model: inv.machineName, specification: inv.faultDescription }]
+                                        : inv.items && inv.items.length > 0
+                                          ? inv.items
+                                          : [
+                                              {
+                                                machineName: inv.machineName,
+                                                serialNo: inv.serialNo,
+                                                qty: inv.qty,
+                                                unitPrice: inv.unitPrice
+                                              }
+                                            ];
 
                                       const displayTitle = isRepair
-                                        ? (invItemsList[0]?.model || inv.machineName)
-                                        : (invItemsList[0]?.machineName || inv.machineName);
+                                        ? invItemsList[0]?.model || inv.machineName
+                                        : invItemsList[0]?.machineName || inv.machineName;
 
                                       const displaySubtitle = isRepair
-                                        ? (invItemsList[0]?.specification || inv.faultDescription || 'General Service')
-                                        : (invItemsList.length > 1 ? `+ ${invItemsList.length - 1} more machines` : '');
+                                        ? invItemsList[0]?.specification || inv.faultDescription || 'General Service'
+                                        : invItemsList.length > 1
+                                          ? `+ ${invItemsList.length - 1} more machines`
+                                          : '';
 
                                       const qtyVal = isRepair
-                                        ? (invItemsList.length || 1)
-                                        : (inv.qty || invItemsList.reduce((acc, i) => acc + (i.qty || 1), 0));
+                                        ? invItemsList.length || 1
+                                        : inv.qty || invItemsList.reduce((acc, i) => acc + (i.qty || 1), 0);
 
-                                      const totalVal = isRepair ? (inv.totalCost || inv.lineTotal || 0) : (inv.lineTotal || 0);
+                                      const totalVal = isRepair ? inv.totalCost || inv.lineTotal || 0 : inv.lineTotal || 0;
                                       const paidVal = inv.paidAmount || 0;
                                       const balVal = Math.max(0, totalVal - paidVal);
 
@@ -702,15 +781,29 @@ export default function CustomerLedgerPage() {
                                           </TableCell>
 
                                           <TableCell align="right">
-                                            <Typography variant="body2" color={balVal > 0 ? 'error.main' : 'textSecondary'} fontWeight={800}>
+                                            <Typography
+                                              variant="body2"
+                                              color={balVal > 0 ? 'error.main' : 'textSecondary'}
+                                              fontWeight={800}
+                                            >
                                               Rs. {balVal.toLocaleString()}
                                             </Typography>
                                           </TableCell>
 
                                           <TableCell align="center">
                                             <Chip
-                                              label={inv.paymentStatus || inv.repairStatus || (paidVal >= totalVal ? 'Paid' : paidVal > 0 ? 'Partial' : 'Unpaid')}
-                                              color={(paidVal >= totalVal || inv.repairStatus === 'Delivered') ? 'success' : paidVal > 0 ? 'warning' : 'error'}
+                                              label={
+                                                inv.paymentStatus ||
+                                                inv.repairStatus ||
+                                                (paidVal >= totalVal ? 'Paid' : paidVal > 0 ? 'Partial' : 'Unpaid')
+                                              }
+                                              color={
+                                                paidVal >= totalVal || inv.repairStatus === 'Delivered'
+                                                  ? 'success'
+                                                  : paidVal > 0
+                                                    ? 'warning'
+                                                    : 'error'
+                                              }
                                               size="small"
                                             />
                                           </TableCell>
@@ -728,7 +821,14 @@ export default function CustomerLedgerPage() {
                                                 </IconButton>
                                               </Tooltip>
                                               <Tooltip title="Delete Record">
-                                                <IconButton color="error" size="small" onClick={() => { setInvoiceToDelete(inv); setDeleteInvoiceDialogOpen(true); }}>
+                                                <IconButton
+                                                  color="error"
+                                                  size="small"
+                                                  onClick={() => {
+                                                    setInvoiceToDelete(inv);
+                                                    setDeleteInvoiceDialogOpen(true);
+                                                  }}
+                                                >
                                                   <DeleteOutlined />
                                                 </IconButton>
                                               </Tooltip>
@@ -777,18 +877,36 @@ export default function CustomerLedgerPage() {
         }}
       >
         <form onSubmit={handlePaymentSubmit}>
-          <DialogTitle sx={{ fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <DialogTitle
+            sx={{
+              fontWeight: 800,
+              color: '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              borderBottom: '1px solid',
+              borderColor: 'divider'
+            }}
+          >
             <DollarOutlined /> Receive Payment (Khaata Entry)
           </DialogTitle>
           <DialogContent dividers sx={{ p: 3 }}>
             {selectedCustomerForPay && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f0fdf4'), borderRadius: 1.5, border: '1px solid #bbf7d0' }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f0fdf4'),
+                    borderRadius: 1.5,
+                    border: '1px solid #bbf7d0'
+                  }}
+                >
                   <Typography variant="h4" fontWeight={800} color="primary.main">
                     {selectedCustomerForPay.customerName}
                   </Typography>
                   <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
-                    Current Pending Balance: <strong style={{ color: '#ef4444' }}>Rs. {selectedCustomerForPay.balanceVal.toLocaleString()}</strong>
+                    Current Pending Balance:{' '}
+                    <strong style={{ color: '#ef4444' }}>Rs. {selectedCustomerForPay.balanceVal.toLocaleString()}</strong>
                   </Typography>
                 </Box>
 
@@ -852,7 +970,9 @@ export default function CustomerLedgerPage() {
                         value={
                           paymentForm.remainingBalance !== undefined && paymentForm.remainingBalance !== ''
                             ? paymentForm.remainingBalance
-                            : (selectedCustomerForPay ? Math.max(0, selectedCustomerForPay.balanceVal - (parseFloat(paymentForm.amountPaid) || 0)) : 0)
+                            : selectedCustomerForPay
+                              ? Math.max(0, selectedCustomerForPay.balanceVal - (parseFloat(paymentForm.amountPaid) || 0))
+                              : 0
                         }
                         onChange={(e) => {
                           const remVal = e.target.value;
@@ -917,9 +1037,20 @@ export default function CustomerLedgerPage() {
               </Box>
             )}
           </DialogContent>
-          <DialogActions sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'), borderTop: '1px solid', borderColor: 'divider' }}>
+          <DialogActions
+            sx={{
+              p: 2,
+              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'),
+              borderTop: '1px solid',
+              borderColor: 'divider'
+            }}
+          >
             <Button onClick={() => setPaymentModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 800, px: 3 }}>
+            <Button
+              type="submit"
+              variant="contained"
+              sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 800, px: 3 }}
+            >
               Confirm Payment Collection
             </Button>
           </DialogActions>
@@ -972,14 +1103,31 @@ export default function CustomerLedgerPage() {
           `}
         </style>
 
-        <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>Customer Account Ledger Statement</Typography>
+        <DialogTitle
+          className="no-print"
+          sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
+        >
+          <Typography variant="h5" fontWeight={700}>
+            Customer Account Ledger Statement
+          </Typography>
           <Chip label="Statement Receipt" color="success" size="small" />
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
           {printCustomerData && (
-            <Box id="printable-customer-statement" sx={{ position: 'relative', overflow: 'hidden', pt: { xs: 8, sm: 11 }, px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+            <Box
+              id="printable-customer-statement"
+              sx={{
+                position: 'relative',
+                overflow: 'hidden',
+                pt: { xs: 8, sm: 11 },
+                px: { xs: 2, sm: 3 },
+                pb: { xs: 2, sm: 3 },
+                bgcolor: '#ffffff',
+                color: '#111827',
+                borderRadius: 1
+              }}
+            >
               <Box sx={{ position: 'relative', zIndex: 1 }}>
                 {/* Brand Header */}
                 <Box sx={{ textAlign: 'center', mb: 1 }}>
@@ -995,18 +1143,30 @@ export default function CustomerLedgerPage() {
 
                 <Grid container spacing={1.5} sx={{ mb: 2 }}>
                   <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary" display="block">CUSTOMER NAME:</Typography>
-                    <Typography variant="h5" fontWeight={800} color="primary.main">{printCustomerData.customerName}</Typography>
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      CUSTOMER NAME:
+                    </Typography>
+                    <Typography variant="h5" fontWeight={800} color="primary.main">
+                      {printCustomerData.customerName}
+                    </Typography>
                     <Typography variant="caption" color="textSecondary" display="block">
                       Phone: {printCustomerData.phone || 'N/A'} | Address: {printCustomerData.city || 'Lahore'}
                     </Typography>
                   </Grid>
 
                   <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" color="textSecondary" display="block">STATEMENT DATE:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</Typography>
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>TOTAL INVOICES:</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>{printCustomerData.invoices.length} Transactions</Typography>
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      STATEMENT DATE:
+                    </Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                      TOTAL INVOICES:
+                    </Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      {printCustomerData.invoices.length} Transactions
+                    </Typography>
                   </Grid>
                 </Grid>
 
@@ -1015,28 +1175,50 @@ export default function CustomerLedgerPage() {
                   <Table size="small">
                     <TableHead sx={{ bgcolor: '#f9fafb' }}>
                       <TableRow>
-                        <TableCell><strong>REF NO / DATE</strong></TableCell>
-                        <TableCell><strong>TYPE</strong></TableCell>
-                        <TableCell align="right"><strong>BILL TOTAL</strong></TableCell>
-                        <TableCell align="right"><strong>PAID</strong></TableCell>
-                        <TableCell align="right"><strong>BALANCE DUE</strong></TableCell>
+                        <TableCell>
+                          <strong>REF NO / DATE</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>TYPE</strong>
+                        </TableCell>
+                        <TableCell align="right">
+                          <strong>BILL TOTAL</strong>
+                        </TableCell>
+                        <TableCell align="right">
+                          <strong>PAID</strong>
+                        </TableCell>
+                        <TableCell align="right">
+                          <strong>BALANCE DUE</strong>
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {printCustomerData.invoices.map((inv) => (
                         <TableRow key={inv.id} hover>
                           <TableCell>
-                            <Typography variant="subtitle2" fontWeight={700}>{inv.id}</Typography>
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              {inv.id}
+                            </Typography>
                             <Typography variant="caption" color="textSecondary" display="block">
                               {inv.receivedDate || formatFullDate(inv.time, inv.dateISO)}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip label={inv.recordType || 'Sale'} size="small" color={inv.recordType === 'Repair' ? 'warning' : 'primary'} sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700 }} />
+                            <Chip
+                              label={inv.recordType || 'Sale'}
+                              size="small"
+                              color={inv.recordType === 'Repair' ? 'warning' : 'primary'}
+                              sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700 }}
+                            />
                           </TableCell>
                           <TableCell align="right">Rs. {(inv.lineTotal || inv.totalCost || 0).toLocaleString()}</TableCell>
-                          <TableCell align="right" sx={{ color: 'success.main', fontWeight: 600 }}>Rs. {(inv.paidAmount || 0).toLocaleString()}</TableCell>
-                          <TableCell align="right" sx={{ color: (inv.lineTotal - (inv.paidAmount || 0)) > 0 ? 'error.main' : 'textSecondary', fontWeight: 700 }}>
+                          <TableCell align="right" sx={{ color: 'success.main', fontWeight: 600 }}>
+                            Rs. {(inv.paidAmount || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ color: inv.lineTotal - (inv.paidAmount || 0) > 0 ? 'error.main' : 'textSecondary', fontWeight: 700 }}
+                          >
                             Rs. {Math.max(0, (inv.lineTotal || inv.totalCost || 0) - (inv.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                         </TableRow>
@@ -1048,11 +1230,17 @@ export default function CustomerLedgerPage() {
                 <Box sx={{ bgcolor: 'transparent', p: 2, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
                   <Grid container spacing={1} alignItems="center">
                     <Grid item xs={6}>
-                      <Typography variant="caption" color="textSecondary" display="block">TOTAL BILLED: Rs. {printCustomerData.totalPurchasesVal.toLocaleString()}</Typography>
-                      <Typography variant="caption" color="textSecondary" display="block">TOTAL PAID: Rs. {printCustomerData.totalPaidVal.toLocaleString()}</Typography>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        TOTAL BILLED: Rs. {printCustomerData.totalPurchasesVal.toLocaleString()}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        TOTAL PAID: Rs. {printCustomerData.totalPaidVal.toLocaleString()}
+                      </Typography>
                     </Grid>
                     <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="textSecondary" display="block">RECEIVABLE BALANCE:</Typography>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        RECEIVABLE BALANCE:
+                      </Typography>
                       <Typography variant="h3" fontWeight={800} color={printCustomerData.balanceVal > 0 ? '#dc2626' : '#059669'}>
                         Rs. {printCustomerData.balanceVal.toLocaleString()}
                       </Typography>
@@ -1067,236 +1255,637 @@ export default function CustomerLedgerPage() {
           <Button variant="outlined" color="secondary" onClick={() => setPrintModalOpen(false)} size="large" className="no-print">
             Close & Continue
           </Button>
-          <Button variant="contained" color="success" startIcon={<PrinterOutlined />} onClick={() => window.print()} size="large" className="no-print" sx={{ px: 3, fontWeight: 700 }}>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<PrinterOutlined />}
+            onClick={() => window.print()}
+            size="large"
+            className="no-print"
+            sx={{ px: 3, fontWeight: 700 }}
+          >
             Print Account Statement
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* EDIT INDIVIDUAL MACHINE INVOICE DRAWER */}
-      <Drawer anchor="right" open={editInvoiceDrawerOpen} onClose={() => setEditInvoiceDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 620 }, p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-            Edit Machine Sale Record
-          </Typography>
-          {editingInvoice && (() => {
-            const editItemsList = editingInvoice.items && editingInvoice.items.length > 0 ? editingInvoice.items : [
-              { machineName: editingInvoice.machineName || '', serialNo: editingInvoice.serialNo || '', qty: editingInvoice.qty || 1, unitPrice: editingInvoice.unitPrice || 0, discount: 0 }
-            ];
-
-            const editSubTotal = editItemsList.reduce((sum, i) => {
-              const q = parseInt(i.qty) || 1;
-              const p = parseFloat(i.unitPrice) || 0;
-              const discPercent = parseFloat(i.discount) || 0;
-              const gross = q * p;
-              const discAmt = (gross * discPercent) / 100;
-              return sum + Math.max(0, gross - discAmt);
-            }, 0);
-
-            const editPaid = parseFloat(editingInvoice.paidAmount) || 0;
-            const editBalance = Math.max(0, editSubTotal - editPaid);
-
-            return (
-              <form onSubmit={handleEditInvoiceSubmit}>
-                <Stack spacing={2.5}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Customer Name *"
-                        fullWidth
-                        required
-                        value={editingInvoice.customerName}
-                        onChange={(e) => setEditingInvoice({ ...editingInvoice, customerName: e.target.value })}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Customer Phone"
-                        fullWidth
-                        value={editingInvoice.customerPhone}
-                        onChange={(e) => setEditingInvoice({ ...editingInvoice, customerPhone: e.target.value })}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="City / Address"
-                        fullWidth
-                        value={editingInvoice.cityAddress}
-                        onChange={(e) => setEditingInvoice({ ...editingInvoice, cityAddress: e.target.value })}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  {/* Machine Items List Section */}
-                  <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc'), borderRadius: 1.5, border: '1px solid #cbd5e1' }}>
-                    <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>
-                      MACHINES INVOICED ({editItemsList.length} Items)
-                    </Typography>
-
-                    <Stack spacing={2}>
-                      {editItemsList.map((rowItem, idx) => {
-                        const q = parseInt(rowItem.qty) || 1;
-                        const p = parseFloat(rowItem.unitPrice) || 0;
-                        const d = parseFloat(rowItem.discount) || 0;
-                        const gross = q * p;
-                        const lineTot = Math.max(0, gross - (gross * d) / 100);
-
-                        return (
-                          <Box key={idx} sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #cbd5e1' }}>
-                            <Grid container spacing={1.5} alignItems="center">
-                              <Grid item xs={12} sm={7}>
-                                <Autocomplete
-                                  freeSolo
-                                  options={machineModels}
-                                  value={rowItem.machineName}
-                                  onChange={(event, newValue) => handleEditItemChange(idx, 'machineName', newValue || '')}
-                                  onInputChange={(event, newInputValue) => handleEditItemChange(idx, 'machineName', newInputValue || '')}
-                                  renderInput={(params) => (
-                                    <TextField {...params} label="MACHINE MODEL *" size="small" required />
-                                  )}
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={5}>
-                                <TextField
-                                  label="SERIAL / ENGINE NO"
-                                  size="small"
-                                  fullWidth
-                                  value={rowItem.serialNo}
-                                  onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
-                                />
-                              </Grid>
-
-                              <Grid item xs={4}>
-                                <TextField
-                                  label="QTY *"
-                                  type="number"
-                                  size="small"
-                                  fullWidth
-                                  required
-                                  inputProps={{ min: 1, style: { textAlign: 'center' } }}
-                                  value={rowItem.qty}
-                                  onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
-                                />
-                              </Grid>
-                              <Grid item xs={4}>
-                                <TextField
-                                  label="RATE (RS) *"
-                                  type="number"
-                                  size="small"
-                                  fullWidth
-                                  required
-                                  inputProps={{ min: 0, style: { textAlign: 'right' } }}
-                                  value={rowItem.unitPrice}
-                                  onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                />
-                              </Grid>
-                              <Grid item xs={4}>
-                                <TextField
-                                  label="DISC (%)"
-                                  type="number"
-                                  size="small"
-                                  fullWidth
-                                  inputProps={{ min: 0, max: 100, style: { textAlign: 'right' } }}
-                                  InputProps={{
-                                    endAdornment: <InputAdornment position="end">%</InputAdornment>
-                                  }}
-                                  value={rowItem.discount || ''}
-                                  onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
-                                />
-                              </Grid>
-
-                              <Grid item xs={8}>
-                                <Typography variant="caption" color="textSecondary" fontWeight={600}>
-                                  Line Total: <strong style={{ color: '#16a34a' }}>Rs. {lineTot.toLocaleString()}</strong>
-                                </Typography>
-                              </Grid>
-                              <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                                {editItemsList.length > 1 && (
-                                  <Button
-                                    size="small"
-                                    color="error"
-                                    startIcon={<DeleteOutlined />}
-                                    onClick={() => handleRemoveEditItemRow(idx)}
-                                    sx={{ textTransform: 'none' }}
-                                  >
-                                    Remove
-                                  </Button>
-                                )}
-                              </Grid>
-                            </Grid>
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<PlusOutlined />}
-                      onClick={handleAddEditItemRow}
-                      sx={{ mt: 1.5, fontWeight: 700 }}
-                    >
-                      Add Machine Item
-                    </Button>
-                  </Box>
-
-                  {/* Financial Summary */}
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="TOTAL INVOICE (RS)"
-                        fullWidth
-                        value={`Rs. ${editSubTotal.toLocaleString()}`}
-                        InputProps={{
-                          readOnly: true,
-                          style: { fontWeight: 800, color: '#16a34a' }
-                        }}
-                        sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'), borderRadius: 1 }}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="PAID AMOUNT (RS) *"
-                        type="number"
-                        fullWidth
-                        required
-                        value={editingInvoice.paidAmount}
-                        onChange={(e) => setEditingInvoice({ ...editingInvoice, paidAmount: parseFloat(e.target.value) || 0 })}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="REMAINING BALANCE (RS)"
-                        fullWidth
-                        value={`Rs. ${editBalance.toLocaleString()}`}
-                        InputProps={{
-                          readOnly: true,
-                          style: { fontWeight: 800, color: editBalance > 0 ? '#ef4444' : '#16a34a' }
-                        }}
-                        sx={{
-                          bgcolor: editBalance > 0 ? (theme => theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2') : (theme => theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'),
-                          borderRadius: 1
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  <TextField
-                    label="Warranty Terms & Note"
-                    fullWidth
-                    multiline
-                    rows={2}
-                    value={editingInvoice.warrantyTerms}
-                    onChange={(e) => setEditingInvoice({ ...editingInvoice, warrantyTerms: e.target.value })}
+      {/* ── EDIT INDIVIDUAL MACHINE INVOICE DRAWER (Right Side Drawer like Stock Out) ──── */}
+      <Drawer
+        anchor="right"
+        open={editInvoiceDrawerOpen}
+        onClose={() => setEditInvoiceDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 600, md: 740, lg: 820 },
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.15)'
+          }
+        }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2.2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: isDark ? 'background.paper' : '#ffffff',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <Stack direction="row" spacing={1.75} alignItems="center">
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  bgcolor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#ecfdf5',
+                  color: '#005F56',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20
+                }}
+              >
+                <EditOutlined />
+              </Box>
+              <Box>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary', fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+                    Edit Machine Sale Record
+                  </Typography>
+                  <Chip
+                    label={editingInvoice?.invoiceNo || editingInvoice?.id || ''}
+                    size="small"
+                    sx={{
+                      bgcolor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea',
+                      color: '#005F56',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      borderRadius: 1.5,
+                      border: '1px solid',
+                      borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0'
+                    }}
                   />
-
-                  <Button variant="contained" color="primary" type="submit" fullWidth size="large" sx={{ fontWeight: 700, mt: 1, py: 1.2 }}>
-                    Update Machine Sale Record
-                  </Button>
                 </Stack>
-              </form>
-            );
-          })()}
+                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.3, fontSize: '0.84rem' }}>
+                  Modify customer contact, machine models, quantities, rates, discounts, or warranty terms.
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton
+              size="small"
+              onClick={() => setEditInvoiceDrawerOpen(false)}
+              sx={{
+                color: 'text.secondary',
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
+                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0', color: 'text.primary' }
+              }}
+            >
+              <CloseOutlined style={{ fontSize: 15 }} />
+            </IconButton>
+          </Box>
+        </Box>
+
+        <Box sx={{ px: 3, pt: 3, pb: 4, flex: 1, overflowY: 'auto', bgcolor: isDark ? 'background.default' : '#ffffff' }}>
+          {editingInvoice &&
+            (() => {
+              const editItemsList =
+                editingInvoice.items && editingInvoice.items.length > 0
+                  ? editingInvoice.items
+                  : [
+                      {
+                        machineName: editingInvoice.machineName || '',
+                        serialNo: editingInvoice.serialNo || '',
+                        qty: editingInvoice.qty || 1,
+                        unitPrice: editingInvoice.unitPrice || 0,
+                        discount: 0
+                      }
+                    ];
+
+              const editSubTotal = editItemsList.reduce((sum, i) => {
+                const q = parseInt(i.qty) || 1;
+                const p = parseFloat(i.unitPrice) || 0;
+                const discPercent = parseFloat(i.discount) || 0;
+                const gross = q * p;
+                const discAmt = (gross * discPercent) / 100;
+                return sum + Math.max(0, gross - discAmt);
+              }, 0);
+
+              const editPaid = parseFloat(editingInvoice.paidAmount) || 0;
+              const editBalance = Math.max(0, editSubTotal - editPaid);
+
+              return (
+                <form id="edit-customer-ledger-invoice-form" onSubmit={handleEditInvoiceSubmit}>
+                  <Stack spacing={3}>
+                    {/* Customer Info Card */}
+                    <Box
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
+                        border: '1px solid',
+                        borderColor: isDark ? 'divider' : '#e2e8f0'
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={800}
+                        sx={{ color: 'text.primary', mb: 1.75, display: 'flex', alignItems: 'center', gap: 1 }}
+                      >
+                        <UserOutlined style={{ color: '#005F56' }} /> Customer & Warranty Details
+                      </Typography>
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                            CUSTOMER NAME *
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            required
+                            placeholder="Customer Name"
+                            value={editingInvoice.customerName || ''}
+                            onChange={(e) => setEditingInvoice({ ...editingInvoice, customerName: e.target.value })}
+                            sx={{
+                              bgcolor: isDark ? 'background.paper' : '#ffffff',
+                              '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                            }}
+                          />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                            PHONE NUMBER
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="0300-XXXXXXX"
+                            value={editingInvoice.customerPhone || ''}
+                            onChange={(e) => setEditingInvoice({ ...editingInvoice, customerPhone: e.target.value })}
+                            sx={{
+                              bgcolor: isDark ? 'background.paper' : '#ffffff',
+                              '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                            }}
+                          />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                            CITY / ADDRESS
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="e.g. Lahore, Pakistan"
+                            value={editingInvoice.cityAddress || ''}
+                            onChange={(e) => setEditingInvoice({ ...editingInvoice, cityAddress: e.target.value })}
+                            sx={{
+                              bgcolor: isDark ? 'background.paper' : '#ffffff',
+                              '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                            }}
+                          />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                            WARRANTY TERMS
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="1 Year Motor & Frame Warranty"
+                            value={editingInvoice.warrantyTerms || ''}
+                            onChange={(e) => setEditingInvoice({ ...editingInvoice, warrantyTerms: e.target.value })}
+                            sx={{
+                              bgcolor: isDark ? 'background.paper' : '#ffffff',
+                              '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Box>
+
+                    {/* Items Section Header with Add Machine Button */}
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1.5 }}>
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={800}
+                          sx={{ color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}
+                        >
+                          <EditOutlined style={{ color: '#005F56' }} /> Purchased Machines ({editItemsList.length} Items)
+                        </Typography>
+
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<PlusOutlined />}
+                          onClick={handleAddEditItemRow}
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            borderRadius: 1.5,
+                            borderColor: isDark ? 'divider' : '#cbd5e1',
+                            color: isDark ? 'text.primary' : '#334155',
+                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#ffffff',
+                            '&:hover': {
+                              borderColor: '#005F56',
+                              color: '#005F56',
+                              bgcolor: isDark ? 'rgba(0, 95, 86, 0.1)' : '#f0fdf4'
+                            }
+                          }}
+                        >
+                          Add Machine Item
+                        </Button>
+                      </Box>
+
+                      {/* Items Table */}
+                      <TableContainer
+                        component={Paper}
+                        variant="outlined"
+                        sx={{
+                          borderRadius: 2,
+                          borderColor: isDark ? 'divider' : '#e2e8f0',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <Table size="small">
+                          <TableHead sx={{ bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f1f5f9' }}>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}>
+                                MACHINE MODEL
+                              </TableCell>
+                              <TableCell
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                                width={150}
+                              >
+                                SERIAL NO
+                              </TableCell>
+                              <TableCell
+                                align="center"
+                                width={90}
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                              >
+                                QTY
+                              </TableCell>
+                              <TableCell
+                                align="center"
+                                width={150}
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                              >
+                                UNIT PRICE (PKR)
+                              </TableCell>
+                              <TableCell
+                                align="center"
+                                width={110}
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                              >
+                                DISCOUNT (%)
+                              </TableCell>
+                              <TableCell
+                                align="right"
+                                width={140}
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                              >
+                                LINE TOTAL
+                              </TableCell>
+                              <TableCell
+                                align="center"
+                                width={60}
+                                sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                              >
+                                DEL
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {editItemsList.map((rowItem, idx) => {
+                              const q = parseInt(rowItem.qty) || 1;
+                              const p = parseFloat(rowItem.unitPrice) || 0;
+                              const discPercent = parseFloat(rowItem.discount) || 0;
+                              const gross = q * p;
+                              const lineTot = Math.max(0, gross - (gross * discPercent) / 100);
+
+                              return (
+                                <TableRow
+                                  key={idx}
+                                  sx={{
+                                    '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#fafafa' },
+                                    '&:last-child td, &:last-child th': { border: 0 }
+                                  }}
+                                >
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <Autocomplete
+                                      freeSolo
+                                      size="small"
+                                      options={machineModels}
+                                      value={rowItem.machineName || ''}
+                                      onChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                      onInputChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                      renderInput={(params) => (
+                                        <TextField
+                                          {...params}
+                                          placeholder="Select or type model..."
+                                          required
+                                          size="small"
+                                          sx={{
+                                            bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                            '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                          }}
+                                        />
+                                      )}
+                                    />
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      placeholder="Serial #"
+                                      value={rowItem.serialNo || ''}
+                                      onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
+                                      sx={{
+                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      required
+                                      inputProps={{ min: 1, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 700 } }}
+                                      value={rowItem.qty || 1}
+                                      onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
+                                      sx={{
+                                        width: 70,
+                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      required
+                                      inputProps={{ min: 0, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 600 } }}
+                                      value={rowItem.unitPrice || 0}
+                                      onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                      sx={{
+                                        width: 110,
+                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      inputProps={{ min: 0, max: 100, style: { textAlign: 'center', padding: '6px 4px' } }}
+                                      value={rowItem.discount || 0}
+                                      onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                                      sx={{
+                                        width: 75,
+                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1.5 }}>
+                                    <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#005F56', fontSize: '0.95rem' }}>
+                                      Rs. {lineTot.toLocaleString()}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    {editItemsList.length > 1 ? (
+                                      <Tooltip title="Remove machine">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleRemoveEditItemRow(idx)}
+                                          sx={{
+                                            color: '#ef4444',
+                                            bgcolor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+                                            border: '1px solid',
+                                            borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#fee2e2',
+                                            '&:hover': { bgcolor: '#fee2e2', color: '#dc2626' }
+                                          }}
+                                        >
+                                          <DeleteOutlined style={{ fontSize: 14 }} />
+                                        </IconButton>
+                                      </Tooltip>
+                                    ) : (
+                                      <IconButton size="small" disabled sx={{ color: 'text.disabled' }}>
+                                        <DeleteOutlined style={{ fontSize: 14 }} />
+                                      </IconButton>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+
+                    {/* Bottom Calculations & Financial Summary */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        justifyContent: 'space-between',
+                        alignItems: 'stretch',
+                        gap: 2.5,
+                        width: '100%'
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            p: 2.5,
+                            height: '100%',
+                            borderRadius: 2.5,
+                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
+                            border: '1px solid',
+                            borderColor: isDark ? 'divider' : '#e2e8f0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight={800}
+                            sx={{ color: '#64748b', mb: 1.5, display: 'block', letterSpacing: '0.04em' }}
+                          >
+                            PAYMENT DISBURSEMENT
+                          </Typography>
+
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Paid Amount (PKR)"
+                              value={editingInvoice.paidAmount || 0}
+                              onChange={(e) => setEditingInvoice({ ...editingInvoice, paidAmount: parseFloat(e.target.value) || 0 })}
+                              sx={{
+                                flex: 1,
+                                bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                px: 2,
+                                py: 1,
+                                borderRadius: 1.5,
+                                bgcolor: editBalance > 0 ? '#fff1f0' : '#f6ffed',
+                                border: '1px solid',
+                                borderColor: editBalance > 0 ? '#ffa39e' : '#b7eb8f'
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: editBalance > 0 ? '#cf1322' : '#389e0d', fontWeight: 800, display: 'block' }}
+                              >
+                                {editBalance > 0 ? `Remaining: Rs. ${editBalance.toLocaleString()}` : 'Fully Paid'}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            p: 2.5,
+                            height: '100%',
+                            borderRadius: 2.5,
+                            bgcolor: isDark ? 'rgba(0, 95, 86, 0.08)' : '#f0fdf4',
+                            border: '1px solid',
+                            borderColor: isDark ? 'rgba(0, 95, 86, 0.3)' : '#bbf7d0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 600 }}>
+                                Total Bill Amount:
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#111827', fontWeight: 700 }}>
+                                Rs. {editSubTotal.toLocaleString()}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 600 }}>
+                                Received / Paid:
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 700 }}>
+                                Rs. {editPaid.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Box sx={{ pt: 1.5, mt: 1.5, borderTop: '1px solid', borderColor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#bbf7d0' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box>
+                                <Typography
+                                  variant="caption"
+                                  fontWeight={800}
+                                  sx={{ color: '#047857', letterSpacing: '0.04em', display: 'block' }}
+                                >
+                                  NET PAYABLE
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                  Balance: Rs. {editBalance.toLocaleString()}
+                                </Typography>
+                              </Box>
+                              <Typography
+                                variant="h4"
+                                fontWeight={900}
+                                sx={{ color: '#005F56', letterSpacing: '-0.02em', fontSize: '1.5rem' }}
+                              >
+                                Rs. {editSubTotal.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Stack>
+                </form>
+              );
+            })()}
+        </Box>
+
+        {/* Fixed Bottom Actions */}
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            bgcolor: isDark ? 'background.paper' : '#f8fafc',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Updates customer ledger balance & sales records.
+          </Typography>
+
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              onClick={() => setEditInvoiceDrawerOpen(false)}
+              variant="outlined"
+              sx={{
+                fontWeight: 700,
+                color: 'text.secondary',
+                borderColor: isDark ? 'divider' : '#cbd5e1',
+                px: 2.5,
+                py: 0.8,
+                borderRadius: 1.5,
+                textTransform: 'none',
+                fontSize: '0.9rem',
+                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9' }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              type="submit"
+              form="edit-customer-ledger-invoice-form"
+              sx={{
+                fontWeight: 700,
+                borderRadius: 1.5,
+                px: 3.5,
+                py: 0.9,
+                bgcolor: '#003830',
+                color: '#ffffff',
+                textTransform: 'none',
+                fontSize: '0.9rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 56, 48, 0.25)',
+                '&:hover': { bgcolor: '#002620', boxShadow: '0 6px 10px -1px rgba(0, 56, 48, 0.35)' }
+              }}
+            >
+              Save Changes
+            </Button>
+          </Stack>
         </Box>
       </Drawer>
 
@@ -1305,12 +1894,17 @@ export default function CustomerLedgerPage() {
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete Machine Sale Invoice</DialogTitle>
         <DialogContent>
           <Typography variant="body1">
-            Are you sure you want to delete the machine sale invoice <strong>{invoiceToDelete?.id}</strong> for <strong>{invoiceToDelete?.customerName}</strong>?
+            Are you sure you want to delete the machine sale invoice <strong>{invoiceToDelete?.id}</strong> for{' '}
+            <strong>{invoiceToDelete?.customerName}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteInvoiceDialogOpen(false)} color="secondary">Cancel</Button>
-          <Button onClick={handleConfirmDeleteInvoice} color="error" variant="contained">Delete Invoice</Button>
+          <Button onClick={() => setDeleteInvoiceDialogOpen(false)} color="secondary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDeleteInvoice} color="error" variant="contained">
+            Delete Invoice
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1362,185 +1956,327 @@ export default function CustomerLedgerPage() {
           `}
         </style>
 
-        <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>Official Customer Machine Sale Invoice</Typography>
+        <DialogTitle
+          className="no-print"
+          sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
+        >
+          <Typography variant="h5" fontWeight={700}>
+            Official Customer Machine Sale Invoice
+          </Typography>
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
-          {printInvoiceData && (() => {
-            const displayItems = (printInvoiceData.items && printInvoiceData.items.length > 0) ? printInvoiceData.items : [
-              {
-                machineName: printInvoiceData.machineName,
-                serialNo: printInvoiceData.serialNo,
-                qty: printInvoiceData.qty,
-                unitPrice: printInvoiceData.unitPrice,
-                lineTotal: printInvoiceData.lineTotal
-              }
-            ];
+          {printInvoiceData &&
+            (() => {
+              const displayItems =
+                printInvoiceData.items && printInvoiceData.items.length > 0
+                  ? printInvoiceData.items
+                  : [
+                      {
+                        machineName: printInvoiceData.machineName,
+                        serialNo: printInvoiceData.serialNo,
+                        qty: printInvoiceData.qty,
+                        unitPrice: printInvoiceData.unitPrice,
+                        lineTotal: printInvoiceData.lineTotal
+                      }
+                    ];
 
-            return (
-              <Box
-                id="printable-machine-invoice"
-                sx={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  pt: { xs: 5, sm: 7 },
-                  px: { xs: 1, sm: 1.5 },
-                  pb: { xs: 1, sm: 1.5 },
-                  bgcolor: '#ffffff',
-                  color: '#111827',
-                  borderRadius: 1
-                }}
-              >
-                <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  {/* Structured Professional Customer & Invoice Metadata Card */}
-                  <div style={{
-                    border: '1.5px solid #111827',
-                    borderRadius: '4px',
-                    marginBottom: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-                      {/* Left Column: Customer Details */}
-                      <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
-                          Customer Details
+              return (
+                <Box
+                  id="printable-machine-invoice"
+                  sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    pt: { xs: 5, sm: 7 },
+                    px: { xs: 1, sm: 1.5 },
+                    pb: { xs: 1, sm: 1.5 },
+                    bgcolor: '#ffffff',
+                    color: '#111827',
+                    borderRadius: 1
+                  }}
+                >
+                  <Box sx={{ position: 'relative', zIndex: 1 }}>
+                    {/* Structured Professional Customer & Invoice Metadata Card */}
+                    <div
+                      style={{
+                        border: '1.5px solid #111827',
+                        borderRadius: '4px',
+                        marginBottom: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                        {/* Left Column: Customer Details */}
+                        <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
+                          <div
+                            style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 800,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '2px'
+                            }}
+                          >
+                            Customer Details
+                          </div>
+                          <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
+                            {printInvoiceData.customerName}
+                          </div>
+                          <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
+                            {printInvoiceData.customerPhone && (
+                              <div>
+                                <strong>Phone:</strong> {printInvoiceData.customerPhone}
+                              </div>
+                            )}
+                            {printInvoiceData.cityAddress && (
+                              <div>
+                                <strong>City / Address:</strong> {printInvoiceData.cityAddress}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
-                          {printInvoiceData.customerName}
-                        </div>
-                        <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
-                          {printInvoiceData.customerPhone && <div><strong>Phone:</strong> {printInvoiceData.customerPhone}</div>}
-                          {printInvoiceData.cityAddress && <div><strong>City / Address:</strong> {printInvoiceData.cityAddress}</div>}
-                        </div>
-                      </div>
 
-                      {/* Right Column: Invoice Meta */}
-                      <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
-                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{printInvoiceData.id}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
-                          <span style={{ fontWeight: 700, color: '#374151' }}>{formatFullDate(printInvoiceData.time, printInvoiceData.dateISO)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
-                          <span style={{ fontWeight: 800, color: printInvoiceData.paidAmount >= printInvoiceData.lineTotal ? '#16a34a' : '#d97706' }}>
-                            {printInvoiceData.paymentStatus || 'Paid'}
-                          </span>
+                        {/* Right Column: Invoice Meta */}
+                        <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
+                            <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{printInvoiceData.id}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                            <span style={{ fontWeight: 700, color: '#374151' }}>
+                              {formatFullDate(printInvoiceData.time, printInvoiceData.dateISO)}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
+                            <span
+                              style={{
+                                fontWeight: 800,
+                                color: printInvoiceData.paidAmount >= printInvoiceData.lineTotal ? '#16a34a' : '#d97706'
+                              }}
+                            >
+                              {printInvoiceData.paymentStatus || 'Paid'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Sr</strong>
-                        </th>
-                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Specification / Model</strong>
-                        </th>
-                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>QTY</strong>
-                        </th>
-                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Rate</strong>
-                        </th>
-                        <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Total Amount</strong>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayItems.map((item, idx) => {
-                        const q = parseInt(item.qty) || 1;
-                        const p = parseFloat(item.unitPrice) || 0;
-                        const d = parseFloat(item.discount) || 0;
-                        const gross = q * p;
-                        const lineAmt = item.lineTotal !== undefined && !isNaN(item.lineTotal) ? item.lineTotal : Math.max(0, gross - (gross * d) / 100);
+                    {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        border: '1.5px solid #111827',
+                        marginBottom: '10px',
+                        backgroundColor: 'transparent'
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                          <th
+                            style={{
+                              width: '8%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 4px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Sr</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '52%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Specification / Model</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '12%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 4px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>QTY</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '14%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Rate</strong>
+                          </th>
+                          <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
+                            <strong>Total Amount</strong>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayItems.map((item, idx) => {
+                          const q = parseInt(item.qty) || 1;
+                          const p = parseFloat(item.unitPrice) || 0;
+                          const d = parseFloat(item.discount) || 0;
+                          const gross = q * p;
+                          const lineAmt =
+                            item.lineTotal !== undefined && !isNaN(item.lineTotal)
+                              ? item.lineTotal
+                              : Math.max(0, gross - (gross * d) / 100);
 
-                        return (
-                          <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {String(idx + 1).padStart(2, '0')}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                              {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {String(q).padStart(2, '0')}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {p.toLocaleString()}
-                            </td>
-                            <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {lineAmt.toLocaleString()}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 4px',
+                                  textAlign: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {String(idx + 1).padStart(2, '0')}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 8px',
+                                  textAlign: 'left',
+                                  fontWeight: 600,
+                                  fontSize: '0.82rem',
+                                  lineHeight: 1.25
+                                }}
+                              >
+                                {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 4px',
+                                  textAlign: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {String(q).padStart(2, '0')}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 8px',
+                                  textAlign: 'right',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {p.toLocaleString()}
+                              </td>
+                              <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
+                                {lineAmt.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
 
-                      {/* Total Amount Bottom Row */}
-                      <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
-                          Total amount
-                        </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
-                          {(printInvoiceData.lineTotal || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        {/* Total Amount Bottom Row */}
+                        <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                          <td
+                            colSpan={2}
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.88rem'
+                            }}
+                          >
+                            Total amount
+                          </td>
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
+                            {(printInvoiceData.lineTotal || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
 
-                  {/* Financial Summary Box */}
-                  <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                    <Grid container spacing={1} alignItems="center">
+                    {/* Financial Summary Box */}
+                    <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
+                      <Grid container spacing={1} alignItems="center">
+                        <Grid item xs={6}>
+                          <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
+                            PAID AMOUNT: Rs. {(printInvoiceData.paidAmount || 0).toLocaleString()}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                          <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
+                            NET TOTAL: Rs. {(printInvoiceData.lineTotal || 0).toLocaleString()}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            fontWeight={800}
+                            color={
+                              (printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0) > 0 ? 'error.main' : 'success.main'
+                            }
+                            display="block"
+                          >
+                            {(printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0) > 0
+                              ? `REMAINING DUE: Rs. ${Math.max(0, (printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)).toLocaleString()}`
+                              : 'FULL PAID (NO DUES)'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+
+                    {/* Signatures Footer */}
+                    <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
                       <Grid item xs={6}>
-                        <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
-                          PAID AMOUNT: Rs. {(printInvoiceData.paidAmount || 0).toLocaleString()}
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}
+                        >
+                          Customer Signature
                         </Typography>
                       </Grid>
                       <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                        <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
-                          NET TOTAL: Rs. {(printInvoiceData.lineTotal || 0).toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" fontWeight={800} color={((printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)) > 0 ? 'error.main' : 'success.main'} display="block">
-                          {((printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)) > 0 ? `REMAINING DUE: Rs. ${Math.max(0, (printInvoiceData.lineTotal || 0) - (printInvoiceData.paidAmount || 0)).toLocaleString()}` : 'FULL PAID (NO DUES)'}
-                        </Typography>
+                        <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                          <CeoSignature />
+                        </Box>
                       </Grid>
                     </Grid>
                   </Box>
-
-                  {/* Signatures Footer */}
-                  <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
-                        Customer Signature
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                      <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
-                        <CeoSignature />
-                      </Box>
-                    </Grid>
-                  </Grid>
                 </Box>
-              </Box>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
         <DialogActions className="no-print" sx={{ p: 2 }}>
-          <Button className="no-print" onClick={() => setPrintInvoiceModalOpen(false)}>Close & Continue</Button>
-          <Button className="no-print" variant="contained" color="success" startIcon={<PrinterOutlined />} onClick={() => window.print()} sx={{ fontWeight: 700 }}>
+          <Button className="no-print" onClick={() => setPrintInvoiceModalOpen(false)}>
+            Close & Continue
+          </Button>
+          <Button
+            className="no-print"
+            variant="contained"
+            color="success"
+            startIcon={<PrinterOutlined />}
+            onClick={() => window.print()}
+            sx={{ fontWeight: 700 }}
+          >
             Print Customer Machine Bill
           </Button>
         </DialogActions>
@@ -1592,35 +2328,67 @@ export default function CustomerLedgerPage() {
           `}
         </style>
 
-        <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>Machine Repairing Job Card Invoice Receipt</Typography>
+        <DialogTitle
+          className="no-print"
+          sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
+        >
+          <Typography variant="h5" fontWeight={700}>
+            Machine Repairing Job Card Invoice Receipt
+          </Typography>
           <Chip label="Repair Receipt" color="success" size="small" />
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
           {printRepairData && (
-            <Box id="printable-ledger-repair-jobcard" sx={{ position: 'relative', overflow: 'hidden', pt: { xs: 5, sm: 7 }, px: { xs: 1, sm: 1.5 }, pb: { xs: 1, sm: 1.5 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+            <Box
+              id="printable-ledger-repair-jobcard"
+              sx={{
+                position: 'relative',
+                overflow: 'hidden',
+                pt: { xs: 5, sm: 7 },
+                px: { xs: 1, sm: 1.5 },
+                pb: { xs: 1, sm: 1.5 },
+                bgcolor: '#ffffff',
+                color: '#111827',
+                borderRadius: 1
+              }}
+            >
               <Box sx={{ position: 'relative', zIndex: 1 }}>
                 {/* Structured Professional Customer & Repair Metadata Card */}
-                <div style={{
-                  border: '1.5px solid #111827',
-                  borderRadius: '4px',
-                  marginBottom: '10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.45)',
-                  overflow: 'hidden'
-                }}>
+                <div
+                  style={{
+                    border: '1.5px solid #111827',
+                    borderRadius: '4px',
+                    marginBottom: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                    overflow: 'hidden'
+                  }}
+                >
                   <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
                     {/* Left Column: Customer Details */}
                     <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
-                      <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                      <div
+                        style={{
+                          fontSize: '0.70rem',
+                          fontWeight: 800,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '2px'
+                        }}
+                      >
                         Customer Details
                       </div>
                       <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
                         {printRepairData.customerName}
                       </div>
                       <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
-                        <div><strong>Phone:</strong> {printRepairData.customerPhone || printRepairData.phone || 'N/A'}</div>
-                        <div><strong>City / Address:</strong> {printRepairData.cityAddress || printRepairData.city || 'N/A'}</div>
+                        <div>
+                          <strong>Phone:</strong> {printRepairData.customerPhone || printRepairData.phone || 'N/A'}
+                        </div>
+                        <div>
+                          <strong>City / Address:</strong> {printRepairData.cityAddress || printRepairData.city || 'N/A'}
+                        </div>
                       </div>
                     </div>
 
@@ -1628,7 +2396,9 @@ export default function CustomerLedgerPage() {
                     <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                         <span style={{ color: '#6b7280', fontWeight: 700 }}>Job Card No:</span>
-                        <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{printRepairData.repairNo || printRepairData.id}</span>
+                        <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>
+                          {printRepairData.repairNo || printRepairData.id}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                         <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
@@ -1642,26 +2412,77 @@ export default function CustomerLedgerPage() {
                   </div>
 
                   {/* Machine Model Highlight Strip */}
-                  <div style={{ padding: '4px 10px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.82rem' }}>
+                  <div
+                    style={{
+                      padding: '4px 10px',
+                      backgroundColor: 'rgba(240, 253, 244, 0.55)',
+                      borderTop: '1px solid #bbf7d0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontSize: '0.82rem'
+                    }}
+                  >
                     <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Model Under Repair:</span>
-                    <span style={{ fontWeight: 800, color: '#111827' }}>{printRepairData.machineName || printRepairData.machineModel || 'Lawn Mower Machine'}</span>
+                    <span style={{ fontWeight: 800, color: '#111827' }}>
+                      {printRepairData.machineName || printRepairData.machineModel || 'Lawn Mower Machine'}
+                    </span>
                   </div>
                 </div>
 
                 {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    border: '1.5px solid #111827',
+                    marginBottom: '10px',
+                    backgroundColor: 'transparent'
+                  }}
+                >
                   <thead>
                     <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                      <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
+                      <th
+                        style={{
+                          width: '8%',
+                          borderRight: '1.5px solid #111827',
+                          padding: '4px 4px',
+                          textAlign: 'center',
+                          fontSize: '0.82rem'
+                        }}
+                      >
                         <strong>Sr</strong>
                       </th>
-                      <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
+                      <th
+                        style={{
+                          width: '52%',
+                          borderRight: '1.5px solid #111827',
+                          padding: '4px 8px',
+                          textAlign: 'center',
+                          fontSize: '0.82rem'
+                        }}
+                      >
                         <strong>Specification</strong>
                       </th>
-                      <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
+                      <th
+                        style={{
+                          width: '12%',
+                          borderRight: '1.5px solid #111827',
+                          padding: '4px 4px',
+                          textAlign: 'center',
+                          fontSize: '0.82rem'
+                        }}
+                      >
                         <strong>QTY</strong>
                       </th>
-                      <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
+                      <th
+                        style={{
+                          width: '14%',
+                          borderRight: '1.5px solid #111827',
+                          padding: '4px 8px',
+                          textAlign: 'center',
+                          fontSize: '0.82rem'
+                        }}
+                      >
                         <strong>Rate</strong>
                       </th>
                       <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
@@ -1674,20 +2495,53 @@ export default function CustomerLedgerPage() {
                       printRepairData.repairItems.map((item, idx) => {
                         const itemQty = parseInt(item.qnty) || 1;
                         const itemRate = parseFloat(item.rate) || 0;
-                        const itemTotal = item.totalAmount || (itemQty * itemRate);
+                        const itemTotal = item.totalAmount || itemQty * itemRate;
 
                         return (
                           <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
+                            <td
+                              style={{
+                                borderRight: '1.5px solid #111827',
+                                padding: '3px 4px',
+                                textAlign: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.82rem'
+                              }}
+                            >
                               {String(idx + 1).padStart(2, '0')}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
+                            <td
+                              style={{
+                                borderRight: '1.5px solid #111827',
+                                padding: '3px 8px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '0.82rem',
+                                lineHeight: 1.25
+                              }}
+                            >
                               {item.specification || item.itemName || item.model}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
+                            <td
+                              style={{
+                                borderRight: '1.5px solid #111827',
+                                padding: '3px 4px',
+                                textAlign: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.82rem'
+                              }}
+                            >
                               {String(itemQty).padStart(2, '0')}
                             </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
+                            <td
+                              style={{
+                                borderRight: '1.5px solid #111827',
+                                padding: '3px 8px',
+                                textAlign: 'right',
+                                fontWeight: 800,
+                                fontSize: '0.82rem'
+                              }}
+                            >
                               {itemRate.toLocaleString()}
                             </td>
                             <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
@@ -1698,16 +2552,49 @@ export default function CustomerLedgerPage() {
                       })
                     ) : (
                       <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
+                        <td
+                          style={{
+                            borderRight: '1.5px solid #111827',
+                            padding: '3px 4px',
+                            textAlign: 'center',
+                            fontWeight: 800,
+                            fontSize: '0.82rem'
+                          }}
+                        >
                           01
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
+                        <td
+                          style={{
+                            borderRight: '1.5px solid #111827',
+                            padding: '3px 8px',
+                            textAlign: 'left',
+                            fontWeight: 600,
+                            fontSize: '0.82rem',
+                            lineHeight: 1.25
+                          }}
+                        >
                           {printRepairData.faultDescription || 'General Repair & Overhauling'}
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
+                        <td
+                          style={{
+                            borderRight: '1.5px solid #111827',
+                            padding: '3px 4px',
+                            textAlign: 'center',
+                            fontWeight: 800,
+                            fontSize: '0.82rem'
+                          }}
+                        >
                           01
                         </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
+                        <td
+                          style={{
+                            borderRight: '1.5px solid #111827',
+                            padding: '3px 8px',
+                            textAlign: 'right',
+                            fontWeight: 800,
+                            fontSize: '0.82rem'
+                          }}
+                        >
                           {(printRepairData.totalCost || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
@@ -1718,7 +2605,16 @@ export default function CustomerLedgerPage() {
 
                     {/* Total Amount Bottom Row */}
                     <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                      <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
+                      <td
+                        colSpan={2}
+                        style={{
+                          borderRight: '1.5px solid #111827',
+                          padding: '4px 8px',
+                          textAlign: 'center',
+                          fontWeight: 800,
+                          fontSize: '0.88rem'
+                        }}
+                      >
                         Total amount
                       </td>
                       <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
@@ -1742,8 +2638,14 @@ export default function CustomerLedgerPage() {
                       <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                         NET TOTAL: Rs. {(printRepairData.totalCost || printRepairData.lineTotal || 0).toLocaleString()}
                       </Typography>
-                      <Typography variant="subtitle2" fontWeight={800} color={(printRepairData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}>
-                        {(printRepairData.balanceAmount || 0) > 0 ? `REMAINING DUE: Rs. ${(printRepairData.balanceAmount || 0).toLocaleString()}` : 'FULL PAID (NO DUES)'}
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={800}
+                        color={(printRepairData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}
+                      >
+                        {(printRepairData.balanceAmount || 0) > 0
+                          ? `REMAINING DUE: Rs. ${(printRepairData.balanceAmount || 0).toLocaleString()}`
+                          : 'FULL PAID (NO DUES)'}
                       </Typography>
                     </Grid>
                   </Grid>

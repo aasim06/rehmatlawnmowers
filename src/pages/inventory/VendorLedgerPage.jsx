@@ -21,6 +21,7 @@ import Chip from '@mui/material/Chip';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 
@@ -37,7 +38,7 @@ import MainCard from 'components/MainCard';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function VendorLedgerPage() {
-  const { vendors, usageLogs, vendorPayments, addVendorPayment, deleteVendorPayment } = useStoreInventory();
+  const { vendors, usageLogs, vendorPayments, addVendorPayment, deleteVendorPayment, deleteVendor, deleteMultipleLogs } = useStoreInventory();
 
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,14 +77,28 @@ export default function VendorLedgerPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printVendorData, setPrintVendorData] = useState(null);
 
+  // Vendor Delete Confirmation State
+  const [deleteVendorModalOpen, setDeleteVendorModalOpen] = useState(false);
+  const [vendorToDelete, setVendorToDelete] = useState(null);
+  const [deletedVendorNames, setDeletedVendorNames] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rehmat_deleted_vendor_ledger_names') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
   // Filter Stock In logs
   const stockInLogs = usageLogs.filter((log) => log.type && log.type.toUpperCase().includes('IN'));
 
-  // Group Stock In logs by Vendor
+  // Group Stock In logs by Vendor (normalized lowerCase keys)
   const vendorMap = {};
   vendors.forEach((v) => {
-    vendorMap[v.name.trim()] = {
-      vendorName: v.name.trim(),
+    const rawName = (v.name || '').trim();
+    if (!rawName) return;
+    const key = rawName.toLowerCase();
+    vendorMap[key] = {
+      vendorName: rawName,
       contactPerson: v.contactPerson || '',
       phone: v.phone || '',
       category: v.category || '',
@@ -96,9 +111,10 @@ export default function VendorLedgerPage() {
   });
 
   stockInLogs.forEach((log) => {
-    const vName = (log.usedBy || 'Unknown Supplier').trim();
-    if (!vendorMap[vName]) {
-      vendorMap[vName] = {
+    const vName = (log.usedBy || log.vendor || log.department || 'Unknown Supplier').trim();
+    const key = vName.toLowerCase();
+    if (!vendorMap[key]) {
+      vendorMap[key] = {
         vendorName: vName,
         contactPerson: '',
         phone: '',
@@ -110,27 +126,33 @@ export default function VendorLedgerPage() {
         shipments: []
       };
     }
-    const logTotal = log.lineTotal || ((parseInt(log.qtyUsed) || 1) * (parseFloat(log.unitPrice) || 0));
-    vendorMap[vName].totalShipmentsCount += 1;
-    vendorMap[vName].totalPurchasesVal += logTotal;
-    vendorMap[vName].shipments.push(log);
+    const logTotal = (log.lineTotal && log.lineTotal > 0) ? log.lineTotal : ((parseInt(log.qtyUsed) || 1) * (parseFloat(log.unitPrice) || 0));
+    vendorMap[key].totalShipmentsCount += 1;
+    vendorMap[key].totalPurchasesVal += logTotal;
+    vendorMap[key].shipments.push(log);
   });
 
   // Add payments made to vendor
   vendorPayments.forEach((p) => {
-    const vName = p.vendorName.trim();
-    if (vendorMap[vName]) {
-      vendorMap[vName].totalPaidVal += parseFloat(p.amountPaid) || 0;
+    const key = (p.vendorName || '').trim().toLowerCase();
+    if (vendorMap[key]) {
+      vendorMap[key].totalPaidVal += parseFloat(p.amountPaid) || 0;
     }
   });
 
-  // Calculate Net Balances
-  const vendorList = Object.values(vendorMap).map((v) => {
-    const balance = Math.max(0, v.totalPurchasesVal - v.totalPaidVal);
-    return { ...v, balanceVal: balance };
-  });
+  // Calculate Net Balances - Only include vendors who have transactions / hisab (purchases, payments, or shipments)
+  const vendorList = Object.values(vendorMap)
+    .filter((v) => !deletedVendorNames.includes((v.vendorName || '').trim().toLowerCase()))
+    .filter((v) => v.totalPurchasesVal > 0 || v.totalPaidVal > 0 || v.totalShipmentsCount > 0)
+    .map((v) => {
+      const balance = Math.max(0, v.totalPurchasesVal - v.totalPaidVal);
+      return { ...v, balanceVal: balance };
+    });
 
-  // Filtered List - ONLY display vendors when user searches
+  // Sort: Vendors with balance due first, then highest purchases
+  vendorList.sort((a, b) => (b.balanceVal - a.balanceVal) || (b.totalPurchasesVal - a.totalPurchasesVal));
+
+  // Filtered List - Show all vendors by default! Filter when search term entered
   const filteredVendors = searchTerm.trim()
     ? vendorList.filter(
         (v) =>
@@ -138,7 +160,7 @@ export default function VendorLedgerPage() {
           v.phone.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
           v.category.toLowerCase().includes(searchTerm.trim().toLowerCase())
       )
-    : [];
+    : vendorList;
 
   // Overall Summary
   const grandTotalPurchases = vendorList.reduce((acc, v) => acc + v.totalPurchasesVal, 0);
@@ -190,6 +212,48 @@ export default function VendorLedgerPage() {
       voucherNo: biltyNos.length > 0 ? `Bill #${biltyNos.join(', #')}` : `VND-${Math.floor(1000 + Math.random() * 9000)}`
     });
     setPrintModalOpen(true);
+  };
+
+  // Open Delete Vendor Confirmation
+  const handleOpenDeleteVendor = (vendor) => {
+    setVendorToDelete(vendor);
+    setDeleteVendorModalOpen(true);
+  };
+
+  // Confirm Delete Vendor
+  const handleConfirmDeleteVendor = () => {
+    if (!vendorToDelete) return;
+    const targetName = (vendorToDelete.vendorName || '').trim();
+    const targetKey = targetName.toLowerCase();
+
+    // 1. Delete matching vendor entity from Store vendors if exists
+    const matched = vendors.find((vend) => (vend.name || '').trim().toLowerCase() === targetKey);
+    if (matched?.id && deleteVendor) {
+      deleteVendor(matched.id);
+    }
+
+    // 2. Delete all payment records for this vendor
+    const matchingPayments = vendorPayments.filter((p) => (p.vendorName || '').trim().toLowerCase() === targetKey);
+    matchingPayments.forEach((p) => {
+      if (deleteVendorPayment) deleteVendorPayment(p.id);
+    });
+
+    // 3. Delete shipment/stock-in logs for this vendor
+    if (vendorToDelete.shipments && vendorToDelete.shipments.length > 0 && deleteMultipleLogs) {
+      deleteMultipleLogs(vendorToDelete.shipments.map((s) => s.id));
+    }
+
+    // 4. Record in deleted list to guarantee immediate removal
+    const updated = Array.from(new Set([...deletedVendorNames, targetKey]));
+    setDeletedVendorNames(updated);
+    try {
+      localStorage.setItem('rehmat_deleted_vendor_ledger_names', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setDeleteVendorModalOpen(false);
+    setVendorToDelete(null);
   };
 
   return (
@@ -334,35 +398,14 @@ export default function VendorLedgerPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {!searchTerm.trim() ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    align="center"
-                    sx={{
-                      py: 8,
-                      bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#fafbfc')
-                    }}
-                  >
-                    <Box sx={{ maxWidth: 480, mx: 'auto', textAlign: 'center' }}>
-                      <SearchOutlined style={{ fontSize: '2.5rem', color: '#a855f7', marginBottom: '12px', display: 'inline-block' }} />
-                      <Typography variant="h5" fontWeight={700} color="textPrimary" gutterBottom>
-                        Search Vendor to View Ledger
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Vendors are hidden by default. Type any supplier or vendor name in the search box above to view their shipments, balances, and history.
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : filteredVendors.length === 0 ? (
+              {filteredVendors.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <Typography variant="body1" fontWeight={700} color="textSecondary">
-                      No Vendor Found Matching &quot;{searchTerm}&quot;
+                      {searchTerm ? `No Vendor Found Matching "${searchTerm}"` : 'No Vendor Records Found'}
                     </Typography>
                     <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
-                      Please check the vendor name or phone number.
+                      {searchTerm ? 'Please check the vendor name or phone number.' : 'Stock in items will automatically list vendors and their payables here.'}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -405,38 +448,84 @@ export default function VendorLedgerPage() {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<DollarOutlined />}
-                          onClick={() => handleOpenPaymentModal(v)}
-                          sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' }, fontWeight: 700 }}
-                        >
-                          Pay Vendor
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          color="info"
-                          startIcon={<HistoryOutlined />}
-                          onClick={() => {
-                            setSelectedVendorForHistory(v);
-                            setHistoryModalOpen(true);
-                          }}
-                          sx={{ fontWeight: 700 }}
-                        >
-                          History
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<PrinterOutlined />}
-                          onClick={() => handlePrintStatement(v)}
-                          sx={{ fontWeight: 700 }}
-                        >
-                          Statement
-                        </Button>
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <Tooltip title="Pay Vendor (Record Payment)">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenPaymentModal(v)}
+                            sx={{
+                              color: '#ffffff',
+                              bgcolor: '#a855f7',
+                              borderRadius: 1.5,
+                              p: 0.85,
+                              boxShadow: '0 1px 2px rgba(168, 85, 247, 0.3)',
+                              '&:hover': { bgcolor: '#9333ea', transform: 'translateY(-1px)' },
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <DollarOutlined style={{ fontSize: '1.05rem' }} />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="View Payment & Shipment History">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedVendorForHistory(v);
+                              setHistoryModalOpen(true);
+                            }}
+                            sx={{
+                              color: '#0284c7',
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : '#e0f2fe'),
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.4)' : '#bae6fd'),
+                              borderRadius: 1.5,
+                              p: 0.85,
+                              '&:hover': { bgcolor: '#0284c7', color: '#fff', transform: 'translateY(-1px)' },
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <HistoryOutlined style={{ fontSize: '1.05rem' }} />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Print Vendor Statement">
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePrintStatement(v)}
+                            sx={{
+                              color: '#059669',
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5'),
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.4)' : '#a7f3d0'),
+                              borderRadius: 1.5,
+                              p: 0.85,
+                              '&:hover': { bgcolor: '#059669', color: '#fff', transform: 'translateY(-1px)' },
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <PrinterOutlined style={{ fontSize: '1.05rem' }} />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Delete Vendor / Clear Records">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDeleteVendor(v)}
+                            sx={{
+                              color: '#dc2626',
+                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.2)' : '#fee2e2'),
+                              border: '1px solid',
+                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.4)' : '#fecaca'),
+                              borderRadius: 1.5,
+                              p: 0.85,
+                              '&:hover': { bgcolor: '#dc2626', color: '#fff', transform: 'translateY(-1px)' },
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <DeleteOutlined style={{ fontSize: '1.05rem' }} />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -446,7 +535,7 @@ export default function VendorLedgerPage() {
           </Table>
         </TableContainer>
 
-        {searchTerm.trim() && filteredVendors.length > 0 && (
+        {filteredVendors.length > 0 && (
           <TablePagination
             rowsPerPageOptions={[10, 25, 50, 100]}
             component="div"
@@ -495,10 +584,12 @@ export default function VendorLedgerPage() {
                   <TextField
                     type="number"
                     fullWidth
+                    autoFocus
                     required
                     placeholder="Enter amount in PKR..."
                     inputProps={{ min: 1 }}
                     value={paymentForm.amountPaid}
+                    onFocus={(e) => e.target.select?.()}
                     onChange={(e) => setPaymentForm({ ...paymentForm, amountPaid: e.target.value })}
                   />
                 </Box>
@@ -843,7 +934,7 @@ export default function VendorLedgerPage() {
                         </Typography>
                       ) : (
                         <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', display: 'block', mt: 0.3 }}>
-                          Payment: Full Udhaar (Credit Purchase)
+                          Payment: Full Credit Purchase (Unpaid)
                         </Typography>
                       )}
                     </div>
@@ -896,6 +987,42 @@ export default function VendorLedgerPage() {
           </Button>
         </DialogActions>
       </Dialog >
+
+      {/* VENDOR DELETE CONFIRMATION DIALOG */}
+      <Dialog
+        open={deleteVendorModalOpen}
+        onClose={() => setDeleteVendorModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteOutlined />
+          <span>Delete Vendor Confirmation</span>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2.5 }}>
+          <Typography variant="body1" color="textPrimary">
+            Are you sure you want to delete vendor <strong>&quot;{vendorToDelete?.vendorName}&quot;</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            This action will delete the vendor profile, clear their payment records, and remove them from the Vendor Payables directory.
+          </Typography>
+          {vendorToDelete && Number(vendorToDelete.balanceVal) > 0 && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fef2f2', borderRadius: 1.5, border: '1px solid #fecaca' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#b91c1c' }}>
+                Note: This vendor has an outstanding balance of Rs. {Number(vendorToDelete.balanceVal).toLocaleString()}.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+          <Button onClick={() => setDeleteVendorModalOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDeleteVendor} variant="contained" color="error" startIcon={<DeleteOutlined />} sx={{ fontWeight: 700 }}>
+            Confirm Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box >
   );
 }

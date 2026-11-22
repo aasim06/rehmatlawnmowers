@@ -223,7 +223,7 @@ export default function AddItemNamePage() {
           Quick Setup: Master Item Names
         </Typography>
         <Typography variant="caption" color="textSecondary">
-          Yahan aap apne factory store ke items ke naam 1 dafa save kar lein. Jab aap store mein naya item add karenge ya stock receive/issue karenge to aapko baar baar naam type nahi karna parega!
+          Save your factory store item names here once. When adding new items, receiving stock, or issuing items, you will not need to retype the name every time!
         </Typography>
       </Box>
 

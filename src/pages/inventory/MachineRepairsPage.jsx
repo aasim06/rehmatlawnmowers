@@ -453,7 +453,7 @@ const STATUS_DESCRIPTIONS = {
   'Received': {
     label: 'Machine Received',
     subtext: 'Workshop Inflow',
-    tooltip: 'Customer ne machine repair ke liye dukan/workshop par jama karwayi hai.',
+    tooltip: 'Customer dropped off the machine at the workshop for repairs.',
     color: '#d46b08',
     bg: '#fffbe6',
     border: '#ffe58f',
@@ -462,7 +462,7 @@ const STATUS_DESCRIPTIONS = {
   'In Repair': {
     label: 'In Repairing',
     subtext: 'Work in Progress',
-    tooltip: 'Mechanic iss machine ki repairing aur servicing kar raha hai.',
+    tooltip: 'Technician is actively servicing and repairing this machine.',
     color: '#096dd9',
     bg: '#e6f7ff',
     border: '#91caff',
@@ -471,7 +471,7 @@ const STATUS_DESCRIPTIONS = {
   'Ready for Delivery': {
     label: 'Ready for Delivery',
     subtext: 'Repair Complete',
-    tooltip: 'Machine repair ho chuki hai, customer ko hand-over ke liye tayar hai.',
+    tooltip: 'Machine repair is complete and ready for customer handover.',
     color: '#389e0d',
     bg: '#f6ffed',
     border: '#b7eb8f',
@@ -480,7 +480,7 @@ const STATUS_DESCRIPTIONS = {
   'Delivered': {
     label: 'Delivered to Customer',
     subtext: 'Handover Completed',
-    tooltip: 'Customer ne bill settle karke machine le li hai.',
+    tooltip: 'Customer settled the bill and received the machine.',
     color: '#595959',
     bg: '#f5f5f5',
     border: '#d9d9d9',

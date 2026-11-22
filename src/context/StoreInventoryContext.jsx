@@ -2364,7 +2364,11 @@ export function StoreInventoryProvider({ children }) {
       deleteExpense,
       expenseCategories,
       addExpenseCategory,
-      deleteExpenseCategory
+      deleteExpenseCategory,
+      shopSales: machineSales,
+      addShopSale: addMachineSale,
+      updateShopSale: updateMachineSale,
+      deleteShopSale: deleteMachineSale
     }),
     [
       items,

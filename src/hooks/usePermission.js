@@ -63,7 +63,8 @@ export function usePermission() {
     '/shop/stock-in': 'shop-add-product',
     '/shop/stock-out': 'shop-mart',
     '/shop/mart': 'shop-mart',
-    '/shop/ledger': 'shop-ledger'
+    '/shop/ledger': 'shop-ledger',
+    '/shop/invoices': 'shop-invoices'
   };
 
   // Check if a specific navigation item (by id or url) is allowed
@@ -113,12 +114,19 @@ export function usePermission() {
         userPerms['shop-dashboard'] ||
         userPerms['shop-mart'] ||
         userPerms['shop-add-product'] ||
-        userPerms['shop-ledger']
+        userPerms['shop-ledger'] ||
+        userPerms['shop-invoices']
       );
     }
 
     // 7. By default, individual shop items must be enabled in userPerms
-    if (itemId === 'shop-dashboard' || itemId === 'shop-add-product' || itemId === 'shop-mart' || itemId === 'shop-ledger') {
+    if (
+      itemId === 'shop-dashboard' ||
+      itemId === 'shop-add-product' ||
+      itemId === 'shop-mart' ||
+      itemId === 'shop-ledger' ||
+      itemId === 'shop-invoices'
+    ) {
       return Boolean(userPerms[itemId]);
     }
 

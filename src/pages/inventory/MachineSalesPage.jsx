@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
 import CeoSignature from 'components/CeoSignature';
@@ -15,7 +16,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
   Drawer,
   Grid,
   IconButton,
@@ -43,22 +43,12 @@ import {
   DeleteOutlined,
   EditOutlined,
   PrinterOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloseCircleOutlined,
+  CloseOutlined,
   FileTextOutlined
 } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
-
-const defaultMachineModels = [
-  'Rehmat 20" Lawn Mower (Petrol Engine)',
-  'Rehmat Electric Lawn Cutter 18"',
-  'Rehmat Heavy Duty Lawn Mower 24"',
-  'Rehmat Grass Trimmer & Cutter 2-Stroke',
-  'Rehmat Hand Push Lawn Roller Mower'
-];
 
 const formatFullDate = (timeStr, dateISO) => {
   if (dateISO) {
@@ -78,17 +68,22 @@ const formatFullDate = (timeStr, dateISO) => {
 
 const formatInvoiceNo = (sale) => {
   if (!sale) return 'MS-10001';
-  const num = typeof sale === 'string' ? sale : (sale.saleNo || sale.sale_no || sale.id);
+  const num = typeof sale === 'string' ? sale : sale.saleNo || sale.sale_no || sale.id;
   if (!num) return 'MS-10001';
   const str = String(num).trim();
   if ((str.startsWith('MS-') || str.startsWith('PO-') || str.startsWith('REP-') || str.startsWith('INV-')) && str.length <= 15) {
     return str;
   }
-  const cleanHex = str.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
+  const cleanHex = str
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 5)
+    .toUpperCase();
   return `MS-${cleanHex || '10001'}`;
 };
 
 export default function MachineSalesPage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const { canDelete, canEditPrice } = usePermission();
   const {
     machineSales = [],
@@ -165,8 +160,7 @@ export default function MachineSalesPage() {
       (item.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.cityAddress || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === 'ALL' || item.paymentStatus === statusFilter;
+    const matchesStatus = statusFilter === 'ALL' || item.paymentStatus === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -295,14 +289,17 @@ export default function MachineSalesPage() {
 
   // Open Edit Drawer
   const handleOpenEdit = (sale) => {
-    const itemsArray = (sale.items && sale.items.length > 0) ? sale.items : [
-      {
-        machineName: sale.machineName,
-        serialNo: sale.serialNo,
-        qty: sale.qty,
-        unitPrice: sale.unitPrice
-      }
-    ];
+    const itemsArray =
+      sale.items && sale.items.length > 0
+        ? sale.items
+        : [
+            {
+              machineName: sale.machineName,
+              serialNo: sale.serialNo,
+              qty: sale.qty,
+              unitPrice: sale.unitPrice
+            }
+          ];
 
     setEditingSale({ ...sale, items: itemsArray });
     setEditDrawerOpen(true);
@@ -312,33 +309,43 @@ export default function MachineSalesPage() {
     e.preventDefault();
     if (!editingSale) return;
 
-    const itemsList = (editingSale.items && editingSale.items.length > 0)
-      ? editingSale.items.map((i) => {
-        const q = parseInt(i.qty) || 1;
-        const p = parseFloat(i.unitPrice) || 0;
-        const discPercent = parseFloat(i.discount) || 0;
-        const gross = q * p;
-        const discAmount = (gross * discPercent) / 100;
-        const lineTotal = Math.max(0, gross - discAmount);
-        return {
-          machineName: i.machineName || 'Machine',
-          serialNo: i.serialNo || '',
-          qty: q,
-          unitPrice: p,
-          discount: discPercent,
-          discountAmount: discAmount,
-          lineTotal
-        };
-      })
-      : [{
-        machineName: editingSale.machineName,
-        serialNo: editingSale.serialNo,
-        qty: parseInt(editingSale.qty) || 1,
-        unitPrice: parseFloat(editingSale.unitPrice) || 0,
-        discount: parseFloat(editingSale.discount) || 0,
-        discountAmount: (((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100,
-        lineTotal: Math.max(0, ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) - ((((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0)) * (parseFloat(editingSale.discount) || 0)) / 100))
-      }];
+    const itemsList =
+      editingSale.items && editingSale.items.length > 0
+        ? editingSale.items.map((i) => {
+            const q = parseInt(i.qty) || 1;
+            const p = parseFloat(i.unitPrice) || 0;
+            const discPercent = parseFloat(i.discount) || 0;
+            const gross = q * p;
+            const discAmount = (gross * discPercent) / 100;
+            const lineTotal = Math.max(0, gross - discAmount);
+            return {
+              machineName: i.machineName || 'Machine',
+              serialNo: i.serialNo || '',
+              qty: q,
+              unitPrice: p,
+              discount: discPercent,
+              discountAmount: discAmount,
+              lineTotal
+            };
+          })
+        : [
+            {
+              machineName: editingSale.machineName,
+              serialNo: editingSale.serialNo,
+              qty: parseInt(editingSale.qty) || 1,
+              unitPrice: parseFloat(editingSale.unitPrice) || 0,
+              discount: parseFloat(editingSale.discount) || 0,
+              discountAmount:
+                ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) * (parseFloat(editingSale.discount) || 0)) /
+                100,
+              lineTotal: Math.max(
+                0,
+                (parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) -
+                  ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) * (parseFloat(editingSale.discount) || 0)) /
+                    100
+              )
+            }
+          ];
 
     const subTotal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
     const discSum = itemsList.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
@@ -384,10 +391,7 @@ export default function MachineSalesPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        items: [
-          ...(prev.items || []),
-          { machineName: '', serialNo: '', qty: 1, unitPrice: 0, discount: 0 }
-        ]
+        items: [...(prev.items || []), { machineName: '', serialNo: '', qty: 1, unitPrice: 0, discount: 0 }]
       };
     });
   };
@@ -485,7 +489,15 @@ export default function MachineSalesPage() {
 
             {/* ROW 2: Multi-Item Machine Rows Section */}
             <Grid size={{ xs: 12 }}>
-              <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'), borderRadius: 1.5, border: '1px solid', borderColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : '#e2e8f0') }}>
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'),
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : '#e2e8f0')
+                }}
+              >
                 <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, color: 'primary.main' }}>
                   Machines Purchased ({form.items.length} Items)
                 </Typography>
@@ -494,12 +506,24 @@ export default function MachineSalesPage() {
                   <Table size="small">
                     <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
                       <TableRow>
-                        <TableCell style={{ width: '32%' }}><strong>MACHINE MODEL*</strong></TableCell>
-                        <TableCell style={{ width: '18%' }}><strong>SERIAL NO</strong></TableCell>
-                        <TableCell align="center" style={{ width: '8%' }}><strong>QTY *</strong></TableCell>
-                        <TableCell align="right" style={{ width: '14%' }}><strong>RATE *</strong></TableCell>
-                        <TableCell align="right" style={{ width: '12%' }}><strong>DISC (%)</strong></TableCell>
-                        <TableCell align="right" style={{ width: '12%' }}><strong>TOTAL</strong></TableCell>
+                        <TableCell style={{ width: '32%' }}>
+                          <strong>MACHINE MODEL*</strong>
+                        </TableCell>
+                        <TableCell style={{ width: '18%' }}>
+                          <strong>SERIAL NO</strong>
+                        </TableCell>
+                        <TableCell align="center" style={{ width: '8%' }}>
+                          <strong>QTY *</strong>
+                        </TableCell>
+                        <TableCell align="right" style={{ width: '14%' }}>
+                          <strong>RATE *</strong>
+                        </TableCell>
+                        <TableCell align="right" style={{ width: '12%' }}>
+                          <strong>DISC (%)</strong>
+                        </TableCell>
+                        <TableCell align="right" style={{ width: '12%' }}>
+                          <strong>TOTAL</strong>
+                        </TableCell>
                         <TableCell align="center" style={{ width: '4%' }}></TableCell>
                       </TableRow>
                     </TableHead>
@@ -519,14 +543,7 @@ export default function MachineSalesPage() {
                                 value={rowItem.machineName}
                                 onChange={(event, newValue) => handleItemRowChange(idx, 'machineName', newValue || '')}
                                 onInputChange={(event, newInputValue) => handleItemRowChange(idx, 'machineName', newInputValue || '')}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    placeholder="Select Model..."
-                                    size="small"
-                                    required
-                                  />
-                                )}
+                                renderInput={(params) => <TextField {...params} placeholder="Select Model..." size="small" required />}
                               />
                             </TableCell>
                             <TableCell>
@@ -642,7 +659,10 @@ export default function MachineSalesPage() {
                   style: { fontWeight: 800, color: balanceVal > 0 ? '#ef4444' : '#10b981', fontSize: '1.05rem' }
                 }}
                 sx={{
-                  bgcolor: balanceVal > 0 ? (theme => theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2') : (theme => theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'),
+                  bgcolor:
+                    balanceVal > 0
+                      ? (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2')
+                      : (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'),
                   borderRadius: 1
                 }}
               />
@@ -684,7 +704,8 @@ export default function MachineSalesPage() {
       <MainCard
         title="Machine Sales & Billing History Logs"
         secondary={
-          selected.length > 0 && canDelete && (
+          selected.length > 0 &&
+          canDelete && (
             <Button
               variant="contained"
               color="error"
@@ -782,7 +803,8 @@ export default function MachineSalesPage() {
                           {sale.customerName}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
-                          {sale.customerPhone ? `${sale.customerPhone} | ` : ''}{sale.cityAddress || 'Local'}
+                          {sale.customerPhone ? `${sale.customerPhone} | ` : ''}
+                          {sale.cityAddress || 'Local'}
                         </Typography>
                       </Box>
 
@@ -818,7 +840,14 @@ export default function MachineSalesPage() {
                           <EditOutlined />
                         </IconButton>
                         {canDelete && (
-                          <IconButton color="error" size="small" onClick={() => { setSaleToDelete(sale); setDeleteDialogOpen(true); }}>
+                          <IconButton
+                            color="error"
+                            size="small"
+                            onClick={() => {
+                              setSaleToDelete(sale);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
                             <DeleteOutlined />
                           </IconButton>
                         )}
@@ -868,9 +897,7 @@ export default function MachineSalesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSales
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((sale) => {
+                  filteredSales.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((sale) => {
                     const isItemSel = isSelected(sale.id);
                     return (
                       <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => canDelete && handleSelectOne(e, sale.id)}>
@@ -889,7 +916,8 @@ export default function MachineSalesPage() {
                             {sale.customerName}
                           </Typography>
                           <Typography variant="caption" color="textSecondary">
-                            {sale.customerPhone ? `${sale.customerPhone} | ` : ''}{sale.cityAddress || 'Lahore'}
+                            {sale.customerPhone ? `${sale.customerPhone} | ` : ''}
+                            {sale.cityAddress || 'Lahore'}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -911,11 +939,7 @@ export default function MachineSalesPage() {
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography
-                            variant="subtitle2"
-                            fontWeight={800}
-                            color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'}
-                          >
+                          <Typography variant="subtitle2" fontWeight={800} color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'}>
                             Rs. {(sale.balanceAmount || 0).toLocaleString()}
                           </Typography>
                         </TableCell>
@@ -980,135 +1004,610 @@ export default function MachineSalesPage() {
         </Box>
       </MainCard>
 
-      {/* Edit Machine Sale Drawer */}
-      <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 520 }, p: 3 }}>
-          <Typography variant="h4" fontWeight={700} sx={{ mb: 3, color: 'primary.main' }}>
-            Edit Machine Sale Record
-          </Typography>
-
-          {editingSale && (
-            <form onSubmit={handleEditSubmit}>
-              <Stack spacing={2.5}>
-                <TextField
-                  label="Customer Name *"
-                  fullWidth
-                  required
-                  value={editingSale.customerName || ''}
-                  onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
-                />
-                <TextField
-                  label="Customer Phone"
-                  fullWidth
-                  value={editingSale.customerPhone || ''}
-                  onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
-                />
-                <TextField
-                  label="City / Address"
-                  fullWidth
-                  value={editingSale.cityAddress || ''}
-                  onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
-                />
-
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Purchased Machines ({(editingSale.items || []).length || 1} Items)
-                </Typography>
-
-                {(editingSale.items || []).map((editItem, idx) => (
-                  <Paper key={idx} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Stack spacing={1.5}>
-                      <Autocomplete
-                        freeSolo
-                        options={machineModels}
-                        value={editItem.machineName || ''}
-                        onChange={(event, newValue) => handleEditItemChange(idx, 'machineName', newValue || '')}
-                        onInputChange={(event, newInputValue) => handleEditItemChange(idx, 'machineName', newInputValue || '')}
-                        renderInput={(params) => <TextField {...params} label={`Machine Model #${idx + 1} *`} required size="small" />}
-                      />
-                      <Grid container spacing={1.5}>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Serial No"
-                            size="small"
-                            fullWidth
-                            value={editItem.serialNo || ''}
-                            onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Qty"
-                            type="number"
-                            size="small"
-                            fullWidth
-                            required
-                            inputProps={{ min: 1 }}
-                            value={editItem.qty || 1}
-                            onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Unit Price (PKR)"
-                            type="number"
-                            size="small"
-                            fullWidth
-                            required
-                            disabled={!canEditPrice}
-                            value={editItem.unitPrice || 0}
-                            onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Discount (%)"
-                            type="number"
-                            size="small"
-                            fullWidth
-                            value={editItem.discount || 0}
-                            onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
-                          />
-                        </Grid>
-                      </Grid>
-                      {(editingSale.items || []).length > 1 && (
-                        <Button color="error" size="small" onClick={() => handleRemoveEditItemRow(idx)}>
-                          Remove Item Row
-                        </Button>
-                      )}
-                    </Stack>
-                  </Paper>
-                ))}
-
-                <Button variant="outlined" size="small" onClick={handleAddEditItemRow}>
-                  + Add Machine Row
-                </Button>
-
-                <TextField
-                  label="Paid Amount (PKR)"
-                  type="number"
-                  fullWidth
-                  value={editingSale.paidAmount || 0}
-                  onChange={(e) => setEditingSale({ ...editingSale, paidAmount: parseFloat(e.target.value) || 0 })}
-                />
-
-                <TextField
-                  label="Warranty Terms"
-                  fullWidth
-                  value={editingSale.warrantyTerms || ''}
-                  onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
-                />
-
-                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="contained" type="submit" color="primary" sx={{ fontWeight: 700 }}>
-                    Save Changes
-                  </Button>
+      {/* ── EDIT MACHINE SALE DRAWER (Right Side Drawer like Stock Out) ──────────── */}
+      <Drawer
+        anchor="right"
+        open={editDrawerOpen}
+        onClose={() => setEditDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 600, md: 740, lg: 820 },
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.15)'
+          }
+        }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2.2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: isDark ? 'background.paper' : '#ffffff',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <Stack direction="row" spacing={1.75} alignItems="center">
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  bgcolor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#ecfdf5',
+                  color: '#005F56',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20
+                }}
+              >
+                <EditOutlined />
+              </Box>
+              <Box>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary', fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+                    Edit Machine Sale Record
+                  </Typography>
+                  <Chip
+                    label={formatInvoiceNo(editingSale)}
+                    size="small"
+                    sx={{
+                      bgcolor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea',
+                      color: '#005F56',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      borderRadius: 1.5,
+                      border: '1px solid',
+                      borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0'
+                    }}
+                  />
                 </Stack>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.3, fontSize: '0.84rem' }}>
+                  Modify customer contact, machine models, quantities, rates, discounts, or warranty terms.
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton
+              size="small"
+              onClick={() => setEditDrawerOpen(false)}
+              sx={{
+                color: 'text.secondary',
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
+                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0', color: 'text.primary' }
+              }}
+            >
+              <CloseOutlined style={{ fontSize: 15 }} />
+            </IconButton>
+          </Box>
+        </Box>
+
+        <Box sx={{ px: 3, pt: 3, pb: 4, flex: 1, overflowY: 'auto', bgcolor: isDark ? 'background.default' : '#ffffff' }}>
+          {editingSale && (
+            <form id="edit-machine-sale-form" onSubmit={handleEditSubmit}>
+              <Stack spacing={3}>
+                {/* Customer Info Card */}
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 2.5,
+                    bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
+                    border: '1px solid',
+                    borderColor: isDark ? 'divider' : '#e2e8f0'
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={800}
+                    sx={{ color: 'text.primary', mb: 1.75, display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    <FileTextOutlined style={{ color: '#005F56' }} /> Customer & Warranty Details
+                  </Typography>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                        CUSTOMER NAME *
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        required
+                        placeholder="Customer Name"
+                        value={editingSale.customerName || ''}
+                        onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
+                        sx={{
+                          bgcolor: isDark ? 'background.paper' : '#ffffff',
+                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                        }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                        PHONE NUMBER
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="0300-XXXXXXX"
+                        value={editingSale.customerPhone || ''}
+                        onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
+                        sx={{
+                          bgcolor: isDark ? 'background.paper' : '#ffffff',
+                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                        }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                        CITY / ADDRESS
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="e.g. Lahore, Pakistan"
+                        value={editingSale.cityAddress || ''}
+                        onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
+                        sx={{
+                          bgcolor: isDark ? 'background.paper' : '#ffffff',
+                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                        }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
+                        WARRANTY TERMS
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="1 Year Motor & Frame Warranty"
+                        value={editingSale.warrantyTerms || ''}
+                        onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
+                        sx={{
+                          bgcolor: isDark ? 'background.paper' : '#ffffff',
+                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                {/* Items Section Header with Add Machine Button */}
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1.5 }}>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={800}
+                      sx={{ color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}
+                    >
+                      <FileTextOutlined style={{ color: '#005F56' }} /> Purchased Machines ({(editingSale.items || []).length || 1} Items)
+                    </Typography>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<PlusOutlined />}
+                      onClick={handleAddEditItemRow}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        borderRadius: 1.5,
+                        borderColor: isDark ? 'divider' : '#cbd5e1',
+                        color: isDark ? 'text.primary' : '#334155',
+                        bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#ffffff',
+                        '&:hover': {
+                          borderColor: '#005F56',
+                          color: '#005F56',
+                          bgcolor: isDark ? 'rgba(0, 95, 86, 0.1)' : '#f0fdf4'
+                        }
+                      }}
+                    >
+                      Add Machine Row
+                    </Button>
+                  </Box>
+
+                  {/* Items Table */}
+                  <TableContainer
+                    component={Paper}
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 2,
+                      borderColor: isDark ? 'divider' : '#e2e8f0',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f1f5f9' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}>
+                            MACHINE MODEL
+                          </TableCell>
+                          <TableCell
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                            width={150}
+                          >
+                            SERIAL NO
+                          </TableCell>
+                          <TableCell
+                            align="center"
+                            width={90}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                          >
+                            QTY
+                          </TableCell>
+                          <TableCell
+                            align="center"
+                            width={150}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                          >
+                            UNIT PRICE (PKR)
+                          </TableCell>
+                          <TableCell
+                            align="center"
+                            width={110}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                          >
+                            DISCOUNT (%)
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            width={140}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                          >
+                            LINE TOTAL
+                          </TableCell>
+                          <TableCell
+                            align="center"
+                            width={60}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
+                          >
+                            DEL
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(editingSale.items || []).map((editItem, idx) => {
+                          const q = parseInt(editItem.qty) || 1;
+                          const p = parseFloat(editItem.unitPrice) || 0;
+                          const discPercent = parseFloat(editItem.discount) || 0;
+                          const gross = q * p;
+                          const lineTotal = Math.max(0, gross - (gross * discPercent) / 100);
+
+                          return (
+                            <TableRow
+                              key={idx}
+                              sx={{
+                                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#fafafa' },
+                                '&:last-child td, &:last-child th': { border: 0 }
+                              }}
+                            >
+                              <TableCell sx={{ py: 1.5 }}>
+                                <Autocomplete
+                                  freeSolo
+                                  size="small"
+                                  options={machineModels}
+                                  value={editItem.machineName || ''}
+                                  onChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                  onInputChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      placeholder="Select or type model..."
+                                      required
+                                      size="small"
+                                      sx={{
+                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                      }}
+                                    />
+                                  )}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ py: 1.5 }}>
+                                <TextField
+                                  fullWidth
+                                  size="small"
+                                  placeholder="Serial #"
+                                  value={editItem.serialNo || ''}
+                                  onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
+                                  sx={{
+                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 1.5 }}>
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  required
+                                  inputProps={{ min: 1, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 700 } }}
+                                  value={editItem.qty || 1}
+                                  onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
+                                  sx={{
+                                    width: 70,
+                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 1.5 }}>
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  required
+                                  disabled={!canEditPrice}
+                                  inputProps={{ min: 0, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 600 } }}
+                                  value={editItem.unitPrice || 0}
+                                  onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                  sx={{
+                                    width: 110,
+                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 1.5 }}>
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  inputProps={{ min: 0, max: 100, style: { textAlign: 'center', padding: '6px 4px' } }}
+                                  value={editItem.discount || 0}
+                                  onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                                  sx={{
+                                    width: 75,
+                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.5 }}>
+                                <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#005F56', fontSize: '0.95rem' }}>
+                                  Rs. {lineTotal.toLocaleString()}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 1.5 }}>
+                                {(editingSale.items || []).length > 1 ? (
+                                  <Tooltip title="Remove machine">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleRemoveEditItemRow(idx)}
+                                      sx={{
+                                        color: '#ef4444',
+                                        bgcolor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+                                        border: '1px solid',
+                                        borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#fee2e2',
+                                        '&:hover': { bgcolor: '#fee2e2', color: '#dc2626' }
+                                      }}
+                                    >
+                                      <DeleteOutlined style={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : (
+                                  <IconButton size="small" disabled sx={{ color: 'text.disabled' }}>
+                                    <DeleteOutlined style={{ fontSize: 14 }} />
+                                  </IconButton>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+
+                {/* Bottom Calculations & Financial Summary */}
+                {(() => {
+                  const subTotal = (editingSale.items || []).reduce((sum, i) => {
+                    const q = parseInt(i.qty) || 1;
+                    const p = parseFloat(i.unitPrice) || 0;
+                    const d = parseFloat(i.discount) || 0;
+                    const gross = q * p;
+                    return sum + Math.max(0, gross - (gross * d) / 100);
+                  }, 0);
+                  const paid = parseFloat(editingSale.paidAmount) || 0;
+                  const balance = Math.max(0, subTotal - paid);
+
+                  return (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        justifyContent: 'space-between',
+                        alignItems: 'stretch',
+                        gap: 2.5,
+                        width: '100%'
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            p: 2.5,
+                            height: '100%',
+                            borderRadius: 2.5,
+                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
+                            border: '1px solid',
+                            borderColor: isDark ? 'divider' : '#e2e8f0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight={800}
+                            sx={{ color: '#64748b', mb: 1.5, display: 'block', letterSpacing: '0.04em' }}
+                          >
+                            PAYMENT DISBURSEMENT
+                          </Typography>
+
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Paid Amount (PKR)"
+                              value={editingSale.paidAmount || 0}
+                              onChange={(e) => setEditingSale({ ...editingSale, paidAmount: parseFloat(e.target.value) || 0 })}
+                              sx={{
+                                flex: 1,
+                                bgcolor: isDark ? 'background.paper' : '#ffffff',
+                                '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                px: 2,
+                                py: 1,
+                                borderRadius: 1.5,
+                                bgcolor: balance > 0 ? '#fff1f0' : '#f6ffed',
+                                border: '1px solid',
+                                borderColor: balance > 0 ? '#ffa39e' : '#b7eb8f'
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: balance > 0 ? '#cf1322' : '#389e0d', fontWeight: 800, display: 'block' }}
+                              >
+                                {balance > 0 ? `Remaining: Rs. ${balance.toLocaleString()}` : 'Fully Paid'}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            p: 2.5,
+                            height: '100%',
+                            borderRadius: 2.5,
+                            bgcolor: isDark ? 'rgba(0, 95, 86, 0.08)' : '#f0fdf4',
+                            border: '1px solid',
+                            borderColor: isDark ? 'rgba(0, 95, 86, 0.3)' : '#bbf7d0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 600 }}>
+                                Total Bill Amount:
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#111827', fontWeight: 700 }}>
+                                Rs. {subTotal.toLocaleString()}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 600 }}>
+                                Received / Paid:
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 700 }}>
+                                Rs. {paid.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Box sx={{ pt: 1.5, mt: 1.5, borderTop: '1px solid', borderColor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#bbf7d0' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box>
+                                <Typography
+                                  variant="caption"
+                                  fontWeight={800}
+                                  sx={{ color: '#047857', letterSpacing: '0.04em', display: 'block' }}
+                                >
+                                  NET PAYABLE
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                  Balance: Rs. {balance.toLocaleString()}
+                                </Typography>
+                              </Box>
+                              <Typography
+                                variant="h4"
+                                fontWeight={900}
+                                sx={{ color: '#005F56', letterSpacing: '-0.02em', fontSize: '1.5rem' }}
+                              >
+                                Rs. {subTotal.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })()}
               </Stack>
             </form>
           )}
+        </Box>
+
+        {/* Fixed Bottom Actions */}
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            bgcolor: isDark ? 'background.paper' : '#f8fafc',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Updates customer ledger balance & sales records.
+          </Typography>
+
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              onClick={() => setEditDrawerOpen(false)}
+              variant="outlined"
+              sx={{
+                fontWeight: 700,
+                color: 'text.secondary',
+                borderColor: isDark ? 'divider' : '#cbd5e1',
+                px: 2.5,
+                py: 0.8,
+                borderRadius: 1.5,
+                textTransform: 'none',
+                fontSize: '0.9rem',
+                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9' }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              type="submit"
+              form="edit-machine-sale-form"
+              sx={{
+                fontWeight: 700,
+                borderRadius: 1.5,
+                px: 3.5,
+                py: 0.9,
+                bgcolor: '#003830',
+                color: '#ffffff',
+                textTransform: 'none',
+                fontSize: '0.9rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 56, 48, 0.25)',
+                '&:hover': { bgcolor: '#002620', boxShadow: '0 6px 10px -1px rgba(0, 56, 48, 0.35)' }
+              }}
+            >
+              Save Changes
+            </Button>
+          </Stack>
         </Box>
       </Drawer>
 
@@ -1117,7 +1616,8 @@ export default function MachineSalesPage() {
         <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Confirm Delete Sale Record</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the machine sale invoice for <strong>{saleToDelete?.customerName}</strong> ({saleToDelete?.machineName})?
+            Are you sure you want to delete the machine sale invoice for <strong>{saleToDelete?.customerName}</strong> (
+            {saleToDelete?.machineName})?
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ p: 2.5 }}>
@@ -1163,7 +1663,9 @@ export default function MachineSalesPage() {
             />
           </DialogContent>
           <DialogActions sx={{ p: 2.5 }}>
-            <Button onClick={() => setNewModelDialogOpen(false)} color="secondary">Cancel</Button>
+            <Button onClick={() => setNewModelDialogOpen(false)} color="secondary">
+              Cancel
+            </Button>
             <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 700 }}>
               Save Machine Model
             </Button>
@@ -1217,189 +1719,322 @@ export default function MachineSalesPage() {
           `}
         </style>
 
-        <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h5" fontWeight={700}>Official Customer Machine Sale Invoice</Typography>
+        <DialogTitle
+          className="no-print"
+          sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
+        >
+          <Typography variant="h5" fontWeight={700}>
+            Official Customer Machine Sale Invoice
+          </Typography>
           <Chip label="Sales Invoice" color="success" size="small" />
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
-          {printData && (() => {
-            const displayItems = (printData.items && printData.items.length > 0) ? printData.items : [
-              {
-                machineName: printData.machineName,
-                serialNo: printData.serialNo,
-                qty: printData.qty,
-                unitPrice: printData.unitPrice,
-                lineTotal: printData.lineTotal
-              }
-            ];
+          {printData &&
+            (() => {
+              const displayItems =
+                printData.items && printData.items.length > 0
+                  ? printData.items
+                  : [
+                      {
+                        machineName: printData.machineName,
+                        serialNo: printData.serialNo,
+                        qty: printData.qty,
+                        unitPrice: printData.unitPrice,
+                        lineTotal: printData.lineTotal
+                      }
+                    ];
 
-            return (
-              <Box
-                id="printable-machine-invoice"
-                sx={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  pt: { xs: 5, sm: 7 },
-                  px: { xs: 1, sm: 1.5 },
-                  pb: { xs: 1, sm: 1.5 },
-                  bgcolor: '#ffffff',
-                  color: '#111827',
-                  borderRadius: 1
-                }}
-              >
-                <Box sx={{ position: 'relative', zIndex: 1 }}>
-                  {/* Structured Professional Customer & Invoice Metadata Card */}
-                  <div style={{
-                    border: '1.5px solid #111827',
-                    borderRadius: '4px',
-                    marginBottom: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-                      {/* Left Column: Customer Details */}
-                      <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
-                          Customer Details
+              return (
+                <Box
+                  id="printable-machine-invoice"
+                  sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    pt: { xs: 5, sm: 7 },
+                    px: { xs: 1, sm: 1.5 },
+                    pb: { xs: 1, sm: 1.5 },
+                    bgcolor: '#ffffff',
+                    color: '#111827',
+                    borderRadius: 1
+                  }}
+                >
+                  <Box sx={{ position: 'relative', zIndex: 1 }}>
+                    {/* Structured Professional Customer & Invoice Metadata Card */}
+                    <div
+                      style={{
+                        border: '1.5px solid #111827',
+                        borderRadius: '4px',
+                        marginBottom: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+                        {/* Left Column: Customer Details */}
+                        <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
+                          <div
+                            style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 800,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '2px'
+                            }}
+                          >
+                            Customer Details
+                          </div>
+                          <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
+                            {printData.customerName}
+                          </div>
+                          <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
+                            {printData.customerPhone && (
+                              <div>
+                                <strong>Phone:</strong> {printData.customerPhone}
+                              </div>
+                            )}
+                            {printData.cityAddress && (
+                              <div>
+                                <strong>City / Address:</strong> {printData.cityAddress}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
-                          {printData.customerName}
-                        </div>
-                        <div style={{ fontSize: '0.80rem', color: '#374151', lineHeight: '1.4' }}>
-                          {printData.customerPhone && <div><strong>Phone:</strong> {printData.customerPhone}</div>}
-                          {printData.cityAddress && <div><strong>City / Address:</strong> {printData.cityAddress}</div>}
+
+                        {/* Right Column: Invoice Meta */}
+                        <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
+                            <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{formatInvoiceNo(printData)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
+                            <span style={{ fontWeight: 700, color: '#374151' }}>{printData.time}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
+                            <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
+                            <span style={{ fontWeight: 800, color: printData.paymentStatus === 'Paid' ? '#16a34a' : '#d97706' }}>
+                              {printData.paymentStatus || 'Paid'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Right Column: Invoice Meta */}
-                      <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
-                          <span style={{ fontWeight: 800, color: '#096dd9', fontSize: '0.88rem' }}>{formatInvoiceNo(printData)}</span>
+                      {/* Machine Model Highlight Strip */}
+                      {printData.machineName && (
+                        <div
+                          style={{
+                            padding: '4px 10px',
+                            backgroundColor: 'rgba(240, 253, 244, 0.55)',
+                            borderTop: '1px solid #bbf7d0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.82rem'
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Sales Category:</span>
+                          <span style={{ fontWeight: 800, color: '#111827' }}>{printData.machineName}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Date & Time:</span>
-                          <span style={{ fontWeight: 700, color: '#374151' }}>{printData.time}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
-                          <span style={{ color: '#6b7280', fontWeight: 600 }}>Payment Status:</span>
-                          <span style={{ fontWeight: 800, color: printData.paymentStatus === 'Paid' ? '#16a34a' : '#d97706' }}>
-                            {printData.paymentStatus || 'Paid'}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Machine Model Highlight Strip */}
-                    {printData.machineName && (
-                      <div style={{ padding: '4px 10px', backgroundColor: 'rgba(240, 253, 244, 0.55)', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontSize: '0.82rem' }}>
-                        <span style={{ fontWeight: 700, color: '#166534', marginRight: '8px' }}>Machine Sales Category:</span>
-                        <span style={{ fontWeight: 800, color: '#111827' }}>{printData.machineName}</span>
-                      </div>
-                    )}
-                  </div>
+                    {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        border: '1.5px solid #111827',
+                        marginBottom: '10px',
+                        backgroundColor: 'transparent'
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
+                          <th
+                            style={{
+                              width: '8%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 4px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Sr</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '52%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Specification / Model</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '12%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 4px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>QTY</strong>
+                          </th>
+                          <th
+                            style={{
+                              width: '14%',
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            <strong>Rate</strong>
+                          </th>
+                          <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
+                            <strong>Total Amount</strong>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayItems.map((item, idx) => {
+                          const q = parseInt(item.qty) || 1;
+                          const p = parseFloat(item.unitPrice) || 0;
+                          const d = parseFloat(item.discount) || 0;
+                          const gross = q * p;
+                          const lineAmt =
+                            item.lineTotal !== undefined && !isNaN(item.lineTotal)
+                              ? item.lineTotal
+                              : Math.max(0, gross - (gross * d) / 100);
 
-                  {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                        <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Sr</strong>
-                        </th>
-                        <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Specification / Model</strong>
-                        </th>
-                        <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>QTY</strong>
-                        </th>
-                        <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Rate</strong>
-                        </th>
-                        <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                          <strong>Total Amount</strong>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayItems.map((item, idx) => {
-                        const q = parseInt(item.qty) || 1;
-                        const p = parseFloat(item.unitPrice) || 0;
-                        const d = parseFloat(item.discount) || 0;
-                        const gross = q * p;
-                        const lineAmt = item.lineTotal !== undefined && !isNaN(item.lineTotal) ? item.lineTotal : Math.max(0, gross - (gross * d) / 100);
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 4px',
+                                  textAlign: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {String(idx + 1).padStart(2, '0')}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 8px',
+                                  textAlign: 'left',
+                                  fontWeight: 600,
+                                  fontSize: '0.82rem',
+                                  lineHeight: 1.25
+                                }}
+                              >
+                                {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 4px',
+                                  textAlign: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {String(q).padStart(2, '0')}
+                              </td>
+                              <td
+                                style={{
+                                  borderRight: '1.5px solid #111827',
+                                  padding: '3px 8px',
+                                  textAlign: 'right',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                {p.toLocaleString()}
+                              </td>
+                              <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
+                                {lineAmt.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
 
-                        return (
-                          <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {String(idx + 1).padStart(2, '0')}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                              {item.machineName || 'Machine Sale'} {item.serialNo ? `(SN: ${item.serialNo})` : ''}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {String(q).padStart(2, '0')}
-                            </td>
-                            <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {p.toLocaleString()}
-                            </td>
-                            <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                              {lineAmt.toLocaleString()}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                        {/* Total Amount Bottom Row */}
+                        <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
+                          <td
+                            colSpan={2}
+                            style={{
+                              borderRight: '1.5px solid #111827',
+                              padding: '4px 8px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.88rem'
+                            }}
+                          >
+                            Total amount
+                          </td>
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
+                            {(printData.lineTotal || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
 
-                      {/* Total Amount Bottom Row */}
-                      <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                        <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
-                          Total amount
-                        </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
-                          {(printData.lineTotal || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                    {/* Financial Summary Box */}
+                    <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
+                      <Grid container spacing={1} alignItems="center">
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
+                            PAID AMOUNT: Rs. {(printData.paidAmount || 0).toLocaleString()}
+                          </Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                          <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
+                            NET TOTAL: Rs. {(printData.lineTotal || 0).toLocaleString()}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            fontWeight={800}
+                            color={(printData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}
+                            display="block"
+                          >
+                            {(printData.balanceAmount || 0) > 0
+                              ? `REMAINING DUE: Rs. ${(printData.balanceAmount || 0).toLocaleString()}`
+                              : 'FULL PAID (NO DUES)'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
 
-                  {/* Financial Summary Box */}
-                  <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                    <Grid container spacing={1} alignItems="center">
+                    {/* Signatures Footer */}
+                    <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
                       <Grid size={{ xs: 6 }}>
-                        <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
-                          PAID AMOUNT: Rs. {(printData.paidAmount || 0).toLocaleString()}
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}
+                        >
+                          Customer Signature
                         </Typography>
                       </Grid>
                       <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                        <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
-                          NET TOTAL: Rs. {(printData.lineTotal || 0).toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" fontWeight={800} color={(printData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'} display="block">
-                          {(printData.balanceAmount || 0) > 0 ? `REMAINING DUE: Rs. ${(printData.balanceAmount || 0).toLocaleString()}` : 'FULL PAID (NO DUES)'}
-                        </Typography>
+                        <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
+                          <CeoSignature />
+                        </Box>
                       </Grid>
                     </Grid>
                   </Box>
-
-                  {/* Signatures Footer */}
-                  <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <Grid size={{ xs: 6 }}>
-                      <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
-                        Customer Signature
-                      </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                      <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
-                        <CeoSignature />
-                      </Box>
-                    </Grid>
-                  </Grid>
                 </Box>
-              </Box>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
 
         <DialogActions className="no-print" sx={{ p: 2.5, justifyContent: 'space-between' }}>

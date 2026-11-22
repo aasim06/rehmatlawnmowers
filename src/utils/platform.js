@@ -26,6 +26,6 @@ export const isWebApp = () => {
 };
 
 export const isLiveCloudMode = () => {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.includes('vercel.app') || window.location.hostname.includes('web.app');
+  if (typeof window === 'undefined') return true;
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
 };

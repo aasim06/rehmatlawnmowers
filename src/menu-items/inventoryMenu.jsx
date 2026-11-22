@@ -157,6 +157,13 @@ const inventoryMenu = {
           type: 'item',
           url: '/shop/ledger',
           icon: icons.BookOutlined
+        },
+        {
+          id: 'shop-invoices',
+          title: 'Shop Invoices',
+          type: 'item',
+          url: '/shop/invoices',
+          icon: icons.FileTextOutlined
         }
       ]
     },

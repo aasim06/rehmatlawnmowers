@@ -22,6 +22,7 @@ import ShopDashboardPage from 'pages/shop/ShopDashboardPage';
 import ShopAddProductPage from 'pages/shop/ShopAddProductPage';
 import ShopMartPage from 'pages/shop/ShopMartPage';
 import ShopLedgerPage from 'pages/shop/ShopLedgerPage';
+import ShopInvoicesPage from 'pages/shop/ShopInvoicesPage';
 // layout, auth & RBAC guards
 import { Navigate } from 'react-router-dom';
 import DashboardLayout from 'layout/Dashboard';
@@ -51,6 +52,7 @@ function RootIndexRoute() {
   if (hasAccessToItem({ id: 'shop-mart' })) return <Navigate to="/shop/mart" replace />;
   if (hasAccessToItem({ id: 'shop-add-product' })) return <Navigate to="/shop/add-product" replace />;
   if (hasAccessToItem({ id: 'shop-ledger' })) return <Navigate to="/shop/ledger" replace />;
+  if (hasAccessToItem({ id: 'shop-invoices' })) return <Navigate to="/shop/invoices" replace />;
 
   return <Navigate to="/dashboard/default" replace />;
 }
@@ -62,6 +64,7 @@ function ShopIndexRoute() {
   if (hasAccessToItem({ id: 'shop-mart' })) return <Navigate to="/shop/mart" replace />;
   if (hasAccessToItem({ id: 'shop-add-product' })) return <Navigate to="/shop/add-product" replace />;
   if (hasAccessToItem({ id: 'shop-ledger' })) return <Navigate to="/shop/ledger" replace />;
+  if (hasAccessToItem({ id: 'shop-invoices' })) return <Navigate to="/shop/invoices" replace />;
   return <Navigate to="/dashboard/default" replace />;
 }
 
@@ -303,6 +306,14 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="shop-ledger">
               <ShopLedgerPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'invoices',
+          element: (
+            <RoleGuard permission="shop-invoices">
+              <ShopInvoicesPage />
             </RoleGuard>
           )
         }

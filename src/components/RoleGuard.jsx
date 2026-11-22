@@ -38,6 +38,7 @@ export default function RoleGuard({ permission, allowedRoles, children, fallback
     if (userPerms?.['shop-stock-out']) return '/shop/stock-out';
     if (userPerms?.['shop-add-product']) return '/shop/add-product';
     if (userPerms?.['shop-ledger']) return '/shop/ledger';
+    if (userPerms?.['shop-invoices']) return '/shop/invoices';
 
     if (userPerms?.['dashboard']) return '/dashboard/default';
 
