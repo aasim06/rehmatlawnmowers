@@ -574,7 +574,7 @@ export default function ShopMartPage() {
               </Tooltip>
             </Box>
             <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem', mt: 0.25, display: 'block' }}>
-              {item.category || 'General'} • {item.unit || 'PCS'}
+              {item.category || 'General'}{item.specification ? ` • ${item.specification}` : ''} • {item.unit || 'PCS'}
             </Typography>
           </Box>
 

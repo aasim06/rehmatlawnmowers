@@ -90,11 +90,13 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(req).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
         }
         return networkResponse;
+      }).catch(() => {
+        return caches.match(req);
       });
     })
   );

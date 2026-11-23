@@ -1053,33 +1053,33 @@ export default function ExpensesPage() {
 
               {/* Financial Summary Box */}
               <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                <Grid container spacing={1} alignItems="center">
-                  <Grid item xs={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <Box>
                     <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
                       TOTAL EXPENSE VOUCHERS: {selectedExpenseForPrint ? 1 : filteredExpenses.length}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
                     <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                       NET TOTAL EXPENSES: Rs. {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
                     </Typography>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </Box>
 
               {/* Signatures Footer */}
-              <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                <Grid item xs={6}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', mt: 1.5, pt: 1 }}>
+                <Box>
                   <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                     Cashier / Manager Signature
                   </Typography>
-                </Grid>
-                <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
                   <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                     <CeoSignature />
                   </Box>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Box>
           </Box>
         </DialogContent>

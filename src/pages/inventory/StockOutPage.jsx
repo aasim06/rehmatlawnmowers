@@ -1105,7 +1105,7 @@ export default function StockOutPage() {
                               {String(idx + 1).padStart(2, '0')}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                              {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                              {(item.itemName || '').replace(/\s*\([^)]*SKU-[^)]*\)/gi, '').trim()}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                               {String(itemQty).padStart(2, '0')}
@@ -1136,33 +1136,33 @@ export default function StockOutPage() {
 
                   {/* Financial Summary Box */}
                   <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                    <Grid container spacing={1} alignItems="center">
-                      <Grid size={{ xs: 6 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <Box>
                         <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
                           TOTAL DISPATCHED ITEMS: {displayLogs.length}
                         </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                      </Box>
+                      <Box sx={{ textAlign: 'right' }}>
                         <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                           NET TOTAL: Rs. {grandTotalSum.toLocaleString()}
                         </Typography>
-                      </Grid>
-                    </Grid>
+                      </Box>
+                    </Box>
                   </Box>
 
                   {/* Signatures Footer */}
-                  <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <Grid size={{ xs: 6 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', mt: 1.5, pt: 1 }}>
+                    <Box>
                       <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                         Customer / Receiver Signature
                       </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                    </Box>
+                    <Box sx={{ textAlign: 'right' }}>
                       <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                         <CeoSignature />
                       </Box>
-                    </Grid>
-                  </Grid>
+                    </Box>
+                  </Box>
                 </Box>
               </Box>
             );

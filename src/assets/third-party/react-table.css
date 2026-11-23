@@ -42,22 +42,82 @@ html[data-color-scheme='dark'] body,
   color: #f8fafc;
 }
 
-[data-color-scheme='dark'] ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ==========================================================================
+   HIDE ALL SCROLLBARS GLOBALLY (Tables, Dropdowns, Drawers, Modals, Page Body)
+   Scrolling functionality remains 100% active and smooth via wheel/touch.
+   ========================================================================== */
+*,
+*::before,
+*::after,
+html,
+body,
+#root {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
-[data-color-scheme='dark'] ::-webkit-scrollbar-track {
-  background: #090d16;
+::-webkit-scrollbar,
+*::-webkit-scrollbar,
+[data-color-scheme='dark'] ::-webkit-scrollbar,
+[data-color-scheme='light'] ::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
-[data-color-scheme='dark'] ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb,
+[data-color-scheme='dark'] ::-webkit-scrollbar-thumb,
+[data-color-scheme='light'] ::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
 }
 
-[data-color-scheme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track,
+[data-color-scheme='dark'] ::-webkit-scrollbar-track,
+[data-color-scheme='light'] ::-webkit-scrollbar-track {
+  display: none !important;
+  background: transparent !important;
+}
+
+/* Specific MUI Overrides for Tables, Autocompletes, Dropdowns, Menus & Drawers */
+.MuiTableContainer-root,
+.MuiAutocomplete-listbox,
+.MuiAutocomplete-paper,
+.MuiMenu-paper,
+.MuiMenu-list,
+.MuiList-root,
+.MuiPopover-paper,
+.MuiDialogContent-root,
+.MuiDrawer-paper,
+.simplebar-content-wrapper,
+.simplebar-mask,
+.simplebar-track,
+.simplebar-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.MuiTableContainer-root::-webkit-scrollbar,
+.MuiAutocomplete-listbox::-webkit-scrollbar,
+.MuiAutocomplete-paper::-webkit-scrollbar,
+.MuiMenu-paper::-webkit-scrollbar,
+.MuiMenu-list::-webkit-scrollbar,
+.MuiList-root::-webkit-scrollbar,
+.MuiPopover-paper::-webkit-scrollbar,
+.MuiDialogContent-root::-webkit-scrollbar,
+.MuiDrawer-paper::-webkit-scrollbar,
+.simplebar-content-wrapper::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.simplebar-track,
+.simplebar-scrollbar {
+  display: none !important;
 }
 
 [data-color-scheme='dark'] ::selection {

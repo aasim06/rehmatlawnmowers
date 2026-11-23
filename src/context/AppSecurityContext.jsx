@@ -39,16 +39,19 @@ export function AppSecurityProvider({ children }) {
     return saved ? parseInt(saved, 10) : Date.now();
   });
 
-  // Calculate offline lock state
-  const allowedOfflineMs = (securityConfig.allowedOfflineHours || 72) * 3600 * 1000;
   const offlineMsElapsed = Date.now() - lastHandshakeTime;
-  const isOfflineExpired = isTauri && offlineMsElapsed > allowedOfflineMs;
 
-  // The application is only ever locked if running in Tauri desktop mode AND locked via Firebase or offline limit
-  const isAppLocked = isTauri && (Boolean(securityConfig.isLocked) || isOfflineExpired);
+  // Offline lock disabled: The software is guaranteed to run 100% offline without expiration lock
+  const isOfflineExpired = false;
 
-  // Fetch latest security state from Firebase Firestore
+  // The application is only ever locked if explicitly locked via Firebase control
+  const isAppLocked = isTauri && Boolean(securityConfig.isLocked);
+
+  // Fetch latest security state from Firebase Firestore (only when online)
   const refreshSecurityConfig = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
     try {
       setLoading(true);
       const securityDocRef = doc(db, 'app_security', 'config');

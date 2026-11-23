@@ -880,7 +880,7 @@ export default function VendorLedgerPage() {
                               {String(idx + 1).padStart(2, '0')}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                              {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                              {(item.itemName || '').replace(/\s*\([^)]*SKU-[^)]*\)/gi, '').trim()}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                               {String(itemQty).padStart(2, '0')}

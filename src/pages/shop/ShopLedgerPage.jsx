@@ -4,6 +4,7 @@ import { useTheme } from '@mui/material/styles';
 
 // material-ui
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -16,6 +17,7 @@ import {
   IconButton,
   InputAdornment,
   Paper,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -25,6 +27,7 @@ import {
   TablePagination,
   TableRow,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 
@@ -44,6 +47,79 @@ import CloseOutlined from '@ant-design/icons/CloseOutlined';
 import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
 import AppstoreOutlined from '@ant-design/icons/AppstoreOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
+import ReloadOutlined from '@ant-design/icons/ReloadOutlined';
+
+// ==============================|| HELPER FUNCTIONS ||============================== //
+
+// Extract normalized YYYY-MM-DD from any slip record
+const getSlipDateString = (slip) => {
+  if (slip.dateISO && typeof slip.dateISO === 'string') {
+    const part = slip.dateISO.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+  if (slip.createdAt) {
+    const d = new Date(slip.createdAt);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  const rawDate = slip.date || slip.time;
+  if (rawDate && typeof rawDate === 'string') {
+    const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+    const cleaned = rawDate.split(',')[0].trim();
+    const parsed = Date.parse(cleaned);
+    if (!isNaN(parsed)) {
+      const d = new Date(parsed);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  return '';
+};
+
+// Check if slip is within [startDate, endDate] range
+const isSlipInDateRange = (slip, start, end) => {
+  if (!start && !end) return true;
+  const slipDay = getSlipDateString(slip);
+  if (!slipDay) return true;
+  if (start && slipDay < start) return false;
+  if (end && slipDay > end) return false;
+  return true;
+};
+
+// Safely normalize slip items for hierarchical ledger table
+const normalizeSlipItems = (slip) => {
+  if (Array.isArray(slip.items) && slip.items.length > 0) {
+    return slip.items.map((it) => {
+      const name = it.name || it.itemName || it.title || 'Item';
+      const qty = parseInt(it.qty ?? it.quantity ?? 1, 10) || 1;
+      let rate = parseFloat(it.unitPrice ?? it.rate ?? it.price ?? 0) || 0;
+      let amount = parseFloat(it.lineTotal ?? it.amount ?? 0);
+      if (!amount && rate > 0) {
+        amount = qty * rate;
+      } else if (amount > 0 && !rate && qty > 0) {
+        rate = amount / qty;
+      }
+      return { name, qty, rate, amount };
+    });
+  }
+  const totalVal = parseFloat(slip.totalAmount) || 0;
+  return [
+    {
+      name: slip.machineName || slip.notes || 'Material Parts',
+      qty: 1,
+      rate: totalVal,
+      amount: totalVal
+    }
+  ];
+};
 
 // ==============================|| SHOP MATERIAL ISSUE LEDGER ||============================== //
 
@@ -51,10 +127,19 @@ export default function ShopLedgerPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  const { shopSales = [], resetShopDataToZero } = useStoreInventory();
+  const {
+    shopSales = [],
+    resetShopDataToZero,
+    deleteShopSale,
+    deleteMachineSale,
+    deleteMultipleShopSales,
+    deleteMultipleMachineSales
+  } = useStoreInventory();
 
-  // Search State
+  // Search & Date Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [expandedPerson, setExpandedPerson] = useState(null);
 
   // Pagination State
@@ -72,7 +157,20 @@ export default function ShopLedgerPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [searchTerm]);
+  }, [searchTerm, startDate, endDate]);
+
+  // Toast / Feedback State
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+
+  // Delete State
+  const [personToDelete, setPersonToDelete] = useState(null);
+  const [deletePersonModalOpen, setDeletePersonModalOpen] = useState(false);
+
+  const [slipToDelete, setSlipToDelete] = useState(null);
+  const [deleteSlipModalOpen, setDeleteSlipModalOpen] = useState(false);
+
+  const [deleting, setDeleting] = useState(false);
 
   // Factory Reset Dialog State
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -84,17 +182,68 @@ export default function ShopLedgerPage() {
     await resetShopDataToZero();
     setResetting(false);
     setResetConfirmOpen(false);
+    showToast('Shop data has been reset to 0.', 'info');
   };
 
   // Print Statement Modal State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printData, setPrintData] = useState(null);
 
-  // Group Shop Issues by Person Name (Recipient)
+  // Quick Date Presets
+  const getTodayISO = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const setFilterToday = () => {
+    const today = getTodayISO();
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const setFilterPast7Days = () => {
+    const now = new Date();
+    const end = getTodayISO();
+    const past = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const y = past.getFullYear();
+    const m = String(past.getMonth() + 1).padStart(2, '0');
+    const d = String(past.getDate()).padStart(2, '0');
+    setStartDate(`${y}-${m}-${d}`);
+    setEndDate(end);
+  };
+
+  const setFilterThisMonth = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const start = `${y}-${m}-01`;
+    const end = getTodayISO();
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const todayStr = useMemo(() => getTodayISO(), []);
+  const isTodaySelected = startDate === todayStr && endDate === todayStr;
+
+  // Group Shop Issues by Person Name (Recipient), filtered by Date Range
   const personLedgers = useMemo(() => {
     const personMap = {};
 
     shopSales.forEach((slip) => {
+      // Date Range Filtering
+      if (!isSlipInDateRange(slip, startDate, endDate)) {
+        return;
+      }
+
       const rawName = (slip.customerName || slip.customer || slip.issuedTo || 'Factory Staff').trim();
       const personKey = rawName.toLowerCase();
 
@@ -124,9 +273,9 @@ export default function ShopLedgerPage() {
     });
 
     return Object.values(personMap).sort((a, b) => b.totalValue - a.totalValue);
-  }, [shopSales]);
+  }, [shopSales, startDate, endDate]);
 
-  // Filtered Persons
+  // Filtered Persons (by Search Term)
   const filteredPersons = useMemo(() => {
     return personLedgers.filter((p) => {
       const term = searchTerm.toLowerCase();
@@ -137,7 +286,7 @@ export default function ShopLedgerPage() {
     });
   }, [personLedgers, searchTerm]);
 
-  // Overall KPIs
+  // Overall KPIs (calculated over filtered date range)
   const kpiData = useMemo(() => {
     let totalValue = 0;
     let totalItems = 0;
@@ -163,6 +312,54 @@ export default function ShopLedgerPage() {
     setPrintModalOpen(true);
   };
 
+  // Delete Handlers
+  const handleConfirmDeletePerson = async () => {
+    if (!personToDelete || !personToDelete.slips) return;
+    setDeleting(true);
+    try {
+      const ids = personToDelete.slips.map((s) => s.id).filter(Boolean);
+      if (ids.length > 0) {
+        const delMulti = deleteMultipleShopSales || deleteMultipleMachineSales;
+        if (typeof delMulti === 'function') {
+          await delMulti(ids);
+        } else {
+          const delSingle = deleteShopSale || deleteMachineSale;
+          if (typeof delSingle === 'function') {
+            await Promise.allSettled(ids.map((id) => delSingle(id)));
+          }
+        }
+      }
+      showToast(`Records for "${personToDelete.personName}" deleted successfully!`);
+      setDeletePersonModalOpen(false);
+      setPersonToDelete(null);
+    } catch (err) {
+      console.error('Delete person ledger error:', err);
+      showToast('Failed to delete records', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleConfirmDeleteSlip = async () => {
+    if (!slipToDelete) return;
+    setDeleting(true);
+    try {
+      const slipId = slipToDelete.id;
+      const delSingle = deleteShopSale || deleteMachineSale;
+      if (typeof delSingle === 'function') {
+        await delSingle(slipId);
+      }
+      showToast(`Slip #${slipToDelete.invoiceNo || slipToDelete.saleNo || slipToDelete.id} deleted successfully!`);
+      setDeleteSlipModalOpen(false);
+      setSlipToDelete(null);
+    } catch (err) {
+      console.error('Delete slip error:', err);
+      showToast('Failed to delete slip', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', pb: 4 }}>
       {/* 1. Header Banner */}
@@ -173,10 +370,10 @@ export default function ShopLedgerPage() {
           </Box>
           <Box>
             <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: -0.3 }}>
-              Shop Issue Ledger (Material Issue History)
+              Shop Customer Ledger
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Track factory workers, technicians &amp; staff who took parts/items from store, total items count, and dates.
+              Track factory workers, technicians &amp; staff issue history, filter by date range, and print statements.
             </Typography>
           </Box>
         </Box>
@@ -271,24 +468,132 @@ export default function ShopLedgerPage() {
         </Grid>
       </Grid>
 
-      {/* 3. Search Bar */}
+      {/* 3. Filter & Date Range Bar */}
       <MainCard sx={{ mb: 3 }}>
-        <TextField
-          placeholder="Search by Person Name, Department, or Phone..."
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          fullWidth
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined style={{ color: '#94a3b8' }} />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
+        <Grid container spacing={2} alignItems="center">
+          {/* Search Input */}
+          <Grid size={{ xs: 12, md: 5 }}>
+            <TextField
+              placeholder="Search by Person Name, Department, or Phone..."
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              fullWidth
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlined style={{ color: '#94a3b8' }} />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Grid>
+
+          {/* From Date */}
+          <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>
+            <TextField
+              label="From Date"
+              type="date"
+              size="small"
+              fullWidth
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              slotProps={{
+                inputLabel: { shrink: true }
+              }}
+              sx={{
+                '& .MuiInputBase-root': { height: 38 }
+              }}
+            />
+          </Grid>
+
+          {/* To Date */}
+          <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>
+            <TextField
+              label="To Date"
+              type="date"
+              size="small"
+              fullWidth
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              slotProps={{
+                inputLabel: { shrink: true }
+              }}
+              sx={{
+                '& .MuiInputBase-root': { height: 38 }
+              }}
+            />
+          </Grid>
+
+          {/* Reset Filters Button */}
+          <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            {(searchTerm || startDate || endDate) ? (
+              <Button
+                variant="outlined"
+                color="secondary"
+                size="small"
+                startIcon={<ReloadOutlined />}
+                onClick={handleResetFilters}
+                fullWidth
+                sx={{ height: 38, fontWeight: 700, borderRadius: 1.5 }}
+              >
+                Reset
+              </Button>
+            ) : null}
+          </Grid>
+        </Grid>
+
+        {/* Quick Date Presets Bar */}
+        <Box sx={{ mt: 1.75, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mr: 0.5 }}>
+            Quick Range:
+          </Typography>
+          <Chip
+            label="All Time"
+            size="small"
+            clickable
+            color={!startDate && !endDate ? 'primary' : 'default'}
+            variant={!startDate && !endDate ? 'filled' : 'outlined'}
+            onClick={() => { setStartDate(''); setEndDate(''); }}
+            sx={{ fontWeight: 700, height: 26, fontSize: '0.75rem' }}
+          />
+          <Chip
+            label="Today"
+            size="small"
+            clickable
+            color={isTodaySelected ? 'primary' : 'default'}
+            variant={isTodaySelected ? 'filled' : 'outlined'}
+            onClick={setFilterToday}
+            sx={{ fontWeight: 700, height: 26, fontSize: '0.75rem' }}
+          />
+          <Chip
+            label="Past 7 Days"
+            size="small"
+            clickable
+            variant="outlined"
+            onClick={setFilterPast7Days}
+            sx={{ fontWeight: 700, height: 26, fontSize: '0.75rem' }}
+          />
+          <Chip
+            label="This Month"
+            size="small"
+            clickable
+            variant="outlined"
+            onClick={setFilterThisMonth}
+            sx={{ fontWeight: 700, height: 26, fontSize: '0.75rem' }}
+          />
+
+          {(startDate || endDate) && (
+            <Chip
+              label={`Records: ${startDate || 'Start'} → ${endDate || 'Today'}`}
+              size="small"
+              color="info"
+              sx={{ fontWeight: 800, height: 26, ml: 'auto' }}
+            />
+          )}
+        </Box>
       </MainCard>
 
       {/* 4. Person / Staff Issue Table */}
@@ -303,7 +608,7 @@ export default function ShopLedgerPage() {
                 <TableCell align="center" sx={{ fontWeight: 800 }}>Total Slips</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 800 }}>Total Items Qty</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 800 }}>Total Value</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, width: 180 }}>Actions</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 800, width: 220 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -315,7 +620,9 @@ export default function ShopLedgerPage() {
                       No issue records found.
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      When staff takes items from Shop Mart, their records will automatically appear here.
+                      {startDate || endDate
+                        ? 'No records match the selected date range. Try expanding your date filter.'
+                        : 'When staff takes items from Shop Mart, their records will automatically appear here.'}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -323,108 +630,175 @@ export default function ShopLedgerPage() {
                 filteredPersons
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((person) => {
-                  const isExpanded = expandedPerson === person.key;
+                    const isExpanded = expandedPerson === person.key;
 
-                  return (
-                    <React.Fragment key={person.key}>
-                      <TableRow
-                        hover
-                        sx={{
-                          cursor: 'pointer',
-                          bgcolor: isExpanded ? (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9') : 'inherit'
-                        }}
-                      >
-                        <TableCell>
-                          <IconButton
-                            size="small"
-                            onClick={() => setExpandedPerson(isExpanded ? null : person.key)}
-                          >
-                            {isExpanded ? <UpOutlined style={{ fontSize: '0.8rem' }} /> : <DownOutlined style={{ fontSize: '0.8rem' }} />}
-                          </IconButton>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="subtitle2" fontWeight={800} color="primary.main">
-                            {person.personName}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {person.phoneOrDept}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip label={`${person.totalSlips} Slips`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip label={`${person.totalItemsCount} Pcs`} color="info" size="small" sx={{ fontWeight: 800 }} />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body1" fontWeight={800} color="#005F56">
-                            Rs. {person.totalValue.toLocaleString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Button
-                            variant="outlined"
-                            color="secondary"
-                            size="small"
-                            startIcon={<PrinterOutlined />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPrintStatement(person);
-                            }}
-                            sx={{ fontWeight: 700, borderRadius: 1.5, fontSize: '0.78rem' }}
-                          >
-                            Print Statement
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                    return (
+                      <React.Fragment key={person.key}>
+                        <TableRow
+                          hover
+                          sx={{
+                            cursor: 'pointer',
+                            bgcolor: isExpanded ? (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9') : 'inherit'
+                          }}
+                        >
+                          <TableCell>
+                            <IconButton
+                              size="small"
+                              onClick={() => setExpandedPerson(isExpanded ? null : person.key)}
+                            >
+                              {isExpanded ? <UpOutlined style={{ fontSize: '0.8rem' }} /> : <DownOutlined style={{ fontSize: '0.8rem' }} />}
+                            </IconButton>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="subtitle2" fontWeight={800} color="primary.main">
+                              {person.personName}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {person.phoneOrDept}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip label={`${person.totalSlips} Slips`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip label={`${person.totalItemsCount} Pcs`} color="info" size="small" sx={{ fontWeight: 800 }} />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body1" fontWeight={800} color="#005F56">
+                              Rs. {person.totalValue.toLocaleString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                              <Button
+                                variant="outlined"
+                                color="secondary"
+                                size="small"
+                                startIcon={<PrinterOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPrintStatement(person);
+                                }}
+                                sx={{ fontWeight: 700, borderRadius: 1.5, fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                              >
+                                Print Statement
+                              </Button>
 
-                      {/* Expanded History Row */}
-                      <TableRow>
-                        <TableCell colSpan={7} sx={{ py: 0, bgcolor: isDark ? 'background.default' : '#f8fafc' }}>
-                          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ p: 2.5 }}>
-                              <Typography variant="subtitle2" fontWeight={800} color="primary" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <FileTextOutlined /> All Material Issue Slips for: {person.personName}
-                              </Typography>
-                              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5 }}>
-                                <Table size="small">
-                                  <TableHead sx={{ bgcolor: isDark ? 'background.paper' : '#f1f5f9' }}>
-                                    <TableRow>
-                                      <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Slip #</TableCell>
-                                      <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Date &amp; Time</TableCell>
-                                      <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Items Issued Description</TableCell>
-                                      <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Value (Rs.)</TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {person.slips.map((s, idx) => (
-                                      <TableRow key={s.id || s.invoiceNo || idx}>
-                                        <TableCell sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#096dd9' }}>
-                                          {s.invoiceNo || s.saleNo || 'SLIP'}
-                                        </TableCell>
-                                        <TableCell sx={{ fontSize: '0.78rem' }}>{s.date || s.time || 'N/A'}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                                          {s.items && s.items.length > 0
-                                            ? s.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
-                                            : 'Factory parts'}
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#005F56' }}>
-                                          Rs. {(parseFloat(s.totalAmount) || 0).toLocaleString()}
-                                        </TableCell>
+                              <Tooltip title={`Delete ${person.personName} Record`}>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPersonToDelete(person);
+                                    setDeletePersonModalOpen(true);
+                                  }}
+                                  sx={{
+                                    bgcolor: isDark ? 'rgba(255, 77, 79, 0.15)' : '#fff1f0',
+                                    border: '1px solid rgba(255, 77, 79, 0.3)',
+                                    borderRadius: 1.5,
+                                    p: 0.75,
+                                    '&:hover': { bgcolor: '#ff4d4f', color: '#fff' }
+                                  }}
+                                >
+                                  <DeleteOutlined style={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Expanded History Row */}
+                        <TableRow>
+                          <TableCell colSpan={7} sx={{ py: 0, bgcolor: isDark ? 'background.default' : '#f8fafc' }}>
+                            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                              <Box sx={{ p: 2.5 }}>
+                                <Typography variant="subtitle2" fontWeight={800} color="primary" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <FileTextOutlined /> All Material Issue Slips for: {person.personName}
+                                </Typography>
+                                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5 }}>
+                                  <Table size="small">
+                                    <TableHead sx={{ bgcolor: isDark ? 'background.paper' : '#ffffff', borderBottom: '1.5px solid #e2e8f0' }}>
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', width: 50, color: 'text.secondary' }}>Sr</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Item</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', width: 80, color: 'text.secondary' }}>Qty</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', width: 110, color: 'text.secondary' }}>Rate</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', width: 110, color: 'text.secondary' }}>Amount</TableCell>
+                                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.75rem', width: 60, color: 'text.secondary' }}>Action</TableCell>
                                       </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </TableContainer>
-                            </Box>
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  );
-                })
+                                    </TableHead>
+                                    <TableBody>
+                                      {person.slips.map((s, sIdx) => {
+                                        const slipItems = normalizeSlipItems(s);
+                                        return (
+                                          <React.Fragment key={s.id || s.invoiceNo || sIdx}>
+                                            <TableRow sx={{ bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                                              <TableCell colSpan={5} sx={{ py: 1, px: 1.5 }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                    <Typography component="span" sx={{ fontWeight: 800, fontSize: '0.84rem', color: '#096dd9' }}>
+                                                      {s.invoiceNo || s.saleNo || 'SLIP'}
+                                                    </Typography>
+                                                    <Typography component="span" sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                                                      {s.date || s.time || 'N/A'}
+                                                    </Typography>
+                                                  </Box>
+                                                  <Typography component="span" sx={{ fontWeight: 800, fontSize: '0.86rem', color: 'text.primary' }}>
+                                                    Rs. {(parseFloat(s.totalAmount) || 0).toLocaleString()}
+                                                  </Typography>
+                                                </Box>
+                                              </TableCell>
+                                              <TableCell align="center" sx={{ py: 0.5 }}>
+                                                <Tooltip title="Delete this issue slip">
+                                                  <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSlipToDelete(s);
+                                                      setDeleteSlipModalOpen(true);
+                                                    }}
+                                                    sx={{
+                                                      bgcolor: isDark ? 'rgba(255, 77, 79, 0.15)' : '#fff1f0',
+                                                      p: 0.5,
+                                                      '&:hover': { bgcolor: '#ff4d4f', color: '#fff' }
+                                                    }}
+                                                  >
+                                                    <DeleteOutlined style={{ fontSize: 13 }} />
+                                                  </IconButton>
+                                                </Tooltip>
+                                              </TableCell>
+                                            </TableRow>
+                                            {slipItems.map((item, itemIdx) => (
+                                              <TableRow key={itemIdx} sx={{ borderBottom: '1px solid #f1f5f9', '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#fafafa' } }}>
+                                                <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary', pl: 2 }}>{itemIdx + 1}</TableCell>
+                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{item.name}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>{item.qty}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', color: 'text.secondary' }}>
+                                                  {item.rate > 0 ? item.rate.toLocaleString() : '-'}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                                                  {item.amount.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell />
+                                              </TableRow>
+                                            ))}
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </TableContainer>
+                              </Box>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    );
+                  })
               )}
             </TableBody>
           </Table>
@@ -530,7 +904,7 @@ export default function ShopLedgerPage() {
                       Factory Store &amp; Workshop • Internal Material Issue Statement
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#64748b' }}>
-                      Workshop Counter • Ph: 0300-XXXXXXX
+                      Workshop Counter • Ph: 03154630026
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
@@ -540,6 +914,15 @@ export default function ShopLedgerPage() {
                     <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
                       Date: {new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </Typography>
+                    {startDate || endDate ? (
+                      <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 800, display: 'block', mt: 0.25 }}>
+                        Period: {startDate || 'Start'} to {endDate || 'Present'}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
+                        Period: All Time Records
+                      </Typography>
+                    )}
                     <Chip label="Factory Issue" size="small" color="primary" sx={{ fontWeight: 800, mt: 0.5 }} />
                   </Box>
                 </Box>
@@ -571,39 +954,71 @@ export default function ShopLedgerPage() {
               <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#005F56', mb: 1, textTransform: 'uppercase' }}>
                 Issued Items Breakdown
               </Typography>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #005F56', marginBottom: '16px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#005F56', color: '#fff' }}>
-                    <th style={{ width: '6%', padding: '6px', textAlign: 'center', fontSize: '0.78rem' }}>Sr</th>
-                    <th style={{ width: '18%', padding: '6px', textAlign: 'center', fontSize: '0.78rem' }}>Slip #</th>
-                    <th style={{ width: '22%', padding: '6px', textAlign: 'left', fontSize: '0.78rem' }}>Date</th>
-                    <th style={{ width: '38%', padding: '6px 8px', textAlign: 'left', fontSize: '0.78rem' }}>Items Issued</th>
-                    <th style={{ width: '16%', padding: '6px 8px', textAlign: 'right', fontSize: '0.78rem' }}>Value (Rs.)</th>
+                  <tr style={{ borderBottom: '1.5px solid #cbd5e1', backgroundColor: '#fff' }}>
+                    <th style={{ width: '6%', padding: '8px 10px', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Sr</th>
+                    <th style={{ width: '48%', padding: '8px 10px', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Item</th>
+                    <th style={{ width: '12%', padding: '8px 10px', textAlign: 'right', fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Qty</th>
+                    <th style={{ width: '17%', padding: '8px 10px', textAlign: 'right', fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Rate</th>
+                    <th style={{ width: '17%', padding: '8px 10px', textAlign: 'right', fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {printData.slips.map((s, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                      <td style={{ padding: '6px', textAlign: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{idx + 1}</td>
-                      <td style={{ padding: '6px', textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#096dd9' }}>
-                        {s.invoiceNo || s.saleNo || 'SLIP'}
-                      </td>
-                      <td style={{ padding: '6px', fontSize: '0.78rem' }}>{s.date || s.time || 'N/A'}</td>
-                      <td style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 600 }}>
-                        {s.items && s.items.length > 0 ? s.items.map((i) => `${i.qty}x ${i.name}`).join(', ') : 'Factory parts'}
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.82rem', fontWeight: 800, color: '#005F56' }}>
-                        Rs. {(parseFloat(s.totalAmount) || 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
+                  {printData.slips.map((s, slipIdx) => {
+                    const slipItems = normalizeSlipItems(s);
+                    return (
+                      <React.Fragment key={s.id || s.invoiceNo || slipIdx}>
+                        {/* Slip Header Bar */}
+                        <tr style={{ backgroundColor: '#f8fafc', borderTop: slipIdx > 0 ? '1px solid #e2e8f0' : 'none', borderBottom: '1px solid #e2e8f0' }}>
+                          <td colSpan={5} style={{ padding: '7px 10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ color: '#096dd9', fontWeight: 800, fontSize: '0.85rem', marginRight: '16px' }}>
+                                  {s.invoiceNo || s.saleNo || 'SLIP'}
+                                </span>
+                                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>
+                                  {s.date || s.time || 'N/A'}
+                                </span>
+                              </div>
+                              <div>
+                                <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#0f172a' }}>
+                                  Rs. {(parseFloat(s.totalAmount) || 0).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Slip Items */}
+                        {slipItems.map((item, itemIdx) => (
+                          <tr key={itemIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '7px 10px', fontSize: '0.82rem', color: '#475569' }}>
+                              {itemIdx + 1}
+                            </td>
+                            <td style={{ padding: '7px 10px', fontSize: '0.83rem', fontWeight: 500, color: '#1e293b' }}>
+                              {item.name}
+                            </td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontSize: '0.83rem', fontWeight: 700, color: '#0f172a' }}>
+                              {item.qty}
+                            </td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontSize: '0.83rem', color: '#334155' }}>
+                              {item.rate > 0 ? item.rate.toLocaleString() : '-'}
+                            </td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontSize: '0.83rem', fontWeight: 600, color: '#0f172a' }}>
+                              {item.amount.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderTop: '2px solid #005F56' }}>
-                    <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.92rem' }}>
+                  <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #005F56' }}>
+                    <td colSpan={4} style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>
                       TOTAL MATERIAL VALUE:
                     </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#005F56' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 900, fontSize: '1rem', color: '#005F56' }}>
                       Rs. {printData.totalValue.toLocaleString()}
                     </td>
                   </tr>
@@ -642,7 +1057,88 @@ export default function ShopLedgerPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm Reset Dialog */}
+      {/* 6. CONFIRM DELETE PERSON LEDGER MODAL */}
+      <Dialog
+        open={deletePersonModalOpen}
+        onClose={() => !deleting && setDeletePersonModalOpen(false)}
+        slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 480 } } }}
+      >
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteOutlined /> Delete Customer / Staff Record?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mt: 1 }}>
+            Are you sure you want to delete all material issue records for{' '}
+            <strong style={{ color: '#1677ff' }}>{personToDelete?.personName}</strong>?
+          </Typography>
+          <Box sx={{ mt: 2, p: 2, bgcolor: isDark ? 'background.neutral' : '#fff1f0', borderRadius: 1.5, border: '1px solid #ffccc7' }}>
+            <Typography variant="body2" color="error.dark" fontWeight={700}>
+              • Total Slips to delete: {personToDelete?.slips?.length || 0}
+            </Typography>
+            <Typography variant="body2" color="error.dark" fontWeight={700} sx={{ mt: 0.5 }}>
+              • Total Value: Rs. {(personToDelete?.totalValue || 0).toLocaleString()}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              This will permanently delete all issue slips for this person from store records.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeletePersonModalOpen(false)} color="inherit" disabled={deleting} sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDeletePerson}
+            color="error"
+            variant="contained"
+            disabled={deleting}
+            sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}
+          >
+            {deleting ? 'Deleting...' : 'Yes, Delete All Records'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 7. CONFIRM DELETE INDIVIDUAL SLIP MODAL */}
+      <Dialog
+        open={deleteSlipModalOpen}
+        onClose={() => !deleting && setDeleteSlipModalOpen(false)}
+        slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 440 } } }}
+      >
+        <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteOutlined /> Delete Issue Slip?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mt: 1 }}>
+            Are you sure you want to delete Slip{' '}
+            <strong style={{ color: '#1677ff' }}>#{slipToDelete?.invoiceNo || slipToDelete?.saleNo || slipToDelete?.id}</strong>?
+          </Typography>
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: isDark ? 'background.neutral' : '#f8fafc', borderRadius: 1.5, border: '1px solid #e2e8f0' }}>
+            <Typography variant="body2" fontWeight={700} color="text.secondary">
+              Date: {slipToDelete?.date || slipToDelete?.time || 'N/A'}
+            </Typography>
+            <Typography variant="subtitle2" fontWeight={800} color="#005F56" sx={{ mt: 0.5 }}>
+              Amount: Rs. {(parseFloat(slipToDelete?.totalAmount) || 0).toLocaleString()}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteSlipModalOpen(false)} color="inherit" disabled={deleting} sx={{ fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteSlip}
+            color="error"
+            variant="contained"
+            disabled={deleting}
+            sx={{ fontWeight: 800, borderRadius: 1.5, px: 3 }}
+          >
+            {deleting ? 'Deleting...' : 'Yes, Delete Slip'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 8. CONFIRM FACTORY RESET DIALOG */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} slotProps={{ paper: { sx: { borderRadius: 2, maxWidth: 500 } } }}>
         <DialogTitle component="div" sx={{ fontWeight: 800, color: 'error.main' }}>
           Confirm Factory Reset Shop Data?
@@ -661,6 +1157,23 @@ export default function ShopLedgerPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 9. TOAST NOTIFICATION SNACKBAR */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: '100%', fontWeight: 700 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

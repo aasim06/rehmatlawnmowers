@@ -4,8 +4,8 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -44,7 +44,6 @@ import EditOutlined from '@ant-design/icons/EditOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import UploadOutlined from '@ant-design/icons/UploadOutlined';
 import ShoppingCartOutlined from '@ant-design/icons/ShoppingCartOutlined';
-import ThunderboltOutlined from '@ant-design/icons/ThunderboltOutlined';
 import PictureOutlined from '@ant-design/icons/PictureOutlined';
 import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
 import CloseOutlined from '@ant-design/icons/CloseOutlined';
@@ -106,12 +105,60 @@ export default function ShopAddProductPage() {
   const {
     items = [],
     categories = [],
+    masterItemNames = [],
     addNewItem,
     updateItem,
     deleteItem,
-    seedShopDemoData,
     resetShopDataToZero
   } = useStoreInventory();
+
+  // Existing product names for searchable dropdown (same as Stock In)
+  const existingProductNames = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...items.map((i) => i.name),
+        ...(masterItemNames || []).map((m) => m.name)
+      ])
+    )
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [items, masterItemNames]);
+
+  // Handle Product Name Select or Typing
+  const handleProductNameChange = (event, newInputValue) => {
+    const val = typeof newInputValue === 'string' ? newInputValue : (newInputValue?.name || '');
+
+    // Check if selecting an existing item
+    const matchedItem = items.find((i) => (i.name || '').toLowerCase() === val.toLowerCase());
+    if (matchedItem) {
+      setFormData((prev) => ({
+        ...prev,
+        name: val,
+        specification: matchedItem.specification || prev.specification || '',
+        category: matchedItem.category || prev.category || 'General',
+        unit: matchedItem.unit || prev.unit || 'PCS',
+        unitPrice: matchedItem.unitPrice !== undefined && matchedItem.unitPrice !== '' ? matchedItem.unitPrice : prev.unitPrice,
+        minLevel: matchedItem.minLevel ?? prev.minLevel ?? '5',
+        imageUrl: matchedItem.imageUrl || prev.imageUrl || ''
+      }));
+    } else {
+      const matchedMaster = (masterItemNames || []).find((m) => (m.name || '').toLowerCase() === val.toLowerCase());
+      if (matchedMaster) {
+        setFormData((prev) => ({
+          ...prev,
+          name: val,
+          category: matchedMaster.category || prev.category || 'General',
+          unit: matchedMaster.defaultUnit || matchedMaster.unit || prev.unit || 'PCS',
+          unitPrice: matchedMaster.unitPrice !== undefined && matchedMaster.unitPrice !== '' ? matchedMaster.unitPrice : prev.unitPrice
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          name: val
+        }));
+      }
+    }
+  };
 
   // Factory Reset State
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -129,6 +176,7 @@ export default function ShopAddProductPage() {
   // Form State
   const [formData, setFormData] = useState({
     name: '',
+    specification: '',
     category: 'Lawn Mowers',
     unit: 'PCS',
     unitPrice: '',
@@ -212,6 +260,7 @@ export default function ShopAddProductPage() {
   const handleResetForm = () => {
     setFormData({
       name: '',
+      specification: '',
       category: 'Lawn Mowers',
       unit: 'PCS',
       unitPrice: '',
@@ -229,6 +278,7 @@ export default function ShopAddProductPage() {
     setEditingItem(item);
     setFormData({
       name: item.name || '',
+      specification: item.specification || '',
       category: item.category || 'General',
       unit: item.unit || 'PCS',
       unitPrice: item.unitPrice || '',
@@ -266,6 +316,7 @@ export default function ShopAddProductPage() {
 
     const payload = {
       name: formData.name.trim(),
+      specification: (formData.specification || '').trim(),
       category: finalCategory || 'General',
       unit: formData.unit || 'PCS',
       unitPrice: priceNum,
@@ -388,31 +439,57 @@ export default function ShopAddProductPage() {
           }}
         >
           <Box component="form" onSubmit={handleSubmit}>
-            {/* 4 INPUTS UPAR & 4 INPUTS NEECHE (Strict 4-Column Grid) */}
+            {/* 5 INPUTS UPAR & 4 INPUTS NEECHE (Clean Responsive Grid) */}
             <Box
               sx={{
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
                   sm: 'repeat(2, 1fr)',
-                  md: 'repeat(4, 1fr)'
+                  md: 'repeat(3, 1fr)',
+                  lg: 'repeat(5, 1fr)'
                 },
                 gap: 2,
                 mb: 2.5
               }}
             >
-              {/* ── ROW 1 (4 INPUTS UPAR) ── */}
-              {/* 1. Product Name */}
-              <TextField
-                label="Product Name"
-                required
-                fullWidth
+              {/* ── ROW 1 ── */}
+              {/* 1. Product Name (Searchable Dropdown + Free typing like Stock In) */}
+              <Autocomplete
+                freeSolo
+                options={existingProductNames}
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Lawn Mower Cutting Blade"
+                onChange={(event, newValue) => handleProductNameChange(event, newValue)}
+                onInputChange={(event, newInputValue) => handleProductNameChange(event, newInputValue)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    padding: '0 36px 0 0 !important',
+                    '& .MuiAutocomplete-input': {
+                      padding: '10.5px 14px 10.5px 12px !important',
+                      height: 'auto !important'
+                    }
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Product Name"
+                    required
+                    placeholder="Select or type product name"
+                  />
+                )}
               />
 
-              {/* 2. Category */}
+              {/* 2. Specification */}
+              <TextField
+                label="Specification"
+                fullWidth
+                value={formData.specification}
+                onChange={(e) => setFormData({ ...formData, specification: e.target.value })}
+                placeholder="e.g. Size, Power, Model, 18-inch..."
+              />
+
+              {/* 3. Category */}
               {!showCustomCat ? (
                 <TextField
                   select
@@ -456,7 +533,7 @@ export default function ShopAddProductPage() {
                 />
               )}
 
-              {/* 3. Unit */}
+              {/* 4. Unit */}
               <TextField
                 select
                 label="Unit"
@@ -471,7 +548,7 @@ export default function ShopAddProductPage() {
                 ))}
               </TextField>
 
-              {/* 4. Price (PKR) */}
+              {/* 5. Price (PKR) */}
               <TextField
                 label="Price (PKR)"
                 type="number"
@@ -483,8 +560,8 @@ export default function ShopAddProductPage() {
                 inputProps={{ min: 0, step: 'any' }}
               />
 
-              {/* ── ROW 2 (4 INPUTS NEECHE) ── */}
-              {/* 5. Stock Qty */}
+              {/* ── ROW 2 ── */}
+              {/* 6. Stock Qty */}
               <TextField
                 label="Stock Qty"
                 type="number"
@@ -496,7 +573,7 @@ export default function ShopAddProductPage() {
                 inputProps={{ min: 0 }}
               />
 
-              {/* 6. Low Stock Warning Level */}
+              {/* 7. Low Stock Warning Level */}
               <TextField
                 label="Low Stock Alert Level"
                 type="number"
@@ -507,7 +584,7 @@ export default function ShopAddProductPage() {
                 inputProps={{ min: 1 }}
               />
 
-              {/* 7. Quick Photo Preset */}
+              {/* 8. Quick Photo Preset */}
               <TextField
                 select
                 fullWidth
@@ -529,13 +606,16 @@ export default function ShopAddProductPage() {
                 ))}
               </TextField>
 
-              {/* 8. Photo URL */}
+              {/* 9. Photo URL */}
               <TextField
                 label="Photo URL"
                 fullWidth
                 value={formData.imageUrl}
                 onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                 placeholder="https://... or paste link"
+                sx={{
+                  gridColumn: { xs: 'span 1', lg: 'span 2' }
+                }}
               />
             </Box>
 
@@ -766,6 +846,11 @@ export default function ShopAddProductPage() {
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
                               {item.name}
                             </Typography>
+                            {item.specification && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                                Spec: {item.specification}
+                              </Typography>
+                            )}
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                               Unit: {item.unit || 'PCS'}
                             </Typography>

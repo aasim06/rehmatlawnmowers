@@ -396,6 +396,9 @@ export function StoreInventoryProvider({ children }) {
   // Parallel Data Fetching via Firebase Firestore for zero-latency initial load & clean error handling
   const fetchFirebaseData = async () => {
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return;
+      }
       const activeUser = sessionStorage.getItem('rehmat_erp_active_user');
       if (!activeUser && !user) return;
 
@@ -452,6 +455,7 @@ export function StoreInventoryProvider({ children }) {
         const mappedItems = cleanItemsData.map((i) => ({
           id: i.id,
           name: i.name,
+          specification: i.specification || '',
           itemCode: i.sku_code || i.item_code || i.itemCode || i.id,
           category: i.category || 'General',
           unit: i.unit || 'PCS',
@@ -463,7 +467,7 @@ export function StoreInventoryProvider({ children }) {
           rackLocation: i.location || i.rack_location || i.rackLocation || 'Main Store',
           status: parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= 0 ? 2 : parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= (parseFloat(i.min_threshold || i.min_level || i.minLevel) || 10) ? 0 : 1
         }));
-        if (mappedItems.length > 0 || itemsList.length === 0) {
+        if (mappedItems.length > 0) {
           setItems(mappedItems);
           localStorage.setItem('rehmat_store_items_v2', JSON.stringify(mappedItems));
         }
@@ -520,7 +524,7 @@ export function StoreInventoryProvider({ children }) {
             notes: l.notes || localItem?.notes || ''
           };
         });
-        if (mappedLogs.length > 0 || logsList.length === 0) {
+        if (mappedLogs.length > 0) {
           setUsageLogs(mappedLogs);
           localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
         }
@@ -543,7 +547,7 @@ export function StoreInventoryProvider({ children }) {
           openingBalance: parseFloat(v.opening_balance || v.openingBalance) || 0,
           currentBalance: parseFloat(v.current_balance || v.currentBalance) || 0
         }));
-        if (mappedVendors.length > 0 || vendorsList.length === 0) {
+        if (mappedVendors.length > 0) {
           setVendors(mappedVendors);
           localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
         }
@@ -579,7 +583,7 @@ export function StoreInventoryProvider({ children }) {
             items: s.items || []
           };
         });
-        if (mappedSales.length > 0 || salesList.length === 0) {
+        if (mappedSales.length > 0) {
           setMachineSales(mappedSales);
           localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
         }
@@ -623,8 +627,10 @@ export function StoreInventoryProvider({ children }) {
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
-        setCustomerPayments(mappedCustPay);
-        localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(mappedCustPay));
+        if (mappedCustPay.length > 0) {
+          setCustomerPayments(mappedCustPay);
+          localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(mappedCustPay));
+        }
       }
 
       if (vendPaySnap.status === 'fulfilled') {
@@ -640,8 +646,10 @@ export function StoreInventoryProvider({ children }) {
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
-        setVendorPayments(mappedVendPay);
-        localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
+        if (mappedVendPay.length > 0) {
+          setVendorPayments(mappedVendPay);
+          localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
+        }
       }
 
       if (repairsSnap.status === 'fulfilled') {
@@ -666,8 +674,10 @@ export function StoreInventoryProvider({ children }) {
           promisedDate: r.promised_date || r.promisedDate || '1-2 Days',
           repairItems: r.repair_items || r.repairItems || []
         }));
-        setMachineRepairs(mappedRepairs);
-        localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
+        if (mappedRepairs.length > 0) {
+          setMachineRepairs(mappedRepairs);
+          localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
+        }
       }
 
       if (expensesSnap.status === 'fulfilled') {
@@ -682,8 +692,10 @@ export function StoreInventoryProvider({ children }) {
           notes: e.notes || '',
           createdAt: e.created_at || e.createdAt || new Date().toISOString()
         }));
-        setExpenses(mappedExpenses);
-        localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
+        if (mappedExpenses.length > 0) {
+          setExpenses(mappedExpenses);
+          localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
+        }
       }
 
       if (recipesSnap.status === 'fulfilled') {
@@ -696,8 +708,10 @@ export function StoreInventoryProvider({ children }) {
           description: r.description || '',
           ingredients: r.ingredients || []
         }));
-        setMachineRecipes(mappedRecipes);
-        localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
+        if (mappedRecipes.length > 0) {
+          setMachineRecipes(mappedRecipes);
+          localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
+        }
       }
     } catch (err) {
       // Cloud fetch notification
@@ -1104,6 +1118,7 @@ export function StoreInventoryProvider({ children }) {
       await setDoc(doc(db, 'store_items', String(itemId)), {
         id: itemId,
         name: newItem.name,
+        specification: newItem.specification || '',
         item_code: itemCode,
         category: newItem.category || 'General',
         unit: newItem.unit || 'PCS',
@@ -1113,6 +1128,7 @@ export function StoreInventoryProvider({ children }) {
         unit_price: priceVal,
         min_level: minLevelVal,
         rack_location: rackLocationVal,
+        image_url: newItem.imageUrl || '',
         status: 1
       }, { merge: true });
       fetchFirebaseData();
@@ -1151,6 +1167,8 @@ export function StoreInventoryProvider({ children }) {
         remaining_stock: updatedData.totalStock,
         unit: updatedData.unit
       };
+      if (updatedData.specification !== undefined) updatePayload.specification = updatedData.specification;
+      if (updatedData.imageUrl !== undefined) updatePayload.image_url = updatedData.imageUrl;
       if (priceVal !== undefined) updatePayload.unit_price = priceVal;
       if (minLevelVal !== undefined) updatePayload.min_level = minLevelVal;
       if (updatedData.rackLocation) updatePayload.rack_location = updatedData.rackLocation;
@@ -2368,7 +2386,8 @@ export function StoreInventoryProvider({ children }) {
       shopSales: machineSales,
       addShopSale: addMachineSale,
       updateShopSale: updateMachineSale,
-      deleteShopSale: deleteMachineSale
+      deleteShopSale: deleteMachineSale,
+      deleteMultipleShopSales: deleteMultipleMachineSales
     }),
     [
       items,

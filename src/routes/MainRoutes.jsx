@@ -6,6 +6,7 @@ import StockInPage from 'pages/inventory/StockInPage';
 import StockOutPage from 'pages/inventory/StockOutPage';
 import VendorsPage from 'pages/inventory/VendorsPage';
 import MachineSalesPage from 'pages/inventory/MachineSalesPage';
+import MachineInvoicesPage from 'pages/inventory/MachineInvoicesPage';
 import MachineRepairsPage from 'pages/inventory/MachineRepairsPage';
 import CategoriesPage from 'pages/inventory/CategoriesPage';
 import UsageLogPage from 'pages/inventory/UsageLogPage';
@@ -151,6 +152,14 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="machine-sales">
               <MachineSalesPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'machine-invoices',
+          element: (
+            <RoleGuard permission="machine-sales">
+              <MachineInvoicesPage />
             </RoleGuard>
           )
         },

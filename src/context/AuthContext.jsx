@@ -306,18 +306,20 @@ export function AuthProvider({ children }) {
           JSON.parse(localStorage.getItem('rehmat_deleted_staff_ids') || '[]').map((x) => String(x).toLowerCase())
         );
 
-        try {
-          const deletedSnap = await getDocs(collection(db, 'deleted_staff'));
-          if (!deletedSnap.empty) {
-            deletedSnap.docs.forEach((docSnap) => {
-              const d = docSnap.data();
-              if (d.id) deletedIds.add(String(d.id).toLowerCase());
-              if (d.email) deletedIds.add(String(d.email).toLowerCase());
-            });
-            localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify([...deletedIds]));
+        if (typeof navigator === 'undefined' || navigator.onLine) {
+          try {
+            const deletedSnap = await getDocs(collection(db, 'deleted_staff'));
+            if (!deletedSnap.empty) {
+              deletedSnap.docs.forEach((docSnap) => {
+                const d = docSnap.data();
+                if (d.id) deletedIds.add(String(d.id).toLowerCase());
+                if (d.email) deletedIds.add(String(d.email).toLowerCase());
+              });
+              localStorage.setItem('rehmat_deleted_staff_ids', JSON.stringify([...deletedIds]));
+            }
+          } catch (e) {
+            console.warn('Deleted staff sync error:', e);
           }
-        } catch (e) {
-          console.warn('Deleted staff sync error:', e);
         }
 
         // Real-time listener for users collection
@@ -414,23 +416,27 @@ export function AuthProvider({ children }) {
     // 1. Instant deterministic & dynamic login for Master Super Admin
     if (cleanEmail === 'admin@rehmat.com') {
       let adminStaff = staffUsers.find((u) => (u.email || '').toLowerCase() === 'admin@rehmat.com');
+      let expectedPass = (adminStaff?.password || '123456').trim();
+      let isPassValid = cleanPass === expectedPass || (expectedPass === '123456' && cleanPass === 'admin123');
 
-      // Check cloud Firestore for latest password in case changed on another machine
-      try {
-        const q = query(collection(db, 'users'), where('email', '==', 'admin@rehmat.com'));
-        const qSnap = await getDocs(q);
-        if (!qSnap.empty) {
-          const docData = qSnap.docs[0].data();
-          if (docData.password) {
-            adminStaff = { ...(adminStaff || {}), ...docData, id: qSnap.docs[0].id };
+      // If local password didn't match, check cloud in case it was updated remotely
+      if (!isPassValid && (typeof navigator === 'undefined' || navigator.onLine)) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', 'admin@rehmat.com'));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+          const qSnap = await Promise.race([getDocs(q), timeoutPromise]);
+          if (qSnap && !qSnap.empty) {
+            const docData = qSnap.docs[0].data();
+            if (docData.password) {
+              expectedPass = docData.password.trim();
+              isPassValid = cleanPass === expectedPass;
+              adminStaff = { ...(adminStaff || {}), ...docData, id: qSnap.docs[0].id };
+            }
           }
+        } catch (err) {
+          // Cloud check timed out or offline
         }
-      } catch (err) {
-        console.warn('Firestore admin verification fallback:', err);
       }
-
-      const expectedPass = (adminStaff?.password || '123456').trim();
-      const isPassValid = cleanPass === expectedPass || (expectedPass === '123456' && cleanPass === 'admin123');
 
       if (isPassValid) {
         const rootAdmin = {

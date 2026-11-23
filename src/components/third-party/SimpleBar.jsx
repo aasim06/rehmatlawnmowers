@@ -5,7 +5,6 @@ import { styled } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 
 // project imports
-import { withAlpha } from 'utils/colorUtils';
 
 // third-party
 import SimpleBar from 'simplebar-react';
@@ -19,23 +18,13 @@ const RootStyle = styled(BrowserView)({
 });
 
 // scroll bar wrapper
-const SimpleBarStyle = styled(SimpleBar)(({ theme }) => ({
+const SimpleBarStyle = styled(SimpleBar)(() => ({
   maxHeight: '100%',
   '& .simplebar-scrollbar': {
-    '&:before': {
-      background: withAlpha(theme.vars.palette.grey[500], 0.48)
-    },
-    '&.simplebar-visible:before': {
-      opacity: 1
-    }
+    display: 'none !important'
   },
   '& .simplebar-track': {
-    '&.simplebar-vertical': {
-      width: 10
-    }
-  },
-  '& .simplebar-track.simplebar-horizontal .simplebar-scrollbar': {
-    height: 6
+    display: 'none !important'
   },
   '& .simplebar-mask': {
     zIndex: 'inherit'

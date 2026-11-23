@@ -108,6 +108,13 @@ const inventoryMenu = {
           icon: icons.ShoppingCartOutlined
         },
         {
+          id: 'machine-invoices',
+          title: 'Machine Invoices',
+          type: 'item',
+          url: '/inventory/machine-invoices',
+          icon: icons.FileTextOutlined
+        },
+        {
           id: 'machine-repairs',
           title: 'Machine Repairing',
           type: 'item',
@@ -152,18 +159,18 @@ const inventoryMenu = {
           icon: icons.ShoppingCartOutlined
         },
         {
-          id: 'shop-ledger',
-          title: 'Shop Customer Ledger',
-          type: 'item',
-          url: '/shop/ledger',
-          icon: icons.BookOutlined
-        },
-        {
           id: 'shop-invoices',
           title: 'Shop Invoices',
           type: 'item',
           url: '/shop/invoices',
           icon: icons.FileTextOutlined
+        },
+        {
+          id: 'shop-ledger',
+          title: 'Shop Customer Ledger',
+          type: 'item',
+          url: '/shop/ledger',
+          icon: icons.BookOutlined
         }
       ]
     },

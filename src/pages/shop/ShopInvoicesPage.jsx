@@ -501,7 +501,7 @@ export default function ShopInvoicesPage() {
         <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Grid container spacing={2} alignItems="center">
             {/* Search Input */}
-            <Grid item xs={12} md={5}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -522,7 +522,7 @@ export default function ShopInvoicesPage() {
             </Grid>
 
             {/* Filter by Period */}
-            <Grid item xs={6} md={3}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Time Period</InputLabel>
                 <Select
@@ -542,7 +542,7 @@ export default function ShopInvoicesPage() {
             </Grid>
 
             {/* Filter by Payment Method */}
-            <Grid item xs={6} md={2.5}>
+            <Grid size={{ xs: 6, md: 2.5 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Payment Method</InputLabel>
                 <Select
@@ -562,7 +562,7 @@ export default function ShopInvoicesPage() {
             </Grid>
 
             {/* Reset Filter Button */}
-            <Grid item xs={12} md={1.5}>
+            <Grid size={{ xs: 12, md: 1.5 }}>
               <Button
                 fullWidth
                 size="medium"
@@ -817,7 +817,7 @@ export default function ShopInvoicesPage() {
         <DialogContent dividers sx={{ p: 3 }}>
           {/* Customer & Payment Info */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -828,7 +828,7 @@ export default function ShopInvoicesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -839,7 +839,7 @@ export default function ShopInvoicesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Payment Method</InputLabel>
                 <Select value={formPaymentMethod} label="Payment Method" onChange={(e) => setFormPaymentMethod(e.target.value)}>
@@ -850,7 +850,7 @@ export default function ShopInvoicesPage() {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -869,7 +869,7 @@ export default function ShopInvoicesPage() {
           {/* Add Item Row */}
           <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: isDark ? 'background.default' : '#f8fafc', borderRadius: 2 }}>
             <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={5}>
+              <Grid size={{ xs: 12, sm: 5 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Select Item from Shop Stock</InputLabel>
                   <Select
@@ -893,7 +893,7 @@ export default function ShopInvoicesPage() {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={6} sm={2}>
+              <Grid size={{ xs: 6, sm: 2 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -905,7 +905,7 @@ export default function ShopInvoicesPage() {
                 />
               </Grid>
 
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -916,7 +916,7 @@ export default function ShopInvoicesPage() {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={2}>
+              <Grid size={{ xs: 12, sm: 2 }}>
                 <Button
                   fullWidth
                   variant="contained"
@@ -992,7 +992,7 @@ export default function ShopInvoicesPage() {
 
           {/* Discount & Tax Row */}
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Stack direction="row" spacing={1}>
                 <TextField
                   fullWidth
@@ -1014,7 +1014,7 @@ export default function ShopInvoicesPage() {
               </Stack>
             </Grid>
 
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -1026,7 +1026,7 @@ export default function ShopInvoicesPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Box
                 sx={{
                   p: 1.5,
@@ -1186,7 +1186,7 @@ export default function ShopInvoicesPage() {
                 </Typography>
 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
                       CUSTOMER NAME
                     </Typography>
@@ -1210,7 +1210,7 @@ export default function ShopInvoicesPage() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
                       PHONE NUMBER
                     </Typography>
@@ -1234,7 +1234,7 @@ export default function ShopInvoicesPage() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
                       PAYMENT METHOD
                     </Typography>
@@ -1254,7 +1254,7 @@ export default function ShopInvoicesPage() {
                     </Select>
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
                       NOTES / REMARKS
                     </Typography>
@@ -1979,12 +1979,7 @@ export default function ShopInvoicesPage() {
                                   lineHeight: 1.25
                                 }}
                               >
-                                {item.name || item.itemName}{' '}
-                                {item.itemCode
-                                  ? `(${item.itemCode})`
-                                  : item.id && !String(item.id).startsWith('ITM-')
-                                    ? `(${item.id})`
-                                    : ''}
+                                {(item.name || item.itemName || '').replace(/\s*\([a-f0-9-]{10,}\)/gi, '').replace(/\s*\(SKU-[^)]+\)/gi, '').trim()}
                               </td>
                               <td
                                 style={{
@@ -2064,11 +2059,11 @@ export default function ShopInvoicesPage() {
                       >
                         <div>
                           <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
-                            TOTAL RECEIVING ITEMS: {displayItems.length}
+                            TOTAL ITEMS: {displayItems.length}
                           </Typography>
                           {isCredit ? (
                             <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', display: 'block', mt: 0.3 }}>
-                              Payment: Full Credit Purchase (Unpaid)
+                              Payment: Credit Sale (Unpaid)
                             </Typography>
                           ) : (
                             <Typography variant="caption" sx={{ fontWeight: 700, color: '#16a34a', display: 'block', mt: 0.3 }}>
@@ -2111,7 +2106,7 @@ export default function ShopInvoicesPage() {
                           display="block"
                           sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}
                         >
-                          Vendor Signature
+                          Customer Signature
                         </Typography>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -2139,7 +2134,7 @@ export default function ShopInvoicesPage() {
             className="no-print"
             sx={{ px: 3, fontWeight: 700 }}
           >
-            Print Vendor Invoice ({selectedInvoice?.items?.length || selectedInvoice?.cart?.length || 1} Items)
+            Print Customer Invoice ({selectedInvoice?.items?.length || selectedInvoice?.cart?.length || 1} Items)
           </Button>
         </DialogActions>
       </Dialog>

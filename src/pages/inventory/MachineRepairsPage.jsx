@@ -1748,8 +1748,8 @@ const STATUS_DESCRIPTIONS = {
 
                 {/* Advance, Discount & Balance Row */}
                 <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                  <Grid container spacing={1} alignItems="center">
-                    <Grid size={{ xs: 6 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <Box>
                       {printData.discountAmount > 0 && (
                         <Typography variant="body2" color="error.main" fontWeight={700} display="block">
                           DISCOUNT: -Rs. {printData.discountAmount.toLocaleString()}
@@ -1758,31 +1758,31 @@ const STATUS_DESCRIPTIONS = {
                       <Typography variant="caption" color="textSecondary" display="block">
                         PAID ADVANCE: Rs. {(printData.paidAmount || 0).toLocaleString()}
                       </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                    </Box>
+                    <Box sx={{ textAlign: 'right' }}>
                       <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
                         NET TOTAL: Rs. {(printData.totalCost || printData.subTotal || 0).toLocaleString()}
                       </Typography>
                       <Typography variant="caption" fontWeight={800} color={printData.balanceAmount > 0 ? 'error.main' : 'success.main'} display="block">
                         {printData.balanceAmount > 0 ? `REMAINING DUE: Rs. ${printData.balanceAmount.toLocaleString()}` : 'FULL PAID (NO DUES)'}
                       </Typography>
-                    </Grid>
-                  </Grid>
+                    </Box>
+                  </Box>
                 </Box>
 
                 {/* Signature Row */}
-                <Grid container spacing={2} sx={{ mt: 1.5, pt: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                  <Grid size={{ xs: 6 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', mt: 1.5, pt: 1 }}>
+                  <Box>
                     <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
                       Customer Signature
                     </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
                     <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
                       <CeoSignature />
                     </Box>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </Box>
             </Box>
           )}

@@ -28,6 +28,17 @@ import Typography from './Typography';
 
 function DialogAndMenu(theme) {
   const isDark = theme.palette.mode === 'dark';
+  const hiddenScrollbar = {
+    scrollbarWidth: 'none !important',
+    msOverflowStyle: 'none !important',
+    '&::-webkit-scrollbar': {
+      display: 'none !important',
+      width: '0 !important',
+      height: '0 !important',
+      background: 'transparent !important'
+    }
+  };
+
   return {
     MuiDialog: {
       styleOverrides: {
@@ -35,7 +46,15 @@ function DialogAndMenu(theme) {
           backgroundImage: 'none',
           backgroundColor: isDark ? '#131b2e' : theme.vars.palette.background.paper,
           border: isDark ? '1px solid #1e293b' : 'none',
-          boxShadow: isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)' : undefined
+          boxShadow: isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)' : undefined,
+          ...hiddenScrollbar
+        }
+      }
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          ...hiddenScrollbar
         }
       }
     },
@@ -45,7 +64,28 @@ function DialogAndMenu(theme) {
           backgroundImage: 'none',
           backgroundColor: isDark ? '#131b2e' : theme.vars.palette.background.paper,
           border: isDark ? '1px solid #1e293b' : 'none',
-          boxShadow: isDark ? '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)' : undefined
+          boxShadow: isDark ? '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)' : undefined,
+          ...hiddenScrollbar
+        },
+        list: {
+          ...hiddenScrollbar
+        }
+      }
+    },
+    MuiAutocomplete: {
+      styleOverrides: {
+        paper: {
+          ...hiddenScrollbar
+        },
+        listbox: {
+          ...hiddenScrollbar
+        }
+      }
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          ...hiddenScrollbar
         }
       }
     },
@@ -69,9 +109,23 @@ function DialogAndMenu(theme) {
     },
     MuiCssBaseline: {
       styleOverrides: {
+        html: {
+          ...hiddenScrollbar
+        },
         body: {
+          ...hiddenScrollbar,
           backgroundColor: isDark ? '#090d16' : 'rgb(247, 246, 242)',
           color: isDark ? '#f8fafc' : undefined
+        },
+        '*': {
+          scrollbarWidth: 'none !important',
+          msOverflowStyle: 'none !important',
+          '&::-webkit-scrollbar': {
+            display: 'none !important',
+            width: '0 !important',
+            height: '0 !important',
+            background: 'transparent !important'
+          }
         }
       }
     }

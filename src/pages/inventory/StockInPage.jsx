@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, Fragment, useEffect } from 'react';
+import { useState, useRef, useMemo, Fragment, useEffect } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import CeoSignature from 'components/CeoSignature';
 
@@ -17,7 +17,6 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
-  Drawer,
   Grid,
   IconButton,
   InputAdornment,
@@ -48,15 +47,12 @@ import {
   DeleteOutlined,
   EditOutlined,
   PrinterOutlined,
-  UploadOutlined,
   DollarOutlined,
   DownOutlined,
-  RightOutlined,
   ShopOutlined,
   FolderOutlined,
   FolderOpenOutlined,
-  CheckOutlined,
-  CloseOutlined
+  CheckOutlined
 } from '@ant-design/icons';
 
 // project imports
@@ -136,8 +132,7 @@ export default function StockInPage() {
     }
   }, [currentInvoiceItems, currentVoucherNo]);
 
-  // Add Drawer Form State
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Form State
   const [form, setForm] = useState({
     vendor: '',
     itemName: '',
@@ -175,8 +170,7 @@ export default function StockInPage() {
     itemsCount: 0
   });
 
-  // Edit Drawer Form State
-  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  // Edit Form State
   const [editingLog, setEditingLog] = useState(null);
 
   // Delete Dialog State
@@ -187,31 +181,6 @@ export default function StockInPage() {
   // Print Invoice Modal State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printData, setPrintData] = useState(null);
-
-  // Local File Upload for Item Image
-  const handleLocalImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 500;
-          const scale = Math.min(1, MAX_WIDTH / img.width);
-          canvas.width = Math.round(img.width * scale);
-          canvas.height = Math.round(img.height * scale);
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          setForm((prev) => ({ ...prev, imageUrl: dataUrl }));
-        };
-        img.onerror = () => setForm((prev) => ({ ...prev, imageUrl: event.target.result }));
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // Combine all items list from store items and master item names for complete dropdown options
   const existingNamesList = Array.from(
@@ -553,7 +522,20 @@ export default function StockInPage() {
 
   // Trigger System Print Window
   const handlePrint = () => {
+    const isCurrentBill = printData?.id === currentVoucherNo || currentInvoiceItems.length > 0;
+
+    const cleanupAfterPrint = () => {
+      if (isCurrentBill) {
+        handleStartNewInvoice();
+      }
+      setPrintModalOpen(false);
+      window.removeEventListener('afterprint', cleanupAfterPrint);
+    };
+
+    window.addEventListener('afterprint', cleanupAfterPrint, { once: true });
     window.print();
+    // Fallback for browsers executing synchronously or without afterprint event
+    setTimeout(cleanupAfterPrint, 300);
   };
 
   // Open Edit in Main Stock In Form (Switches Tab to 0 and pre-fills form)
@@ -1585,7 +1567,7 @@ export default function StockInPage() {
                               lineHeight: 1.3
                             }}
                           >
-                            {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                            {(item.itemName || '').replace(/\s*\([^)]*SKU-[^)]*\)/gi, '').trim()}
                           </td>
                           <td
                             style={{
@@ -2858,7 +2840,7 @@ export default function StockInPage() {
                               {String(idx + 1).padStart(2, '0')}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                              {item.itemName} {item.itemCode ? `(${item.itemCode})` : ''}
+                              {(item.itemName || '').replace(/\s*\([^)]*SKU-[^)]*\)/gi, '').trim()}
                             </td>
                             <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
                               {String(itemQty).padStart(2, '0')}

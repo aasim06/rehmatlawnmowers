@@ -46,9 +46,8 @@ export function useAppUpdate() {
       }
     } catch {}
 
-    // 3. Force reload with cache-busting timestamp
-    const ts = Date.now();
-    window.location.href = `https://rehmatlawnmowers.vercel.app/?platform=tauri&_v=${ts}`;
+    // 3. Force reload current view without navigating away
+    window.location.reload();
   }, []);
 
   useEffect(() => {
