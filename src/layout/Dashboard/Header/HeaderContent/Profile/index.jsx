@@ -2,8 +2,6 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // material-ui
-import { useTheme } from '@mui/material/styles';
-import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import CardContent from '@mui/material/CardContent';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -30,9 +28,6 @@ import usePermission from 'hooks/usePermission';
 
 // assets
 import LogoutOutlined from '@ant-design/icons/LogoutOutlined';
-import UserOutlined from '@ant-design/icons/UserOutlined';
-import CrownOutlined from '@ant-design/icons/CrownOutlined';
-import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
 import TeamOutlined from '@ant-design/icons/TeamOutlined';
 import CloudSyncOutlined from '@ant-design/icons/CloudSyncOutlined';
 import DashboardOutlined from '@ant-design/icons/DashboardOutlined';
@@ -41,9 +36,8 @@ import avatar1 from 'assets/images/users/avatar-1.png';
 // ==============================|| HEADER CONTENT - CLEAN ERP PROFILE ||============================== //
 
 export default function Profile() {
-  const theme = useTheme();
   const navigate = useNavigate();
-  const { user, logout, switchUserRole } = useAuth();
+  const { user, logout } = useAuth();
   const { hasAccessToItem, isSuperAdmin } = usePermission();
 
   const anchorRef = useRef(null);
@@ -170,62 +164,6 @@ export default function Profile() {
                         </IconButton>
                       </Tooltip>
                     </Stack>
-
-                    {/* Role Preview Switcher for Super Admin Testing */}
-                    {userRole === 'Super Admin' && (
-                      <Box sx={{ mt: 1.5, p: 1.25, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            fullWidth
-                            size="small"
-                            variant="outlined"
-                            color="info"
-                            startIcon={<SafetyCertificateOutlined />}
-                            onClick={() => {
-                              switchUserRole('Admin');
-                              setOpen(false);
-                            }}
-                            sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.4, borderRadius: 1.5 }}
-                          >
-                            Admin
-                          </Button>
-                          <Button
-                            fullWidth
-                            size="small"
-                            variant="outlined"
-                            color="warning"
-                            startIcon={<UserOutlined />}
-                            onClick={() => {
-                              switchUserRole('Store Keeper');
-                              setOpen(false);
-                            }}
-                            sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.4, borderRadius: 1.5 }}
-                          >
-                            Store Keeper
-                          </Button>
-                        </Stack>
-                      </Box>
-                    )}
-
-                    {/* Return to Super Admin Button only if currently previewing another role as Master Admin */}
-                    {userRole !== 'Super Admin' && userEmail === 'admin@rehmat.com' && (
-                      <Box sx={{ mt: 1.5 }}>
-                        <Button
-                          fullWidth
-                          size="small"
-                          variant="contained"
-                          color="primary"
-                          startIcon={<CrownOutlined />}
-                          onClick={() => {
-                            switchUserRole('Super Admin');
-                            setOpen(false);
-                          }}
-                          sx={{ fontWeight: 700, py: 0.75, borderRadius: 1.5 }}
-                        >
-                          Restore Super Admin
-                        </Button>
-                      </Box>
-                    )}
                   </CardContent>
 
                   <Divider />
