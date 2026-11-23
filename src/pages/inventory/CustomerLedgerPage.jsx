@@ -304,7 +304,11 @@ export default function CustomerLedgerPage() {
         };
       }
       const billTotal = parseFloat(sale.lineTotal || sale.subTotal) || 0;
-      const paid = parseFloat(sale.paidAmount) || 0;
+      const directPaid = parseFloat(sale.paidAmount) || 0;
+      const extraPaid = (customerPayments || [])
+        .filter((p) => String(p.invoiceId) === String(sale.id))
+        .reduce((sum, p) => sum + (parseFloat(p.amountPaid) || 0), 0);
+      const paid = Math.max(directPaid, extraPaid);
       const mItems = normalizeMachineItems(sale);
       const machineCount = mItems.reduce((acc, i) => acc + (parseInt(i.qty, 10) || 1), 0);
 
@@ -314,6 +318,9 @@ export default function CustomerLedgerPage() {
       customerMap[lowerKey].totalPaidVal += paid;
       customerMap[lowerKey].invoices.push({
         ...sale,
+        paidAmount: paid,
+        balanceAmount: Math.max(0, billTotal - paid),
+        paymentStatus: paid >= billTotal && billTotal > 0 ? 'Paid' : paid > 0 ? 'Partial' : (sale.paymentStatus || 'Unpaid'),
         recordType: 'Sale'
       });
       if (!customerMap[lowerKey].phone && sale.customerPhone) customerMap[lowerKey].phone = sale.customerPhone;
@@ -364,7 +371,7 @@ export default function CustomerLedgerPage() {
       const balance = Math.max(0, cust.totalPurchasesVal - cust.totalPaidVal);
       return { ...cust, balanceVal: balance };
     }).sort((a, b) => b.totalPurchasesVal - a.totalPurchasesVal);
-  }, [machineSales, machineRepairs, startDate, endDate]);
+  }, [machineSales, machineRepairs, customerPayments, startDate, endDate]);
 
   // Filtered List by Search Term
   const filteredCustomers = useMemo(() => {
@@ -969,7 +976,9 @@ export default function CustomerLedgerPage() {
                                     {cust.invoices.map((inv, invIdx) => {
                                       const machineItems = normalizeMachineItems(inv);
                                       const invNo = formatInvoiceNo(inv);
-                                      const pStatus = inv.paymentStatus || (inv.paidAmount >= inv.lineTotal ? 'Paid' : inv.paidAmount > 0 ? 'Partial' : 'Unpaid');
+                                      const invBill = parseFloat(inv.lineTotal || inv.totalCost || 0);
+                                      const invPaid = parseFloat(inv.paidAmount || 0);
+                                      const pStatus = invPaid >= invBill && invBill > 0 ? 'Paid' : invPaid > 0 ? 'Partial' : (inv.paymentStatus || 'Unpaid');
 
                                       return (
                                         <React.Fragment key={inv.id || invIdx}>
@@ -2200,10 +2209,10 @@ export default function CustomerLedgerPage() {
                             <span
                               style={{
                                 fontWeight: 800,
-                                color: printInvoiceData.paidAmount >= printInvoiceData.lineTotal ? '#16a34a' : '#d97706'
+                                color: (parseFloat(printInvoiceData.paidAmount) || 0) >= (parseFloat(printInvoiceData.lineTotal) || 0) ? '#16a34a' : '#d97706'
                               }}
                             >
-                              {printInvoiceData.paymentStatus || 'Paid'}
+                              {(parseFloat(printInvoiceData.paidAmount) || 0) >= (parseFloat(printInvoiceData.lineTotal) || 0) ? 'Paid' : (parseFloat(printInvoiceData.paidAmount) || 0) > 0 ? 'Partial' : (printInvoiceData.paymentStatus || 'Unpaid')}
                             </span>
                           </div>
                         </div>

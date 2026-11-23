@@ -99,6 +99,7 @@ export default function MachineInvoicesPage() {
   const {
     machineSales = [],
     machineModels = [],
+    customerPayments = [],
     addCustomerPayment,
     updateMachineSale,
     deleteMachineSale
@@ -142,7 +143,11 @@ export default function MachineInvoicesPage() {
   const handleOpenPaymentModal = (inv) => {
     setSelectedInvoiceForPay(inv);
     const totalBill = parseFloat(inv.lineTotal || inv.subTotal) || 0;
-    const currentPaid = parseFloat(inv.paidAmount) || 0;
+    const directPaid = parseFloat(inv.paidAmount) || 0;
+    const extraPayments = (customerPayments || [])
+      .filter((p) => String(p.invoiceId) === String(inv.id))
+      .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
+    const currentPaid = Math.max(directPaid, extraPayments);
     const currentBal = Math.max(0, totalBill - currentPaid);
     setPaymentForm({
       amountPaid: currentBal > 0 ? String(currentBal) : '',
@@ -163,13 +168,25 @@ export default function MachineInvoicesPage() {
       return;
     }
 
-    const currentPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
     const totalBill = parseFloat(selectedInvoiceForPay.lineTotal || selectedInvoiceForPay.subTotal) || 0;
+    const directPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
+    const extraPayments = (customerPayments || [])
+      .filter((p) => String(p.invoiceId) === String(selectedInvoiceForPay.id))
+      .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
+    const currentPaid = Math.max(directPaid, extraPayments);
     const newPaid = currentPaid + paidNum;
     const newBalance = Math.max(0, totalBill - newPaid);
     const newStatus = newPaid >= totalBill ? 'Paid' : newPaid > 0 ? 'Partial' : 'Unpaid';
 
     try {
+      if (updateMachineSale) {
+        await updateMachineSale(selectedInvoiceForPay.id, {
+          paidAmount: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newStatus
+        });
+      }
+
       if (addCustomerPayment) {
         await addCustomerPayment({
           customerName: selectedInvoiceForPay.customerName || 'Walk-in Customer',
@@ -178,14 +195,6 @@ export default function MachineInvoicesPage() {
           paymentMethod: paymentForm.paymentMethod,
           referenceNo: paymentForm.referenceNo,
           notes: paymentForm.notes
-        });
-      }
-
-      if (updateMachineSale) {
-        await updateMachineSale(selectedInvoiceForPay.id, {
-          paidAmount: newPaid,
-          balanceAmount: newBalance,
-          paymentStatus: newStatus
         });
       }
 
@@ -345,13 +354,19 @@ export default function MachineInvoicesPage() {
 
       // 3. Filter by Payment Method / Status
       if (filterPayment !== 'all') {
-        const status = (inv.paymentStatus || 'Paid').toLowerCase();
+        const totalAmt = parseFloat(inv.lineTotal || inv.subTotal) || 0;
+        const directPaid = parseFloat(inv.paidAmount) || 0;
+        const extraPayments = (customerPayments || [])
+          .filter((p) => String(p.invoiceId) === String(inv.id))
+          .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
+        const currentPaid = Math.max(directPaid, extraPayments);
+        const status = (currentPaid >= totalAmt && totalAmt > 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Unpaid').toLowerCase();
         if (status !== filterPayment.toLowerCase()) return false;
       }
 
       return true;
     });
-  }, [machineSales, searchTerm, filterPeriod, filterPayment]);
+  }, [machineSales, customerPayments, searchTerm, filterPeriod, filterPayment]);
 
   // Paginated Slices
   const paginatedInvoices = useMemo(() => {
@@ -516,8 +531,13 @@ export default function MachineInvoicesPage() {
                   const rawItems = inv.items && inv.items.length > 0 ? inv.items : [{ machineName: inv.machineName, qty: inv.qty || 1 }];
                   const totalAmt = parseFloat(inv.lineTotal || inv.subTotal) || 0;
                   const subTotal = parseFloat(inv.subTotal) || totalAmt;
-                  const pStatus = inv.paymentStatus || (inv.paidAmount >= totalAmt ? 'Paid' : inv.paidAmount > 0 ? 'Partial' : 'Unpaid');
-                  const bal = parseFloat(inv.balanceAmount) || Math.max(0, totalAmt - (parseFloat(inv.paidAmount) || 0));
+                  const directPaid = parseFloat(inv.paidAmount) || 0;
+                  const extraPayments = (customerPayments || [])
+                    .filter((p) => String(p.invoiceId) === String(inv.id))
+                    .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
+                  const currentPaid = Math.max(directPaid, extraPayments);
+                  const bal = Math.max(0, totalAmt - currentPaid);
+                  const pStatus = currentPaid >= totalAmt && totalAmt > 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : (inv.paymentStatus || 'Unpaid');
 
                   return (
                     <TableRow key={inv.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
@@ -871,37 +891,49 @@ export default function MachineInvoicesPage() {
               </table>
 
               {/* Financial Box with Flex Space-Between */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  p: 1.5,
-                  bgcolor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 1,
-                  mb: 3
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  PAID AMOUNT: Rs. {(parseFloat(selectedInvoice.paidAmount) || 0).toLocaleString()}
-                </Typography>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                    NET TOTAL: Rs. {(parseFloat(selectedInvoice.lineTotal || selectedInvoice.subTotal) || 0).toLocaleString()}
-                  </Typography>
-                  <Typography
-                    variant="caption"
+              {(() => {
+                const totalAmt = parseFloat(selectedInvoice.lineTotal || selectedInvoice.subTotal) || 0;
+                const directPaid = parseFloat(selectedInvoice.paidAmount) || 0;
+                const extraPaid = (customerPayments || [])
+                  .filter((p) => String(p.invoiceId) === String(selectedInvoice.id))
+                  .reduce((sum, p) => sum + (parseFloat(p.amountPaid) || 0), 0);
+                const printPaid = Math.max(directPaid, extraPaid);
+                const printBal = Math.max(0, totalAmt - printPaid);
+
+                return (
+                  <Box
                     sx={{
-                      fontWeight: 800,
-                      color: (parseFloat(selectedInvoice.balanceAmount) || 0) > 0 ? 'error.main' : 'success.main',
-                      display: 'block'
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      p: 1.5,
+                      bgcolor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 1,
+                      mb: 3
                     }}
                   >
-                    REMAINING DUE: Rs. {(parseFloat(selectedInvoice.balanceAmount) || 0).toLocaleString()}
-                  </Typography>
-                </Box>
-              </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                      PAID AMOUNT: Rs. {printPaid.toLocaleString()}
+                    </Typography>
+                    <Box sx={{ textAlign: 'right' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                        NET TOTAL: Rs. {totalAmt.toLocaleString()}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 800,
+                          color: printBal > 0 ? 'error.main' : 'success.main',
+                          display: 'block'
+                        }}
+                      >
+                        {printBal > 0 ? `REMAINING DUE: Rs. ${printBal.toLocaleString()}` : 'STATUS: FULLY PAID'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })()}
 
               {/* Warranty Terms */}
               {selectedInvoice.warrantyTerms && (
@@ -1110,7 +1142,11 @@ export default function MachineInvoicesPage() {
           <DialogContent dividers sx={{ p: 3 }}>
             {selectedInvoiceForPay && (() => {
               const totalBill = parseFloat(selectedInvoiceForPay.lineTotal || selectedInvoiceForPay.subTotal) || 0;
-              const alreadyPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
+              const directPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
+              const extraPayments = (customerPayments || [])
+                .filter((p) => String(p.invoiceId) === String(selectedInvoiceForPay.id))
+                .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
+              const alreadyPaid = Math.max(directPaid, extraPayments);
               const dueBal = Math.max(0, totalBill - alreadyPaid);
               const paidNow = parseFloat(paymentForm.amountPaid) || 0;
               const remAfter = Math.max(0, dueBal - paidNow);

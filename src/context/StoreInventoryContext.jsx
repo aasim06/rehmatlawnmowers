@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { useAuth } from 'context/AuthContext';
-import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
+import { initialCategories } from 'data/factoryStoreData';
 import { db } from 'api/firebase';
 import {
   collection,
@@ -74,8 +74,6 @@ const normalizeCategories = (cats = []) => {
     return c;
   });
 };
-
-const initialMasterItemNames = [];
 
 export function StoreInventoryProvider({ children }) {
   const { user } = useAuth();
@@ -577,8 +575,12 @@ export function StoreInventoryProvider({ children }) {
             discountAmount: parseFloat(s.discount_amount !== undefined ? s.discount_amount : s.discountAmount) || 0,
             lineTotal: parseFloat(s.line_total !== undefined ? s.line_total : s.lineTotal) || 0,
             paidAmount: parseFloat(s.paid_amount !== undefined ? s.paid_amount : s.paidAmount) || 0,
-            balanceAmount: parseFloat(s.balance_amount !== undefined ? s.balance_amount : s.balanceAmount) || 0,
-            paymentStatus: s.payment_status || s.paymentStatus || 'Paid',
+            balanceAmount: Math.max(0, (parseFloat(s.line_total !== undefined ? s.line_total : s.lineTotal) || 0) - (parseFloat(s.paid_amount !== undefined ? s.paid_amount : s.paidAmount) || 0)),
+            paymentStatus: (parseFloat(s.paid_amount !== undefined ? s.paid_amount : s.paidAmount) || 0) >= (parseFloat(s.line_total !== undefined ? s.line_total : s.lineTotal) || 0) && (parseFloat(s.line_total !== undefined ? s.line_total : s.lineTotal) || 0) > 0
+              ? 'Paid'
+              : (parseFloat(s.paid_amount !== undefined ? s.paid_amount : s.paidAmount) || 0) > 0
+                ? 'Partial'
+                : (s.payment_status || s.paymentStatus || 'Unpaid'),
             time: s.time || (s.created_at ? new Date(s.created_at).toLocaleString() : new Date().toLocaleString()),
             items: s.items || []
           };
@@ -619,6 +621,7 @@ export function StoreInventoryProvider({ children }) {
       if (custPaySnap.status === 'fulfilled') {
         const mappedCustPay = custPayList.map((p) => ({
           id: p.id,
+          invoiceId: p.invoice_id || p.invoiceId || '',
           customerName: p.customer_name || p.customerName,
           amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
           paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
@@ -713,12 +716,10 @@ export function StoreInventoryProvider({ children }) {
           localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
         }
       }
-    } catch (err) {
+    } catch {
       // Cloud fetch notification
     }
   };
-
-  const fetchSupabaseData = fetchFirebaseData;
 
   useEffect(() => {
     if (!user) return;
@@ -1705,24 +1706,31 @@ export function StoreInventoryProvider({ children }) {
   };
 
   const updateMachineSale = async (id, updatedData) => {
-    setMachineSales((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
-    );
+    let updatedList = [];
+    setMachineSales((prev) => {
+      updatedList = prev.map((m) => (String(m.id) === String(id) ? { ...m, ...updatedData } : m));
+      localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(updatedList));
+      return updatedList;
+    });
+
+    const firestorePayload = {};
+    if (updatedData.customerName !== undefined) firestorePayload.customer_name = updatedData.customerName;
+    if (updatedData.customerPhone !== undefined) firestorePayload.customer_phone = updatedData.customerPhone;
+    if (updatedData.cityAddress !== undefined) firestorePayload.city_address = updatedData.cityAddress;
+    if (updatedData.machineName !== undefined) firestorePayload.machine_name = updatedData.machineName;
+    if (updatedData.serialNo !== undefined) firestorePayload.serial_no = updatedData.serialNo;
+    if (updatedData.qty !== undefined) firestorePayload.qty = updatedData.qty;
+    if (updatedData.unitPrice !== undefined) firestorePayload.unit_price = updatedData.unitPrice;
+    if (updatedData.discountAmount !== undefined) firestorePayload.discount_amount = updatedData.discountAmount;
+    if (updatedData.lineTotal !== undefined) firestorePayload.line_total = updatedData.lineTotal;
+    if (updatedData.paidAmount !== undefined) firestorePayload.paid_amount = updatedData.paidAmount;
+    if (updatedData.balanceAmount !== undefined) firestorePayload.balance_amount = updatedData.balanceAmount;
+    if (updatedData.paymentStatus !== undefined) firestorePayload.payment_status = updatedData.paymentStatus;
+    if (updatedData.warrantyTerms !== undefined) firestorePayload.warranty_terms = updatedData.warrantyTerms;
+    if (updatedData.items !== undefined) firestorePayload.items = updatedData.items;
+
     try {
-      await setDoc(doc(db, 'machine_sales', String(id)), {
-        customer_name: updatedData.customerName,
-        customer_phone: updatedData.customerPhone,
-        city_address: updatedData.cityAddress,
-        machine_name: updatedData.machineName,
-        serial_no: updatedData.serialNo,
-        qty: updatedData.qty,
-        unit_price: updatedData.unitPrice,
-        line_total: updatedData.lineTotal,
-        paid_amount: updatedData.paidAmount,
-        balance_amount: updatedData.balanceAmount,
-        payment_status: updatedData.paymentStatus
-      }, { merge: true });
-      fetchFirebaseData();
+      await setDoc(doc(db, 'machine_sales', String(id)), firestorePayload, { merge: true });
     } catch (e) {
       console.error('Firebase updateMachineSale error:', e);
     }
@@ -1858,36 +1866,63 @@ export function StoreInventoryProvider({ children }) {
       createdAt: now.toISOString()
     };
 
-    setCustomerPayments((prev) => [newPayment, ...prev]);
+    setCustomerPayments((prev) => {
+      const updated = [newPayment, ...prev];
+      localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(updated));
+      localStorage.setItem('rehmat_customer_payments_v2', JSON.stringify(updated));
+      return updated;
+    });
 
     // Auto-update machine sales invoice paid amount & status if matching invoiceId
     if (paymentData.invoiceId) {
-      setMachineSales((prevSales) =>
-        prevSales.map((sale) => {
-          if (sale.id === paymentData.invoiceId) {
-            const updatedPaid = (sale.paidAmount || 0) + newPayment.amountPaid;
-            const netBill = sale.lineTotal || 0;
+      let saleToSync = null;
+      setMachineSales((prevSales) => {
+        const updated = prevSales.map((sale) => {
+          if (String(sale.id) === String(paymentData.invoiceId)) {
+            const currentPaid = parseFloat(sale.paidAmount) || 0;
+            const updatedPaid = currentPaid + newPayment.amountPaid;
+            const netBill = parseFloat(sale.lineTotal || sale.subTotal) || 0;
             const updatedStatus = updatedPaid >= netBill ? 'Paid' : updatedPaid > 0 ? 'Partial' : 'Unpaid';
-            return {
+            const updatedBal = Math.max(0, netBill - updatedPaid);
+            const updatedSale = {
               ...sale,
               paidAmount: updatedPaid,
+              balanceAmount: updatedBal,
               paymentStatus: updatedStatus
             };
+            saleToSync = updatedSale;
+            return updatedSale;
           }
           return sale;
-        })
-      );
+        });
+        localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(updated));
+        return updated;
+      });
+
+      if (saleToSync) {
+        try {
+          await setDoc(doc(db, 'machine_sales', String(paymentData.invoiceId)), {
+            paid_amount: saleToSync.paidAmount,
+            balance_amount: saleToSync.balanceAmount,
+            payment_status: saleToSync.paymentStatus
+          }, { merge: true });
+        } catch (e) {
+          console.error('Firebase updateMachineSale in addCustomerPayment error:', e);
+        }
+      }
     }
 
     try {
       await setDoc(doc(db, 'customer_payments', String(paymentId)), {
         id: paymentId,
+        invoice_id: newPayment.invoiceId || '',
         customer_name: newPayment.customerName,
         payment_date: newPayment.time,
         amount_paid: newPayment.amountPaid,
         payment_method: newPayment.paymentMethod,
         reference_no: newPayment.referenceNo,
-        notes: newPayment.notes
+        notes: newPayment.notes,
+        created_at: newPayment.createdAt
       }, { merge: true });
       fetchFirebaseData();
     } catch (e) {
@@ -2274,8 +2309,6 @@ export function StoreInventoryProvider({ children }) {
     () => items.reduce((acc, i) => acc + ((Number(i.remainingStock) || 0) * (Number(i.unitPrice) || 0)), 0),
     [items]
   );
-
-  const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   const todayLogs = useMemo(() => {
     const todayStr = new Date().toDateString();
