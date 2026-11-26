@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -7,7 +7,6 @@ import {
   Autocomplete,
   Box,
   Button,
-  Checkbox,
   Chip,
   Dialog,
   DialogActions,
@@ -15,67 +14,53 @@ import {
   DialogContentText,
   DialogTitle,
   Drawer,
-  FormControl,
   Grid,
   IconButton,
-  InputAdornment,
-  InputLabel,
   MenuItem,
-  OutlinedInput,
-  Paper,
-  Select,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TablePagination,
-  TableRow,
   TextField,
   Typography,
   Tooltip
 } from '@mui/material';
 
 // icons
-import { PlusOutlined, SearchOutlined, ImportOutlined, ExportOutlined, DeleteOutlined, EditOutlined, WarningOutlined } from '@ant-design/icons';
+import {
+  PlusOutlined,
+  ImportOutlined,
+  ExportOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  WarningOutlined,
+  ReloadOutlined,
+  PlusSquareOutlined
+} from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
-
-import { useDebounce } from 'hooks/useDebounce';
+import { AppDataTable, AppButton } from 'components/common';
+import { formatCategoryLabel } from 'utils/formatText';
 
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
 export default function ItemsPage() {
-  const { items, masterItemNames = [], categories = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems, cleanDuplicateItems } = useStoreInventory();
+  const {
+    items,
+    masterItemNames = [],
+    categories = [],
+    issueStock,
+    receiveStock,
+    addNewItem,
+    updateItem,
+    deleteItem,
+    deleteMultipleItems,
+    cleanDuplicateItems,
+    restoreDefaultStoreItems
+  } = useStoreInventory();
 
   // Search & Category filter
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
-  const [searchTerm, setSearchTerm] = useState(urlSearch);
-
-  useEffect(() => {
-    if (urlSearch) {
-      setSearchTerm(urlSearch);
-    }
-  }, [urlSearch]);
-
-  const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedCategory, setSelectedCategory] = useState('All');
-
-  // Pagination State
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
 
   // Checkbox Selection State
   const [selected, setSelected] = useState([]);
@@ -93,18 +78,17 @@ export default function ItemsPage() {
   const [qtyReceived, setQtyReceived] = useState(10);
   const [supplierName, setSupplierName] = useState('Siemens Industrial');
 
-  // Add Item Drawer State
-  const [addDrawerOpen, setAddDrawerOpen] = useState(false);
+  // Add Item Drawer State (navigates to /inventory/items/add-name)
   const [newItem, setNewItem] = useState({
-    itemCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+    itemCode: '',
     name: '',
-    category: 'Electrical & Motors',
-    totalStock: 50,
+    category: '',
+    totalStock: '',
     unit: 'PCS',
-    totalBillAmount: 1250,
-    unitPrice: 25,
-    minLevel: 10,
-    rackLocation: 'Rack A-01'
+    totalBillAmount: '',
+    unitPrice: 0,
+    minLevel: '',
+    rackLocation: ''
   });
 
   // Edit Item Drawer State
@@ -118,56 +102,120 @@ export default function ItemsPage() {
   // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const categoryOptions = Array.from(
-    new Set([
+  const categoryOptions = useMemo(() => {
+    const rawSet = new Set([
       'General',
       ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean),
       ...items.map((i) => i.category).filter(Boolean)
-    ])
+    ]);
+    const list = Array.from(rawSet).filter(Boolean);
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [categories, items]);
+
+  const categoryFilteredItems = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'All') return items;
+    return items.filter((i) => i.category === selectedCategory);
+  }, [items, selectedCategory]);
+
+  const columns = useMemo(
+    () => [
+      {
+        id: 'name',
+        label: 'Item Name',
+        sortable: true,
+        render: (item) => (
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700} color="primary.main">
+              {item.name}
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              Rack: {item.rackLocation || 'N/A'}
+            </Typography>
+          </Box>
+        )
+      },
+      {
+        id: 'category',
+        label: 'Category',
+        sortable: true,
+        render: (item) => (
+          <Chip
+            label={formatCategoryLabel(item.category || 'General')}
+            size="small"
+            variant="outlined"
+            color="primary"
+          />
+        )
+      },
+      {
+        id: 'itemCode',
+        label: 'SKU Code',
+        sortable: true,
+        render: (item) => (
+          <Typography variant="subtitle2" fontWeight={600}>
+            {item.itemCode}
+          </Typography>
+        )
+      },
+      {
+        id: 'totalBillAmount',
+        label: 'Total Bill Amount',
+        align: 'right',
+        sortable: true,
+        render: (item) => {
+          const totalBill = (item.totalBillAmount !== undefined && Number(item.totalBillAmount) > 0)
+            ? Number(item.totalBillAmount)
+            : ((Number(item.remainingStock || item.totalStock || 0)) * (Number(item.unitPrice) || 0));
+          return (
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                Rs. {Number(totalBill).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" display="block">
+                Rs. {(Number(item.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} / {item.unit || 'PCS'}
+              </Typography>
+            </Box>
+          );
+        }
+      },
+      {
+        id: 'unit',
+        label: 'Units',
+        align: 'center',
+        sortable: true,
+        render: (item) => <Chip label={item.unit} size="small" variant="outlined" />
+      },
+      {
+        id: 'remainingStock',
+        label: 'Stock Quantity',
+        align: 'center',
+        sortable: true,
+        render: (item) => {
+          const isLow = Number(item.remainingStock) <= Number(item.minLevel);
+          return (
+            <Typography variant="subtitle1" fontWeight={800} color={isLow ? 'error.main' : 'success.main'}>
+              {item.remainingStock}
+            </Typography>
+          );
+        }
+      },
+      {
+        id: 'minLevel',
+        label: 'Min Threshold',
+        align: 'center',
+        sortable: true,
+        render: (item) => {
+          const isLow = Number(item.remainingStock) <= Number(item.minLevel);
+          return isLow ? (
+            <Chip icon={<WarningOutlined />} label={`Low (${item.minLevel})`} color="error" size="small" sx={{ fontWeight: 700 }} />
+          ) : (
+            <Chip label={item.minLevel} size="small" variant="outlined" />
+          );
+        }
+      }
+    ],
+    []
   );
-
-  const categoryFilterOptions = ['All', ...categoryOptions];
-
-  const filteredItems = items.filter((i) => {
-    const sTerm = (debouncedSearch || '').toLowerCase();
-    const matchesSearch =
-      (i.name || '').toLowerCase().includes(sTerm) ||
-      (i.itemCode || '').toLowerCase().includes(sTerm) ||
-      (i.rackLocation || '').toLowerCase().includes(sTerm);
-
-    const matchesCategory = selectedCategory === 'All' || i.category === selectedCategory;
-
-    return matchesSearch && matchesCategory;
-  });
-
-  // Checkbox Selection Handlers
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = filteredItems.map((n) => n.id);
-      setSelected(newSelected);
-      return;
-    }
-    setSelected([]);
-  };
-
-  const handleSelectOne = (event, id) => {
-    event.stopPropagation();
-    const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-    }
-    setSelected(newSelected);
-  };
-
-  const isSelected = (id) => selected.indexOf(id) !== -1;
 
   // Open Handlers
   const handleOpenStockOut = (item) => {
@@ -242,24 +290,30 @@ export default function ItemsPage() {
     const finalStock = parseInt(newItem.totalStock) || 0;
     const finalBill = parseFloat(newItem.totalBillAmount) || 0;
     const computedUnitPrice = finalStock > 0 ? (finalBill / finalStock) : (parseFloat(newItem.unitPrice) || 0);
+    const finalItemCode = newItem.itemCode?.trim() || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const finalMinLevel = parseInt(newItem.minLevel) || 5;
 
     addNewItem({
       ...newItem,
+      itemCode: finalItemCode,
+      category: newItem.category?.trim() || 'General',
       totalStock: finalStock,
       totalBillAmount: finalBill,
-      unitPrice: computedUnitPrice
+      unitPrice: computedUnitPrice,
+      minLevel: finalMinLevel,
+      rackLocation: newItem.rackLocation?.trim() || ''
     });
     setAddDrawerOpen(false);
     setNewItem({
-      itemCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      itemCode: '',
       name: '',
-      category: 'Electrical & Motors',
-      totalStock: 50,
+      category: '',
+      totalStock: '',
       unit: 'PCS',
-      totalBillAmount: 1250,
-      unitPrice: 25,
-      minLevel: 10,
-      rackLocation: 'Rack A-01'
+      totalBillAmount: '',
+      unitPrice: 0,
+      minLevel: '',
+      rackLocation: ''
     });
   };
 
@@ -324,12 +378,12 @@ export default function ItemsPage() {
                     const matchedMaster = masterItemNames.find((m) => m.name.toLowerCase() === (newInputValue || '').toLowerCase());
                     const masterUnitPrice = matchedMaster?.unitPrice || 0;
                     setNewItem((prev) => {
-                      const stock = parseInt(prev.totalStock) || 50;
-                      const bill = masterUnitPrice > 0 ? (masterUnitPrice * stock) : prev.totalBillAmount;
+                      const stock = parseInt(prev.totalStock) || 0;
+                      const bill = (masterUnitPrice > 0 && stock > 0) ? (masterUnitPrice * stock) : prev.totalBillAmount;
                       return {
                         ...prev,
                         name: newInputValue || '',
-                        category: matchedMaster ? matchedMaster.category : prev.category || 'General',
+                        category: matchedMaster ? matchedMaster.category : prev.category || '',
                         unit: matchedMaster ? (matchedMaster.defaultUnit || prev.unit) : prev.unit,
                         unitPrice: masterUnitPrice > 0 ? masterUnitPrice : prev.unitPrice,
                         totalBillAmount: bill
@@ -351,13 +405,13 @@ export default function ItemsPage() {
                 <Autocomplete
                   freeSolo
                   options={categoryOptions}
-                  value={newItem.category}
+                  value={newItem.category || ''}
                   onChange={(event, newValue) => {
-                    const val = typeof newValue === 'string' ? newValue : (newValue || 'General');
+                    const val = typeof newValue === 'string' ? newValue : (newValue || '');
                     setNewItem((prev) => ({ ...prev, category: val }));
                   }}
                   onInputChange={(event, newInputValue) => {
-                    setNewItem((prev) => ({ ...prev, category: newInputValue || 'General' }));
+                    setNewItem((prev) => ({ ...prev, category: newInputValue || '' }));
                   }}
                   renderInput={(params) => (
                     <TextField
@@ -372,11 +426,10 @@ export default function ItemsPage() {
 
               <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <TextField
-                  label="SKU CODE / SHORT ID *"
+                  label="SKU CODE / SHORT ID"
                   fullWidth
-                  required
-                  placeholder="e.g. SKU-84564564"
-                  value={newItem.itemCode}
+                  placeholder="e.g. SKU-84564564 (Auto if blank)"
+                  value={newItem.itemCode || ''}
                   onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
                 />
               </Grid>
@@ -386,7 +439,7 @@ export default function ItemsPage() {
                   label="RACK / LOCATION"
                   fullWidth
                   placeholder="e.g. Rack A-01"
-                  value={newItem.rackLocation}
+                  value={newItem.rackLocation || ''}
                   onChange={(e) => setNewItem({ ...newItem, rackLocation: e.target.value })}
                 />
               </Grid>
@@ -397,7 +450,7 @@ export default function ItemsPage() {
                   label="UNIT *"
                   fullWidth
                   required
-                  value={newItem.unit}
+                  value={newItem.unit || 'PCS'}
                   onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
                 >
                   {UNIT_OPTIONS.map((option) => (
@@ -416,15 +469,15 @@ export default function ItemsPage() {
                   fullWidth
                   required
                   inputProps={{ min: 0 }}
-                  value={newItem.totalStock}
+                  value={newItem.totalStock !== undefined ? newItem.totalStock : ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const stockNum = parseInt(val) || 0;
+                    const stockNum = val === '' ? 0 : (parseInt(val) || 0);
                     const billNum = parseFloat(newItem.totalBillAmount) || 0;
                     const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
                     setNewItem((prev) => ({
                       ...prev,
-                      totalStock: val === '' ? '' : stockNum,
+                      totalStock: val,
                       unitPrice
                     }));
                   }}
@@ -442,7 +495,7 @@ export default function ItemsPage() {
                   value={newItem.totalBillAmount !== undefined ? newItem.totalBillAmount : ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const billNum = parseFloat(val) || 0;
+                    const billNum = val === '' ? 0 : (parseFloat(val) || 0);
                     const stockNum = parseInt(newItem.totalStock) || 0;
                     const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
                     setNewItem((prev) => ({
@@ -466,232 +519,164 @@ export default function ItemsPage() {
                   fullWidth
                   required
                   inputProps={{ min: 1 }}
-                  value={newItem.minLevel}
-                  onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
+                  value={newItem.minLevel !== undefined ? newItem.minLevel : ''}
+                  onChange={(e) => setNewItem({ ...newItem, minLevel: e.target.value })}
                   helperText="Low stock alert trigger"
                 />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 12, md: 3 }}>
-                <Button
-                  variant="contained"
-                  color="success"
-                  fullWidth
-                  type="submit"
-                  startIcon={<PlusOutlined />}
-                  sx={{ fontWeight: 800, height: 40, borderRadius: 2 }}
-                >
+                <AppButton intent="primary" fullWidth type="submit" startIcon={<PlusOutlined />}>
                   Save New Store Item
-                </Button>
+                </AppButton>
               </Grid>
             </Grid>
           </Box>
         </form>
       </MainCard>
 
-      {/* 2. BOTTOM SECTION: Store Inventory Items Table Card */}
-      <MainCard
-        title="Store Inventory Items"
-        secondary={
-          <Stack direction="row" spacing={1.5}>
-            {selected.length > 0 && (
+      {/* 2. BOTTOM SECTION: Store Inventory Items Table with AppDataTable */}
+      <AppDataTable
+        cardProps={{
+          title: 'Store Inventory Items',
+          secondary: (
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+              {selected.length > 0 && (
+                <AppButton intent="danger" startIcon={<DeleteOutlined />} onClick={() => setBulkDeleteDialogOpen(true)}>
+                  Delete Selected ({selected.length})
+                </AppButton>
+              )}
+              {items.length === 0 && typeof restoreDefaultStoreItems === 'function' && (
+                <AppButton intent="primary" startIcon={<ReloadOutlined />} onClick={restoreDefaultStoreItems}>
+                  Load Default Store Items (19 Items)
+                </AppButton>
+              )}
+              <AppButton component={Link} to="/inventory/add-item-name" intent="secondary" startIcon={<PlusSquareOutlined />}>
+                Item Names Directory ({masterItemNames?.length || 0})
+              </AppButton>
+              <AppButton intent="neutral" onClick={cleanDuplicateItems}>
+                Clean Duplicates
+              </AppButton>
+            </Stack>
+          )
+        }}
+        columns={columns}
+        data={categoryFilteredItems}
+        selectable
+        selected={selected}
+        onSelect={setSelected}
+        searchPlaceholder="Search items, SKU code, rack location..."
+        searchKeys={['name', 'itemCode', 'rackLocation', 'category']}
+        initialSearch={urlSearch}
+        toolbarLeft={
+          <TextField
+            select
+            size="small"
+            value={selectedCategory || 'All'}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            sx={{
+              width: { xs: '100%', sm: 220, md: 240 },
+              '& .MuiOutlinedInput-root': { height: 38 }
+            }}
+            SelectProps={{
+              MenuProps: {
+                PaperProps: {
+                  sx: {
+                    maxHeight: 280,
+                    borderRadius: 2,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    mt: 0.5,
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.85rem',
+                      py: 0.8,
+                      px: 1.5,
+                      borderRadius: 1,
+                      mx: 0.5,
+                      my: 0.2,
+                      '&.Mui-selected': {
+                        fontWeight: 700,
+                        bgcolor: 'primary.lighter',
+                        color: 'primary.main'
+                      }
+                    }
+                  }
+                },
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left'
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'left'
+                }
+              }
+            }}
+          >
+            <MenuItem value="All">All Categories</MenuItem>
+            {categoryOptions.map((cat) => (
+              <MenuItem key={cat} value={cat}>
+                {formatCategoryLabel(cat)}
+              </MenuItem>
+            ))}
+          </TextField>
+        }
+        actions={(item) => (
+          <Stack direction="row" spacing={0.5} justifyContent="center">
+            <Tooltip title="Stock Out (Usage)">
+              <IconButton color="error" size="small" onClick={() => handleOpenStockOut(item)}>
+                <ExportOutlined />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Stock In (Receive)">
+              <IconButton color="success" size="small" onClick={() => handleOpenStockIn(item)}>
+                <ImportOutlined />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Edit Item">
+              <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
+                <EditOutlined />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Delete Item">
+              <IconButton color="error" size="small" onClick={() => handleOpenDelete(item)}>
+                <DeleteOutlined />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
+        emptyTitle="No Store Items Found"
+        emptySubtitle="If items were cleared or factory reset, you can load the standard store catalog or add new items from pre-saved item names."
+        emptyAction={
+          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
+            {typeof restoreDefaultStoreItems === 'function' && (
               <Button
                 variant="contained"
-                color="error"
-                startIcon={<DeleteOutlined />}
-                onClick={() => setBulkDeleteDialogOpen(true)}
+                color="primary"
+                startIcon={<ReloadOutlined />}
+                onClick={restoreDefaultStoreItems}
+                sx={{ fontWeight: 700 }}
               >
-                Delete Selected ({selected.length})
+                Load Default Store Items (19 Items)
               </Button>
             )}
-            <Button variant="outlined" color="warning" onClick={cleanDuplicateItems}>
-              Clean Duplicates
+            <Button
+              component={Link}
+              to="/inventory/add-item-name"
+              variant="outlined"
+              color="secondary"
+              startIcon={<PlusSquareOutlined />}
+              sx={{ fontWeight: 700 }}
+            >
+              Item Names Directory ({masterItemNames?.length || 0})
             </Button>
           </Stack>
         }
-      >
-        {/* Search Header */}
-        <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-          <Grid size={{ xs: 12, sm: 5 }}>
-            <OutlinedInput
-              fullWidth
-              placeholder="Search items, SKU code, rack location..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              startAdornment={
-                <InputAdornment position="start">
-                  <SearchOutlined />
-                </InputAdornment>
-              }
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Category Filter"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              {categoryFilterOptions.map((cat) => (
-                <MenuItem key={cat} value={cat}>
-                  {cat === 'All' ? 'All Categories' : cat}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 3 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-            <Typography variant="caption" color="textSecondary">
-              {selected.length > 0 ? (
-                <strong style={{ color: '#ff4d4f' }}>{selected.length} items selected for deletion</strong>
-              ) : (
-                `Total ${filteredItems.length} Store Items`
-              )}
-            </Typography>
-          </Grid>
-        </Grid>
-
-        {/* Items Table */}
-        <TableContainer>
-          <Table sx={{ minWidth: 750 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    color="primary"
-                    indeterminate={selected.length > 0 && selected.length < filteredItems.length}
-                    checked={filteredItems.length > 0 && selected.length === filteredItems.length}
-                    onChange={handleSelectAllClick}
-                    inputProps={{ 'aria-label': 'select all items' }}
-                  />
-                </TableCell>
-                <TableCell>Item Name</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>SKU Code</TableCell>
-                <TableCell align="right">Total Bill Amount</TableCell>
-                <TableCell align="center">Units</TableCell>
-                <TableCell align="center">Stock Quantity</TableCell>
-                <TableCell align="center">Min Threshold</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredItems
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((item) => {
-                  const isLow = item.remainingStock <= item.minLevel;
-                  const isItemSelected = isSelected(item.id);
-
-                  return (
-                    <TableRow key={item.id} hover selected={isItemSelected}>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          color="primary"
-                          checked={isItemSelected}
-                          onChange={(e) => handleSelectOne(e, item.id)}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="subtitle1" fontWeight={700} color="primary.main">
-                          {item.name}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          Rack: {item.rackLocation || 'N/A'}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        <Chip
-                          label={item.category || 'General'}
-                          size="small"
-                          variant="outlined"
-                          color="primary"
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          {item.itemCode}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell align="right">
-                        <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                          Rs. {((item.totalBillAmount !== undefined && Number(item.totalBillAmount) > 0)
-                            ? Number(item.totalBillAmount)
-                            : ((Number(item.remainingStock || item.totalStock || 0)) * (Number(item.unitPrice) || 0))).toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          Rs. {(Number(item.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} / {item.unit || 'PCS'}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell align="center">
-                        <Chip label={item.unit} size="small" variant="outlined" />
-                      </TableCell>
-
-                      <TableCell align="center">
-                        <Typography variant="subtitle1" fontWeight={800} color={isLow ? 'error.main' : 'success.main'}>
-                          {item.remainingStock}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell align="center">
-                        {isLow ? (
-                          <Chip icon={<WarningOutlined />} label={`Low (${item.minLevel})`} color="error" size="small" sx={{ fontWeight: 700 }} />
-                        ) : (
-                          <Chip label={item.minLevel} size="small" variant="outlined" />
-                        )}
-                      </TableCell>
-
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center">
-                          <Tooltip title="Stock Out (Usage)">
-                            <IconButton color="error" size="small" onClick={() => handleOpenStockOut(item)}>
-                              <ExportOutlined />
-                            </IconButton>
-                          </Tooltip>
-
-                          <Tooltip title="Stock In (Receive)">
-                            <IconButton color="success" size="small" onClick={() => handleOpenStockIn(item)}>
-                              <ImportOutlined />
-                            </IconButton>
-                          </Tooltip>
-
-                          <Tooltip title="Edit Item">
-                            <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
-                              <EditOutlined />
-                            </IconButton>
-                          </Tooltip>
-
-                          <Tooltip title="Delete Item">
-                            <IconButton color="error" size="small" onClick={() => handleOpenDelete(item)}>
-                              <DeleteOutlined />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component="div"
-          count={filteredItems.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </MainCard>
+      />
 
       {/* Modal 1: Stock Out */}
       <Dialog open={stockOutOpen} onClose={() => setStockOutOpen(false)} maxWidth="xs" fullWidth>
@@ -782,7 +767,7 @@ export default function ItemsPage() {
       {/* Drawer 4: Edit Item (7 Inputs Form) */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: { xs: '100vw', sm: 420 }, p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
             Edit Item Details
           </Typography>
 
@@ -841,10 +826,30 @@ export default function ItemsPage() {
                   required
                   value={editingItem.category || 'General'}
                   onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                  SelectProps={{
+                    MenuProps: {
+                      PaperProps: {
+                        sx: {
+                          maxHeight: 280,
+                          borderRadius: 1.5,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          mt: 0.5
+                        }
+                      },
+                      anchorOrigin: {
+                        vertical: 'bottom',
+                        horizontal: 'left'
+                      },
+                      transformOrigin: {
+                        vertical: 'top',
+                        horizontal: 'left'
+                      }
+                    }
+                  }}
                 >
                   {categoryOptions.map((cat) => (
                     <MenuItem key={cat} value={cat}>
-                      {cat}
+                      {formatCategoryLabel(cat)}
                     </MenuItem>
                   ))}
                 </TextField>

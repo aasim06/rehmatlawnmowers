@@ -1,6 +1,22 @@
 <!doctype html>
 <html lang="en" data-color-scheme="light">
   <head>
+    <script>
+      (function() {
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]') {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for (var r of regs) { r.unregister(); }
+            });
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              for (var k of keys) { caches.delete(k); }
+            });
+          }
+        }
+      })();
+    </script>
     <title>Rehmat Lawn Mowers - Store Inventory & Billing System</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" type="image/jpeg" href="/src/assets/images/rehmat-logo.jpg" />
@@ -9,7 +25,7 @@
     <!-- Meta Tags-->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#52c41a" />
+    <meta name="theme-color" content="#465fff" />
     <meta name="title" content="Rehmat Lawn Mowers - Store Inventory & Billing System" />
     <meta property="og:site_name" content="Rehmat Lawn Mowers Store System" />
     <meta
@@ -24,6 +40,10 @@
     <!-- Performance hints for Vite -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- DNS prefetch for external resources -->
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
@@ -59,15 +79,44 @@
     -->
     <script type="module" src="/src/index.jsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').then(function(reg) {
-            console.log('⚡ Offline cache service worker active');
-          }).catch(function(err) {
-            console.warn('SW registration notice:', err);
-          });
-        });
-      }
+      (function() {
+        var isLocal =
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname === '[::1]' ||
+          window.location.hostname.endsWith('.local');
+
+        if (isLocal) {
+          // In development on localhost, ensure service workers & caches are completely cleared
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              for (var reg of registrations) {
+                reg.unregister();
+                console.log('🧹 [Dev] Unregistered service worker on localhost');
+              }
+            });
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              for (var name of names) {
+                caches.delete(name);
+                console.log('🧹 [Dev] Cleared cache:', name);
+              }
+            });
+          }
+        } else {
+          // In production, register offline service worker
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                console.log('⚡ Offline cache service worker active');
+              }).catch(function(err) {
+                console.warn('SW registration notice:', err);
+              });
+            });
+          }
+        }
+      })();
     </script>
   </body>
 </html>

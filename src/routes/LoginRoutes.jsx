@@ -1,5 +1,8 @@
+import { lazy } from 'react';
 import { Navigate } from 'react-router-dom';
-import LoginPage from 'pages/auth/Login';
+import Loadable from 'components/Loadable';
+
+const LoginPage = Loadable(lazy(() => import('pages/auth/Login')));
 
 // ==============================|| AUTH ROUTING (INSTANT) ||============================== //
 

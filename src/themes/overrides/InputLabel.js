@@ -12,17 +12,21 @@ export default function InputLabel(theme) {
           }
         },
         outlined: {
-          lineHeight: '1rem',
-          top: -4,
-          '&.MuiInputLabel-sizeSmall': {
-            lineHeight: '1em'
+          top: 0,
+          lineHeight: '1.4375em',
+          '&:not(.MuiInputLabel-shrink)': {
+            transform: 'translate(14px, 10px) scale(1)',
+            '&.MuiInputLabel-sizeSmall': {
+              transform: 'translate(14px, 7.5px) scale(1)'
+            }
           },
           '&.MuiInputLabel-shrink': {
-            background: isDark ? '#162033' : theme.vars.palette.background.paper,
-            padding: '0 8px',
-            marginLeft: -6,
-            top: 2,
-            lineHeight: '1rem'
+            background: 'transparent',
+            padding: 0,
+            marginLeft: 0,
+            top: 0,
+            lineHeight: '1.4375em',
+            transform: 'translate(14px, -9px) scale(0.75)'
           }
         }
       }

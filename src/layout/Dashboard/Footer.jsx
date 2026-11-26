@@ -1,19 +1,27 @@
 // material-ui
-import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 export default function Footer() {
   return (
-    <Stack
-      direction={{ xs: 'column', sm: 'row' }}
-      sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between', p: '24px 16px 0px', mt: 'auto' }}
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 1.5,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        pt: 3,
+        px: 2,
+        mt: 'auto'
+      }}
     >
-      <Typography variant="caption" sx={{ fontWeight: 600 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
         &copy; All rights reserved{' '}
-        <Typography component="span" variant="caption" sx={{ color: '#10b981', fontWeight: 700 }}>
+        <Typography component="span" variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
           Rehmat Lawn Mowers
         </Typography>
       </Typography>
-    </Stack>
+    </Box>
   );
 }

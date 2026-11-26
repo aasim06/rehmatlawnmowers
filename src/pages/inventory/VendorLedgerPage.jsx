@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import CeoSignature from 'components/CeoSignature';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -23,7 +24,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
-import Divider from '@mui/material/Divider';
 
 // ant design icons
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
@@ -35,6 +35,7 @@ import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import CloseCircleOutlined from '@ant-design/icons/CloseCircleOutlined';
 
 import MainCard from 'components/MainCard';
+import { AppButton } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function VendorLedgerPage() {
@@ -155,11 +156,11 @@ export default function VendorLedgerPage() {
   // Filtered List - Show all vendors by default! Filter when search term entered
   const filteredVendors = searchTerm.trim()
     ? vendorList.filter(
-        (v) =>
-          v.vendorName.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
-          v.phone.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
-          v.category.toLowerCase().includes(searchTerm.trim().toLowerCase())
-      )
+      (v) =>
+        v.vendorName.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+        v.phone.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+        v.category.toLowerCase().includes(searchTerm.trim().toLowerCase())
+    )
     : vendorList;
 
   // Overall Summary
@@ -268,8 +269,8 @@ export default function VendorLedgerPage() {
       >
         <Grid container spacing={2} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="h3" fontWeight={800} color="textPrimary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TeamOutlined style={{ color: '#a855f7' }} /> Vendor Payables & Supplier Ledger
+            <Typography variant="h4" fontWeight={700} color="textPrimary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TeamOutlined style={{ color: '#a855f7' }} /> Vendor Payables &amp; Supplier Ledger
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
               Track raw material purchases from suppliers, log payment disbursements, and manage vendor balances.
@@ -295,7 +296,7 @@ export default function VendorLedgerPage() {
                 <Typography variant="caption" color="textSecondary" fontWeight={700} display="block" noWrap>
                   TOTAL PURCHASES
                 </Typography>
-                <Typography variant="subtitle1" fontWeight={800} color="primary.main">
+                <Typography variant="subtitle1" fontWeight={700} color="primary.main">
                   Rs. {grandTotalPurchases.toLocaleString()}
                 </Typography>
               </Box>
@@ -316,7 +317,7 @@ export default function VendorLedgerPage() {
                 <Typography variant="caption" color="textSecondary" fontWeight={700} display="block" noWrap>
                   PAID TO VENDORS
                 </Typography>
-                <Typography variant="subtitle1" fontWeight={800} color="success.main">
+                <Typography variant="subtitle1" fontWeight={700} color="success.main">
                   Rs. {grandTotalPaid.toLocaleString()}
                 </Typography>
               </Box>
@@ -337,7 +338,7 @@ export default function VendorLedgerPage() {
                 <Typography variant="caption" color="error.main" fontWeight={700} display="block" noWrap>
                   OUTSTANDING PAYABLE
                 </Typography>
-                <Typography variant="subtitle1" fontWeight={800} color="error.main">
+                <Typography variant="subtitle1" fontWeight={700} color="error.main">
                   Rs. {grandTotalPayables.toLocaleString()}
                 </Typography>
               </Box>
@@ -347,7 +348,19 @@ export default function VendorLedgerPage() {
       </MainCard>
 
       {/* Main Ledger Card */}
-      <MainCard title="Vendor Payables & Accounts Directory">
+      <MainCard
+        title="Vendor Payables & Accounts Directory"
+        secondary={
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <AppButton intent="secondary" size="small" component={Link} to="/inventory/store-payments">
+              Store Payments &amp; Cashbook
+            </AppButton>
+            <AppButton intent="primary" size="small" component={Link} to="/inventory/store-ledger">
+              Full Store Party Ledger
+            </AppButton>
+          </Box>
+        }
+      >
         {/* Search Bar */}
         <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <OutlinedInput
@@ -386,15 +399,15 @@ export default function VendorLedgerPage() {
         {/* Vendor Table */}
         <TableContainer component={Paper} variant="outlined">
           <Table>
-            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
+            <TableHead>
               <TableRow>
-                <TableCell><strong>VENDOR / SUPPLIER NAME</strong></TableCell>
-                <TableCell align="center"><strong>PHONE / CONTACT</strong></TableCell>
-                <TableCell align="center"><strong>SHIPMENTS</strong></TableCell>
-                <TableCell align="right"><strong>TOTAL PURCHASES</strong></TableCell>
-                <TableCell align="right"><strong>AMOUNT PAID</strong></TableCell>
-                <TableCell align="right"><strong>Remaining BALANCE</strong></TableCell>
-                <TableCell align="center"><strong>ACTIONS</strong></TableCell>
+                <TableCell>Vendor / Supplier Name</TableCell>
+                <TableCell align="center">Phone / Contact</TableCell>
+                <TableCell align="center">Shipments</TableCell>
+                <TableCell align="right">Total Purchases</TableCell>
+                <TableCell align="right">Amount Paid</TableCell>
+                <TableCell align="right">Remaining Balance</TableCell>
+                <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -413,123 +426,123 @@ export default function VendorLedgerPage() {
                 filteredVendors
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((v, idx) => (
-                  <TableRow key={idx} hover>
-                    <TableCell>
-                      <Typography variant="subtitle1" fontWeight={800} color="textPrimary">
-                        {v.vendorName}
-                      </Typography>
-                      {v.category && (
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          Category: {v.category}
+                    <TableRow key={idx} hover>
+                      <TableCell>
+                        <Typography variant="subtitle1" fontWeight={700} color="textPrimary">
+                          {v.vendorName}
                         </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2" fontWeight={600} color="textSecondary">
-                        {v.phone || 'N/A'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip label={`${v.totalShipmentsCount} Shipments`} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        Rs. {v.totalPurchasesVal.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                        Rs. {v.totalPaidVal.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="subtitle1" fontWeight={800} color={v.balanceVal > 0 ? 'error.main' : 'success.main'}>
-                        Rs. {v.balanceVal.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
-                        <Tooltip title="Pay Vendor (Record Payment)">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpenPaymentModal(v)}
-                            sx={{
-                              color: '#ffffff',
-                              bgcolor: '#a855f7',
-                              borderRadius: 1.5,
-                              p: 0.85,
-                              boxShadow: '0 1px 2px rgba(168, 85, 247, 0.3)',
-                              '&:hover': { bgcolor: '#9333ea', transform: 'translateY(-1px)' },
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <DollarOutlined style={{ fontSize: '1.05rem' }} />
-                          </IconButton>
-                        </Tooltip>
+                        {v.category && (
+                          <Typography variant="caption" color="textSecondary" display="block">
+                            Category: {v.category}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2" fontWeight={600} color="textSecondary">
+                          {v.phone || 'N/A'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={`${v.totalShipmentsCount} Shipments`} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Rs. {v.totalPurchasesVal.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" fontWeight={700} color="success.main">
+                          Rs. {v.totalPaidVal.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle1" fontWeight={700} color={v.balanceVal > 0 ? 'error.main' : 'success.main'}>
+                          Rs. {v.balanceVal.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
+                          <Tooltip title="Pay Vendor (Record Payment)">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenPaymentModal(v)}
+                              sx={{
+                                color: '#ffffff',
+                                bgcolor: '#a855f7',
+                                borderRadius: 1.5,
+                                p: 0.85,
+                                boxShadow: '0 1px 2px rgba(168, 85, 247, 0.3)',
+                                '&:hover': { bgcolor: '#9333ea', transform: 'translateY(-1px)' },
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <DollarOutlined style={{ fontSize: '1.05rem' }} />
+                            </IconButton>
+                          </Tooltip>
 
-                        <Tooltip title="View Payment & Shipment History">
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setSelectedVendorForHistory(v);
-                              setHistoryModalOpen(true);
-                            }}
-                            sx={{
-                              color: '#0284c7',
-                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : '#e0f2fe'),
-                              border: '1px solid',
-                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.4)' : '#bae6fd'),
-                              borderRadius: 1.5,
-                              p: 0.85,
-                              '&:hover': { bgcolor: '#0284c7', color: '#fff', transform: 'translateY(-1px)' },
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <HistoryOutlined style={{ fontSize: '1.05rem' }} />
-                          </IconButton>
-                        </Tooltip>
+                          <Tooltip title="View Payment & Shipment History">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSelectedVendorForHistory(v);
+                                setHistoryModalOpen(true);
+                              }}
+                              sx={{
+                                color: '#0284c7',
+                                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : '#e0f2fe'),
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.4)' : '#bae6fd'),
+                                borderRadius: 1.5,
+                                p: 0.85,
+                                '&:hover': { bgcolor: '#0284c7', color: '#fff', transform: 'translateY(-1px)' },
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <HistoryOutlined style={{ fontSize: '1.05rem' }} />
+                            </IconButton>
+                          </Tooltip>
 
-                        <Tooltip title="Print Vendor Statement">
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePrintStatement(v)}
-                            sx={{
-                              color: '#059669',
-                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5'),
-                              border: '1px solid',
-                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.4)' : '#a7f3d0'),
-                              borderRadius: 1.5,
-                              p: 0.85,
-                              '&:hover': { bgcolor: '#059669', color: '#fff', transform: 'translateY(-1px)' },
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <PrinterOutlined style={{ fontSize: '1.05rem' }} />
-                          </IconButton>
-                        </Tooltip>
+                          <Tooltip title="Print Vendor Statement">
+                            <IconButton
+                              size="small"
+                              onClick={() => handlePrintStatement(v)}
+                              sx={{
+                                color: '#059669',
+                                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5'),
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(5, 150, 105, 0.4)' : '#a7f3d0'),
+                                borderRadius: 1.5,
+                                p: 0.85,
+                                '&:hover': { bgcolor: '#059669', color: '#fff', transform: 'translateY(-1px)' },
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <PrinterOutlined style={{ fontSize: '1.05rem' }} />
+                            </IconButton>
+                          </Tooltip>
 
-                        <Tooltip title="Delete Vendor / Clear Records">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpenDeleteVendor(v)}
-                            sx={{
-                              color: '#dc2626',
-                              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.2)' : '#fee2e2'),
-                              border: '1px solid',
-                              borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.4)' : '#fecaca'),
-                              borderRadius: 1.5,
-                              p: 0.85,
-                              '&:hover': { bgcolor: '#dc2626', color: '#fff', transform: 'translateY(-1px)' },
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <DeleteOutlined style={{ fontSize: '1.05rem' }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <Tooltip title="Delete Vendor / Clear Records">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDeleteVendor(v)}
+                              sx={{
+                                color: '#dc2626',
+                                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.2)' : '#fee2e2'),
+                                border: '1px solid',
+                                borderColor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(220, 38, 38, 0.4)' : '#fecaca'),
+                                borderRadius: 1.5,
+                                p: 0.85,
+                                '&:hover': { bgcolor: '#dc2626', color: '#fff', transform: 'translateY(-1px)' },
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <DeleteOutlined style={{ fontSize: '1.05rem' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
             </TableBody>
           </Table>
@@ -562,14 +575,14 @@ export default function VendorLedgerPage() {
         }}
       >
         <form onSubmit={handlePaymentSubmit}>
-          <DialogTitle sx={{ fontWeight: 800, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <DialogTitle sx={{ fontWeight: 700, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
             <DollarOutlined /> Pay Supplier / Vendor
           </DialogTitle>
           <DialogContent dividers sx={{ p: 3 }}>
             {selectedVendorForPay && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <Box sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#faf5ff'), borderRadius: 1.5, border: '1px solid #e9d5ff' }}>
-                  <Typography variant="h4" fontWeight={800} color="primary.main">
+                  <Typography variant="h4" fontWeight={700} color="primary.main">
                     {selectedVendorForPay.vendorName}
                   </Typography>
                   <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
@@ -637,10 +650,12 @@ export default function VendorLedgerPage() {
             )}
           </DialogContent>
           <DialogActions sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'), borderTop: '1px solid', borderColor: 'divider' }}>
-            <Button onClick={() => setPaymentModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' }, fontWeight: 800, px: 3 }}>
+            <AppButton intent="cancel" onClick={() => setPaymentModalOpen(false)}>
+              Cancel
+            </AppButton>
+            <AppButton intent="primary" type="submit">
               Confirm Vendor Payment
-            </Button>
+            </AppButton>
           </DialogActions>
         </form>
       </Dialog>
@@ -652,7 +667,7 @@ export default function VendorLedgerPage() {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 800, color: 'text.primary', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Payment History & Vouchers — {selectedVendorForHistory?.vendorName}</span>
           <Chip
             label={`Total Paid: Rs. ${(selectedVendorForHistory?.totalPaidVal || 0).toLocaleString()}`}
@@ -678,28 +693,28 @@ export default function VendorLedgerPage() {
             return (
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
-                  <TableHead sx={{ bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f8fafc') }}>
+                  <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Date & Time</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="right">Amount Paid</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Method</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Reference / Cheque</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Action</TableCell>
+                      <TableCell>Date &amp; Time</TableCell>
+                      <TableCell align="right">Amount Paid</TableCell>
+                      <TableCell>Method</TableCell>
+                      <TableCell>Reference / Cheque</TableCell>
+                      <TableCell>Notes</TableCell>
+                      <TableCell align="center">Action</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {list.map((p) => (
                       <TableRow key={p.id} hover>
-                        <TableCell sx={{ fontSize: '0.85rem' }}>{p.time}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 800, color: 'success.main' }}>
+                        <TableCell>{p.time}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, color: 'success.main' }}>
                           Rs. {(parseFloat(p.amountPaid) || 0).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Chip label={p.paymentMethod || 'Cash'} size="small" variant="outlined" />
                         </TableCell>
-                        <TableCell sx={{ fontSize: '0.85rem' }}>{p.referenceNo || '—'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.85rem' }}>{p.notes || '—'}</TableCell>
+                        <TableCell>{p.referenceNo || '—'}</TableCell>
+                        <TableCell>{p.notes || '—'}</TableCell>
                         <TableCell align="center">
                           <Button
                             size="small"
@@ -971,20 +986,12 @@ export default function VendorLedgerPage() {
         </DialogContent >
 
         <DialogActions className="no-print" sx={{ p: 2.5, justifyContent: 'space-between' }}>
-          <Button variant="outlined" color="secondary" onClick={() => setPrintModalOpen(false)} size="large" className="no-print">
-            Close & Continue
-          </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<PrinterOutlined />}
-            onClick={() => window.print()}
-            size="large"
-            className="no-print"
-            sx={{ px: 3, fontWeight: 700 }}
-          >
+          <AppButton intent="cancel" onClick={() => setPrintModalOpen(false)} className="no-print">
+            Close &amp; Continue
+          </AppButton>
+          <AppButton intent="print" startIcon={<PrinterOutlined />} onClick={() => window.print()} className="no-print">
             Print Vendor Statement
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog >
 
@@ -995,7 +1002,7 @@ export default function VendorLedgerPage() {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 800, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
           <DeleteOutlined />
           <span>Delete Vendor Confirmation</span>
         </DialogTitle>

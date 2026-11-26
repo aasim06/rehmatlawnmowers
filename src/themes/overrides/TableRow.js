@@ -8,17 +8,17 @@ export default function TableRow(theme) {
         root: {
           transition: 'background-color 0.15s ease',
           '&:hover': {
-            backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(0, 0, 0, 0.03)'
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#f9fafb'
           },
           '&.Mui-selected': {
-            backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(0, 150, 214, 0.08)',
+            backgroundColor: isDark ? 'rgba(70, 95, 255, 0.14)' : 'rgba(70, 95, 255, 0.06)',
             '&:hover': {
-              backgroundColor: isDark ? 'rgba(99, 102, 241, 0.16)' : 'rgba(0, 150, 214, 0.12)'
+              backgroundColor: isDark ? 'rgba(70, 95, 255, 0.2)' : 'rgba(70, 95, 255, 0.1)'
             }
           },
           '&:last-of-type': {
             '& .MuiTableCell-root': {
-              borderBottom: `1px solid ${isDark ? '#1e293b' : 'inherit'}`
+              borderBottom: `1px solid ${isDark ? '#2e3a47' : '#f2f4f7'}`
             }
           },
           '& .MuiTableCell-root': {

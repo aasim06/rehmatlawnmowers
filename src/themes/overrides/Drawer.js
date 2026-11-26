@@ -7,8 +7,8 @@ export default function Drawer(theme) {
       styleOverrides: {
         paper: {
           backgroundImage: 'none',
-          backgroundColor: isDark ? '#131b2e' : (theme?.vars?.palette?.background?.paper || '#ffffff'),
-          color: isDark ? '#f8fafc' : '#262626',
+          backgroundColor: isDark ? '#171f2f' : '#ffffff',
+          color: isDark ? '#f9fafb' : '#101828',
           scrollbarWidth: 'none !important',
           msOverflowStyle: 'none !important',
           '&::-webkit-scrollbar': {

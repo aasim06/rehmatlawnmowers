@@ -36,12 +36,16 @@ export default function Header() {
         onClick={() => handlerDrawerOpen(!drawerOpen)}
         edge="start"
         color="secondary"
-        variant="light"
-        sx={(theme) => ({
-          color: 'text.primary',
-          bgcolor: drawerOpen ? 'transparent' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.100',
-          ml: { xs: 0, lg: -2 }
-        })}
+        variant="outlined"
+        sx={{
+          width: 38,
+          height: 38,
+          borderRadius: 2,
+          color: 'text.secondary',
+          borderColor: 'divider',
+          bgcolor: drawerOpen ? 'transparent' : 'action.hover',
+          ml: { xs: 0, lg: -1 }
+        }}
       >
         {!drawerOpen ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
       </IconButton>
@@ -56,8 +60,8 @@ export default function Header() {
     elevation: 0,
     sx: {
       borderBottom: '1px solid',
-      borderBottomColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : 'divider'),
-      bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)'),
+      borderBottomColor: 'divider',
+      bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(23, 31, 47, 0.92)' : 'rgba(255, 255, 255, 0.92)'),
       backdropFilter: 'blur(8px)',
       zIndex: 1200,
       width: { xs: '100%', lg: drawerOpen ? `calc(100% - ${DRAWER_WIDTH}px)` : `calc(100% - ${MINI_DRAWER_WIDTH}px)` }

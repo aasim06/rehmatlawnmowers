@@ -1,29 +1,38 @@
-// direct imports for instantaneous 0ms page switching
-import DashboardDefault from 'pages/dashboard/default';
-import ItemsPage from 'pages/inventory/ItemsPage';
-import AddItemNamePage from 'pages/inventory/AddItemNamePage';
-import StockInPage from 'pages/inventory/StockInPage';
-import StockOutPage from 'pages/inventory/StockOutPage';
-import VendorsPage from 'pages/inventory/VendorsPage';
-import MachineSalesPage from 'pages/inventory/MachineSalesPage';
-import MachineInvoicesPage from 'pages/inventory/MachineInvoicesPage';
-import MachineRepairsPage from 'pages/inventory/MachineRepairsPage';
-import CategoriesPage from 'pages/inventory/CategoriesPage';
-import UsageLogPage from 'pages/inventory/UsageLogPage';
-import ReportsPage from 'pages/inventory/ReportsPage';
-import MachineBOMPage from 'pages/inventory/MachineBOMPage';
-import CustomerLedgerPage from 'pages/inventory/CustomerLedgerPage';
-import VendorLedgerPage from 'pages/inventory/VendorLedgerPage';
-import BackupRestorePage from 'pages/inventory/BackupRestorePage';
-import ExpensesPage from 'pages/inventory/ExpensesPage';
-import UserManagementPage from 'pages/admin/UserManagementPage';
-import AppSecurityPage from 'pages/admin/AppSecurityPage';
-import ShopRouteWrapper from 'pages/shop/ShopRouteWrapper';
-import ShopDashboardPage from 'pages/shop/ShopDashboardPage';
-import ShopAddProductPage from 'pages/shop/ShopAddProductPage';
-import ShopMartPage from 'pages/shop/ShopMartPage';
-import ShopLedgerPage from 'pages/shop/ShopLedgerPage';
-import ShopInvoicesPage from 'pages/shop/ShopInvoicesPage';
+import { lazy } from 'react';
+import Loadable from 'components/Loadable';
+
+// Lazy-loaded route pages for instant initial load & code-splitting
+const DashboardDefault = Loadable(lazy(() => import('pages/dashboard/default')));
+const ItemsPage = Loadable(lazy(() => import('pages/inventory/ItemsPage')));
+const AddItemNamePage = Loadable(lazy(() => import('pages/inventory/AddItemNamePage')));
+const StockInPage = Loadable(lazy(() => import('pages/inventory/StockInPage')));
+const StockOutPage = Loadable(lazy(() => import('pages/inventory/StockOutPage')));
+const VendorsPage = Loadable(lazy(() => import('pages/inventory/VendorsPage')));
+const MachineDashboardPage = Loadable(lazy(() => import('pages/inventory/MachineDashboardPage')));
+const MachineSalesPage = Loadable(lazy(() => import('pages/inventory/MachineSalesPage')));
+const MachineInvoicesPage = Loadable(lazy(() => import('pages/inventory/MachineInvoicesPage')));
+const MachinePaymentsPage = Loadable(lazy(() => import('pages/inventory/MachinePaymentsPage')));
+const MachineRepairsPage = Loadable(lazy(() => import('pages/inventory/MachineRepairsPage')));
+const CategoriesPage = Loadable(lazy(() => import('pages/inventory/CategoriesPage')));
+const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
+const StorePaymentsPage = Loadable(lazy(() => import('pages/inventory/StorePaymentsPage')));
+const StoreLedgerPage = Loadable(lazy(() => import('pages/inventory/StoreLedgerPage')));
+const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
+const MachineBOMPage = Loadable(lazy(() => import('pages/inventory/MachineBOMPage')));
+const CustomerLedgerPage = Loadable(lazy(() => import('pages/inventory/CustomerLedgerPage')));
+const VendorLedgerPage = Loadable(lazy(() => import('pages/inventory/VendorLedgerPage')));
+const BackupRestorePage = Loadable(lazy(() => import('pages/inventory/BackupRestorePage')));
+const ExpensesPage = Loadable(lazy(() => import('pages/inventory/ExpensesPage')));
+const UserManagementPage = Loadable(lazy(() => import('pages/admin/UserManagementPage')));
+const AppSecurityPage = Loadable(lazy(() => import('pages/admin/AppSecurityPage')));
+const ProfilePage = Loadable(lazy(() => import('pages/admin/ProfilePage')));
+const ShopRouteWrapper = Loadable(lazy(() => import('pages/shop/ShopRouteWrapper')));
+const ShopDashboardPage = Loadable(lazy(() => import('pages/shop/ShopDashboardPage')));
+const ShopAddProductPage = Loadable(lazy(() => import('pages/shop/ShopAddProductPage')));
+const ShopMartPage = Loadable(lazy(() => import('pages/shop/ShopMartPage')));
+const ShopLedgerPage = Loadable(lazy(() => import('pages/shop/ShopLedgerPage')));
+const ShopInvoicesPage = Loadable(lazy(() => import('pages/shop/ShopInvoicesPage')));
+const ShopPaymentsPage = Loadable(lazy(() => import('pages/shop/ShopPaymentsPage')));
 // layout, auth & RBAC guards
 import { Navigate } from 'react-router-dom';
 import DashboardLayout from 'layout/Dashboard';
@@ -47,6 +56,7 @@ function RootIndexRoute() {
   if (hasAccessToItem({ id: 'expenses' })) return <Navigate to="/inventory/expenses" replace />;
   if (hasAccessToItem({ id: 'vendors' })) return <Navigate to="/inventory/vendors" replace />;
   if (hasAccessToItem({ id: 'categories' })) return <Navigate to="/inventory/categories" replace />;
+  if (hasAccessToItem({ id: 'store-ledger' })) return <Navigate to="/inventory/store-ledger" replace />;
   if (hasAccessToItem({ id: 'ledger' })) return <Navigate to="/inventory/ledger" replace />;
   if (hasAccessToItem({ id: 'reports' })) return <Navigate to="/inventory/reports" replace />;
   if (hasAccessToItem({ id: 'shop-dashboard' })) return <Navigate to="/shop/dashboard" replace />;
@@ -148,6 +158,14 @@ const MainRoutes = {
           )
         },
         {
+          path: 'machine-dashboard',
+          element: (
+            <RoleGuard permission="machine-sales">
+              <MachineDashboardPage />
+            </RoleGuard>
+          )
+        },
+        {
           path: 'machine-sales',
           element: (
             <RoleGuard permission="machine-sales">
@@ -168,6 +186,14 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="machine-repairs">
               <MachineRepairsPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'machine-payments',
+          element: (
+            <RoleGuard permission="customer-ledgers">
+              <MachinePaymentsPage />
             </RoleGuard>
           )
         },
@@ -200,6 +226,22 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="ledger">
               <UsageLogPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'store-payments',
+          element: (
+            <RoleGuard permission="store-ledger">
+              <StorePaymentsPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'store-ledger',
+          element: (
+            <RoleGuard permission="store-ledger">
+              <StoreLedgerPage />
             </RoleGuard>
           )
         },
@@ -244,6 +286,14 @@ const MainRoutes = {
           )
         }
       ]
+    },
+    {
+      path: 'profile',
+      element: <ProfilePage />
+    },
+    {
+      path: 'account-settings',
+      element: <Navigate to="/profile?section=security" replace />
     },
     {
       path: 'admin',
@@ -325,6 +375,14 @@ const MainRoutes = {
               <ShopInvoicesPage />
             </RoleGuard>
           )
+        },
+        {
+          path: 'payments',
+          element: (
+            <RoleGuard permission="shop-ledger">
+              <ShopPaymentsPage />
+            </RoleGuard>
+          )
         }
       ]
     }
@@ -332,5 +390,3 @@ const MainRoutes = {
 };
 
 export default MainRoutes;
-
-

@@ -11,16 +11,15 @@ import {
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
+import { useTheme } from '@mui/material/styles';
 import {
   Avatar,
   Box,
-  Button,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Drawer,
   FormControl,
   Grid,
@@ -30,7 +29,6 @@ import {
   OutlinedInput,
   Paper,
   Select,
-  Stack,
   Switch,
   Tab,
   Tabs,
@@ -57,6 +55,7 @@ import {
   SafetyCertificateOutlined,
   CheckCircleOutlined,
   ControlOutlined,
+  CloseOutlined,
   LockOutlined,
   CrownOutlined,
   TeamOutlined,
@@ -66,41 +65,155 @@ import {
 
 // project imports
 import MainCard from 'components/MainCard';
+import { AppButton, MasterKpiGrid } from 'components/common';
+import { getCardSurfaceSx, getSubSurfaceSx, getToneColors } from 'utils/themeSurface';
 
-const MODULE_LIST = [
-  { key: 'dashboard', label: 'Main Store Dashboard', desc: 'Allows viewing executive dashboard analytics & alerts' },
-  { key: 'stock-out', label: 'Stock Out Page', desc: 'Allows recording stock issuance & daily usage' },
-  { key: 'stock-in', label: 'Stock In Page', desc: 'Allows receiving new stock shipments from vendors' },
-  { key: 'shop-dashboard', label: 'Shop Dashboard', desc: 'Allows viewing independent retail shop analytics & sales metrics' },
-  { key: 'shop-add-product', label: 'Shop Add Product', desc: 'Allows adding and managing products in retail shop catalogue' },
-  { key: 'shop-mart', label: 'Shop Mart (POS Counter)', desc: 'Point of sale visual mart counter with cart drawer & instant checkout' },
-  { key: 'shop-invoices', label: 'Shop Invoices (Billing & Receipts)', desc: 'Generate, edit, print, and manage retail store customer invoices' },
-  { key: 'shop-ledger', label: 'Shop Customer Ledger (Credit Accounts)', desc: 'Retail counter customer accounts, credit recovery & customer statements' },
-  { key: 'items', label: 'Store Items Catalogue', desc: 'View store items stock levels & rack locations' },
-  { key: 'categories', label: 'Categories Master', desc: 'Manage item categories and racks' },
-  { key: 'machine-sales', label: 'Machine Sales Page', desc: 'Allows selling machines to customers' },
-  { key: 'machine-repairs', label: 'Machine Repairing', desc: 'Allows managing workshop repair jobs' },
-  { key: 'customer-ledgers', label: 'Machine & Customer Ledgers', desc: 'View customer balance history' },
-  { key: 'vendor-ledgers', label: 'Vendor Payables', desc: 'View supplier payment ledgers' },
-  { key: 'vendors', label: 'Vendors & Parties Master', desc: 'Add/edit supplier and customer contacts' },
-  { key: 'ledger', label: 'Store History Log', desc: 'View complete item transaction history' },
-  { key: 'reports', label: 'Reports & Analytics', desc: 'View store financial reports & graphs' },
-  { key: 'expenses', label: 'Daily Expenses', desc: 'Record and track shop daily expenses' },
-  { key: 'backup-restore', label: 'Data Backup & Restore', desc: 'Export & import system data (Super Admin Only)' },
-  { key: 'user-management', label: 'User Management & Logs', desc: 'Manage staff accounts and permissions (Super Admin Only)' },
-  { key: 'canEditPrice', label: 'Edit Unit Prices Permission', desc: 'Allow user to change prices on sales/stock out' },
-  { key: 'canDelete', label: 'Delete Records Permission', desc: 'Allow user to delete logs or catalog items' }
+const MODULE_GROUPS = [
+  {
+    id: 'factory-store',
+    title: 'Factory Store',
+    description: 'Inventory, stock in / out and store ledger',
+    accentLight: '#2563eb',
+    accentDark: '#60a5fa',
+    headerBgLight: '#eff6ff',
+    headerBgDark: 'rgba(37, 99, 235, 0.14)',
+    pages: [
+      { key: 'dashboard', label: 'Dashboard' },
+      { key: 'items', label: 'Store Items' },
+      { key: 'add-item-name', label: 'Item Names (Directory)' },
+      { key: 'categories', label: 'Categories' },
+      { key: 'stock-in', label: 'Stock In' },
+      { key: 'stock-out', label: 'Stock Out' },
+      { key: 'store-ledger', syncKeys: ['store-payments'], label: 'Store Payments & Party Ledger' },
+      { key: 'ledger', label: 'Store History & Ledger' }
+    ]
+  },
+  {
+    id: 'machine-production',
+    title: 'Machine Production',
+    description: 'Machine sales, repairs & customer accounts',
+    accentLight: '#d97706',
+    accentDark: '#fbbf24',
+    headerBgLight: '#fffbeb',
+    headerBgDark: 'rgba(217, 119, 6, 0.14)',
+    pages: [
+      { key: 'machine-dashboard', label: 'Machine Dashboard' },
+      { key: 'machine-sales', label: 'Machine Sales' },
+      { key: 'machine-invoices', label: 'Machine Invoices' },
+      { key: 'machine-repairs', label: 'Machine Repairing' },
+      { key: 'machine-payments', label: 'Machine Payments' },
+      { key: 'customer-ledgers', label: 'Machine Customer Ledgers' }
+    ]
+  },
+  {
+    id: 'retail-shop',
+    title: 'Retail Shop Mart',
+    description: 'POS counter, products and shop billing',
+    accentLight: '#059669',
+    accentDark: '#34d399',
+    headerBgLight: '#ecfdf5',
+    headerBgDark: 'rgba(5, 150, 105, 0.14)',
+    pages: [
+      { key: 'shop-dashboard', label: 'Shop Dashboard' },
+      { key: 'shop-add-product', label: 'Add Product' },
+      { key: 'shop-mart', label: 'Shop Mart (POS Counter)' },
+      { key: 'shop-invoices', label: 'Shop Invoices' },
+      { key: 'shop-payments', label: 'Shop Payments' },
+      { key: 'shop-ledger', label: 'Shop Customer Ledger' }
+    ]
+  },
+  {
+    id: 'accounts-finance',
+    title: 'Accounts & Finance',
+    description: 'Expenses, vendors and business reports',
+    accentLight: '#7c3aed',
+    accentDark: '#a78bfa',
+    headerBgLight: '#f5f3ff',
+    headerBgDark: 'rgba(124, 58, 237, 0.14)',
+    pages: [
+      { key: 'expenses', label: 'Daily Expenses' },
+      { key: 'vendor-ledgers', label: 'Vendor Payables' },
+      { key: 'vendors', label: 'Vendors & Suppliers' },
+      { key: 'reports', label: 'Reports & Analytics' }
+    ]
+  }
 ];
 
+const MODULE_LIST = MODULE_GROUPS.flatMap((group) => group.pages);
+
+const PRESET_OPTIONS = [
+  { key: 'strict', label: 'Strict Keeper' },
+  { key: 'fullKeeper', label: 'Standard Keeper' },
+  { key: 'admin', label: 'Store Admin' },
+  { key: 'superAdmin', label: 'Super Admin' }
+];
+
+const buildAllGroupKeys = (enabled) => {
+  const next = {};
+  MODULE_GROUPS.forEach((group) => {
+    group.pages.forEach((p) => {
+      next[p.key] = enabled;
+      (p.syncKeys || []).forEach((sk) => {
+        next[sk] = enabled;
+      });
+    });
+  });
+  return next;
+};
+
+const getPresetPermissions = (presetType) => {
+  if (presetType === 'strict') {
+    return {
+      ...defaultStoreKeeperPermissions,
+      ...buildAllGroupKeys(false),
+      'stock-out': true,
+      canEditPrice: false,
+      canDelete: false
+    };
+  }
+  if (presetType === 'fullKeeper') {
+    return {
+      ...defaultStoreKeeperPermissions,
+      ...buildAllGroupKeys(false),
+      dashboard: true,
+      items: true,
+      'add-item-name': true,
+      categories: true,
+      'stock-in': true,
+      'stock-out': true,
+      'store-ledger': true,
+      'store-payments': true,
+      ledger: true,
+      'shop-dashboard': true,
+      'shop-add-product': true,
+      'shop-mart': true,
+      'shop-ledger': true,
+      expenses: true,
+      canEditPrice: false,
+      canDelete: false
+    };
+  }
+  if (presetType === 'admin') {
+    return {
+      ...defaultAdminPermissions,
+      ...buildAllGroupKeys(true),
+      'user-management': false,
+      'backup-restore': false,
+      canResetData: false
+    };
+  }
+  return {
+    ...defaultSuperAdminPermissions,
+    ...buildAllGroupKeys(true)
+  };
+};
+
 export default function UserManagementPage() {
-  const {
-    staffUsers = [],
-    addStaffUser,
-    deleteStaffUser,
-    updateStaffUser,
-    updateUserPermissions,
-    user: activeUser
-  } = useAuth();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const primaryTone = getToneColors(theme, 'primary');
+
+  const { staffUsers = [], addStaffUser, deleteStaffUser, updateStaffUser, updateUserPermissions } = useAuth();
   const { auditLogs = [] } = useStoreInventory();
 
   const [activeTab, setActiveTab] = useState(0);
@@ -199,11 +312,32 @@ export default function UserManagementPage() {
     setPermsDrawerOpen(true);
   };
 
-  const handleTogglePerm = (key) => {
-    setTempPerms((prev) => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+  const handleTogglePerm = (pageObj) => {
+    const key = typeof pageObj === 'string' ? pageObj : pageObj.key;
+    const syncKeys = typeof pageObj === 'string' ? [] : pageObj.syncKeys || [];
+    setTempPerms((prev) => {
+      const nextVal = !prev[key];
+      const next = { ...prev, [key]: nextVal };
+      syncKeys.forEach((sk) => {
+        next[sk] = nextVal;
+      });
+      return next;
+    });
+  };
+
+  const handleToggleModuleGroup = (group) => {
+    const anyEnabled = group.pages.some((p) => Boolean(tempPerms[p.key]));
+    const nextVal = !anyEnabled;
+    setTempPerms((prev) => {
+      const next = { ...prev };
+      group.pages.forEach((p) => {
+        next[p.key] = nextVal;
+        (p.syncKeys || []).forEach((sk) => {
+          next[sk] = nextVal;
+        });
+      });
+      return next;
+    });
   };
 
   const handleSavePerms = () => {
@@ -215,26 +349,17 @@ export default function UserManagementPage() {
   };
 
   const handlePresetPreset = (presetType) => {
-    if (presetType === 'strict') {
-      setTempPerms({
-        ...defaultStoreKeeperPermissions,
-        'stock-out': true,
-        'stock-in': false,
-        'items': false
-      });
-    } else if (presetType === 'fullKeeper') {
-      setTempPerms({
-        ...defaultStoreKeeperPermissions,
-        'stock-in': true,
-        'stock-out': true,
-        'items': true
-      });
-    } else if (presetType === 'admin') {
-      setTempPerms({ ...defaultAdminPermissions });
-    } else if (presetType === 'superAdmin' || presetType === 'allowAll') {
-      setTempPerms({ ...defaultSuperAdminPermissions });
-    }
+    setTempPerms(getPresetPermissions(presetType));
   };
+
+  const activePresetKey =
+    PRESET_OPTIONS.find((preset) => {
+      const target = getPresetPermissions(preset.key);
+      return (
+        MODULE_LIST.every((p) => Boolean(tempPerms[p.key]) === Boolean(target[p.key])) &&
+        Boolean(tempPerms['user-management']) === Boolean(target['user-management'])
+      );
+    })?.key || '';
 
   const handleConfirmDeleteStaff = () => {
     if (staffToDelete) {
@@ -244,346 +369,146 @@ export default function UserManagementPage() {
     }
   };
 
+  const getRoleToneKey = (role) => {
+    if (role === 'Super Admin') return 'primary';
+    if (role === 'Admin') return 'info';
+    if (role === 'Store Keeper') return 'warning';
+    return 'neutral';
+  };
+
   const getRoleBadge = (role) => {
     switch (role) {
       case 'Super Admin':
-        return <Chip icon={<CrownOutlined />} label="Super Admin" color="primary" size="small" sx={{ fontWeight: 700 }} />;
+        return <Chip label="Super Admin" color="primary" variant="light" size="small" />;
       case 'Admin':
-        return <Chip icon={<SafetyCertificateOutlined />} label="Admin (Manager)" color="info" size="small" sx={{ fontWeight: 700 }} />;
+        return <Chip label="Admin (Manager)" color="info" variant="light" size="small" />;
       case 'Store Keeper':
-        return <Chip icon={<UserOutlined />} label="Store Keeper" color="warning" size="small" sx={{ fontWeight: 700 }} />;
+        return <Chip label="Store Keeper" color="warning" variant="light" size="small" />;
       default:
-        return <Chip label={role} color="secondary" size="small" sx={{ fontWeight: 700 }} />;
+        return <Chip label={role} color="secondary" variant="light" size="small" />;
     }
   };
 
   return (
-    <Stack spacing={3}>
-      {/* 1. Executive Page Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          justifyContent: 'space-between',
-          alignItems: { xs: 'flex-start', md: 'center' },
-          gap: 2,
-          pt: 0.5
-        }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.5px' }}>
-              Staff & Access Control
-            </Typography>
-            <Chip
-              label="RBAC Security"
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{ fontWeight: 700, fontSize: '0.72rem', height: 24, borderRadius: '6px' }}
-            />
-          </Stack>
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-            Manage staff credentials, configure role access privileges, and review audit trail logs.
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
-          {/* Active User Session Pill */}
-          <Box
-            sx={{
-              display: { xs: 'none', sm: 'flex' },
-              alignItems: 'center',
-              gap: 1.25,
-              px: 2,
-              py: 0.85,
-              borderRadius: 2,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-            }}
-          >
-            <Avatar
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pb: 4 }}>
+      {/* 1. Executive Page Header Card (TailAdmin Style) */}
+      <Paper elevation={0} sx={{ ...getCardSurfaceSx(theme), p: { xs: 2, sm: 2.75 } }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', lg: 'row' },
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', lg: 'center' },
+            gap: 2
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
+            <Box
               sx={{
-                width: 32,
-                height: 32,
-                bgcolor: activeUser?.role === 'Super Admin' ? 'primary.main' : activeUser?.role === 'Admin' ? 'info.main' : 'warning.main',
-                fontSize: '0.8rem',
-                fontWeight: 700
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: primaryTone.bg,
+                color: primaryTone.main,
+                border: '1px solid',
+                borderColor: primaryTone.border,
+                fontSize: '1.35rem',
+                flexShrink: 0
               }}
             >
-              {(activeUser?.name || 'U').charAt(0).toUpperCase()}
-            </Avatar>
+              <SafetyCertificateOutlined />
+            </Box>
             <Box>
-              <Typography variant="caption" color="textSecondary" display="block" sx={{ lineHeight: 1 }}>
-                Logged In Session
-              </Typography>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2, mt: 0.25 }}>
-                {(activeUser?.name || 'Sabeel').replace(/\s*\([^)]*\)/g, '').trim()} &bull;{' '}
-                <Box component="span" sx={{ color: 'primary.main' }}>
-                  {activeUser?.role || 'Super Admin'}
-                </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: '-0.015em', color: 'text.primary' }}>
+                  Staff & Access Control
+                </Typography>
+                <Chip label="RBAC Security" size="small" color="primary" variant="light" />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
+                Manage staff credentials, configure role access privileges, and review audit trail logs.
               </Typography>
             </Box>
           </Box>
 
-          {!isTauriApp() && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<LockOutlined />}
-              component={Link}
-              to="/admin/security"
-              sx={{
-                fontWeight: 700,
-                px: 2,
-                py: 1.1,
-                borderRadius: 1.5,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Remote App Control
-            </Button>
-          )}
-
-          {/* Add Staff Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<PlusOutlined />}
-            onClick={() => setDrawerOpen(true)}
+          <Box
             sx={{
-              fontWeight: 700,
-              px: 2.5,
-              py: 1.1,
-              boxShadow: '0 4px 12px rgba(24, 144, 255, 0.25)',
-              borderRadius: 1.5,
-              whiteSpace: 'nowrap',
-              flex: { xs: 1, md: 'none' }
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: { xs: 'flex-start', lg: 'flex-end' },
+              flexWrap: 'wrap',
+              gap: 1.25,
+              width: { xs: '100%', lg: 'auto' }
             }}
           >
-            Add Staff Member
-          </Button>
-        </Stack>
-      </Box>
+            {!isTauriApp() && (
+              <AppButton intent="danger-outlined" startIcon={<LockOutlined />} component={Link} to="/admin/security">
+                Remote App Control
+              </AppButton>
+            )}
 
-      {/* 2. Executive Stat Cards */}
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2.5,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              width: '100%',
-              height: '100%',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-                borderColor: 'primary.main'
-              }
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
-                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
-                  Total Staff Accounts
-                </Typography>
-                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: 'text.primary' }}>
-                  {totalStaff}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  {totalStaff === 1 ? '1 active account' : `${totalStaff} active registered accounts`}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  bgcolor: 'primary.lighter',
-                  color: 'primary.main',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.25rem'
-                }}
-              >
-                <TeamOutlined />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
+            <AppButton intent="primary" startIcon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
+              Add Staff Member
+            </AppButton>
+          </Box>
+        </Box>
+      </Paper>
 
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2.5,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              width: '100%',
-              height: '100%',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-                borderColor: '#722ed1'
-              }
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
-                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
-                  Admins & Managers
-                </Typography>
-                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#722ed1' }}>
-                  {superAdminCount + adminCount}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  {superAdminCount} Super Admin &bull; {adminCount} Admin
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  bgcolor: '#f9f0ff',
-                  color: '#722ed1',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.25rem'
-                }}
-              >
-                <CrownOutlined />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2.5,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              width: '100%',
-              height: '100%',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-                borderColor: '#52c41a'
-              }
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
-                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
-                  Store Keepers
-                </Typography>
-                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#52c41a' }}>
-                  {storeKeeperCount}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  Counter & Inventory operators
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  bgcolor: '#f6ffed',
-                  color: '#52c41a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.25rem'
-                }}
-              >
-                <UserOutlined />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2.5,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              width: '100%',
-              height: '100%',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-                borderColor: '#fa8c16'
-              }
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-              <Box sx={{ flex: 1, minWidth: 0, pr: 1.5 }}>
-                <Typography variant="caption" fontWeight={600} color="textSecondary" textTransform="uppercase" letterSpacing={0.5}>
-                  Security Audit Logs
-                </Typography>
-                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.75, mb: 0.5, color: '#fa8c16' }}>
-                  {auditLogsCount}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  Recorded actions & events
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  bgcolor: '#fff7e6',
-                  color: '#fa8c16',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.25rem'
-                }}
-              >
-                <HistoryOutlined />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
+      {/* 2. Executive Stat Cards (Shared TailAdmin MasterKpiGrid) */}
+      <MasterKpiGrid
+        kpis={[
+          {
+            label: 'Total Staff Accounts',
+            value: totalStaff.toLocaleString(),
+            helper: totalStaff === 1 ? '1 active account' : `${totalStaff} active registered accounts`,
+            icon: <TeamOutlined />,
+            tone: 'primary'
+          },
+          {
+            label: 'Admins & Managers',
+            value: (superAdminCount + adminCount).toLocaleString(),
+            helper: `${superAdminCount} Super Admin • ${adminCount} Admin`,
+            icon: <CrownOutlined />,
+            tone: 'info'
+          },
+          {
+            label: 'Store Keepers',
+            value: storeKeeperCount.toLocaleString(),
+            helper: 'Counter & Inventory operators',
+            icon: <UserOutlined />,
+            tone: 'success'
+          },
+          {
+            label: 'Security Audit Logs',
+            value: auditLogsCount.toLocaleString(),
+            helper: 'Recorded actions & events',
+            icon: <HistoryOutlined />,
+            tone: 'warning'
+          }
+        ]}
+      />
 
       {/* 3. Main Data Card: Staff List & Audit Logs */}
-      <MainCard>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2.5 }}>
+      <MainCard content={false} sx={{ overflow: 'hidden', mt: -0.5 }}>
+        <Box sx={{ px: 2.5, pt: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
-            <Tab icon={<UserOutlined />} iconPosition="start" label={`Staff Users (${staffUsers.length})`} sx={{ fontWeight: 700 }} />
-            <Tab icon={<HistoryOutlined />} iconPosition="start" label={`Immutable Audit Logs (${auditLogs.length})`} sx={{ fontWeight: 700 }} />
+            <Tab icon={<UserOutlined />} iconPosition="start" label={`Staff Users (${staffUsers.length})`} sx={{ fontWeight: 600 }} />
+            <Tab
+              icon={<HistoryOutlined />}
+              iconPosition="start"
+              label={`Immutable Audit Logs (${auditLogs.length})`}
+              sx={{ fontWeight: 600 }}
+            />
           </Tabs>
         </Box>
 
         {/* TAB 0: STAFF USERS LIST */}
         {activeTab === 0 && (
-          <Stack spacing={2.5}>
-            <Grid container spacing={2} alignItems="center">
+          <Box>
+            <Grid container spacing={2} alignItems="center" sx={{ p: 2.5 }}>
               <Grid size={{ xs: 12, sm: 6, md: 5 }}>
                 <OutlinedInput
                   fullWidth
@@ -596,11 +521,12 @@ export default function UserManagementPage() {
                       <SearchOutlined />
                     </InputAdornment>
                   }
+                  sx={{ height: 38 }}
                 />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <FormControl size="small" fullWidth>
+                <FormControl size="small" fullWidth sx={{ '& .MuiOutlinedInput-root': { height: 38 } }}>
                   <Select
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
@@ -627,50 +553,49 @@ export default function UserManagementPage() {
                 <Chip
                   label={`${filteredStaff.length} of ${staffUsers.length} staff displayed`}
                   size="small"
-                  variant="outlined"
-                  sx={{ fontWeight: 600, color: 'text.secondary' }}
+                  variant="light"
+                  color="secondary"
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
+                <AppButton
                   size="small"
+                  intent="primary"
                   startIcon={<PlusOutlined />}
                   onClick={() => setDrawerOpen(true)}
-                  sx={{ fontWeight: 700, px: 2, py: 0.75, display: { xs: 'flex', md: 'none' } }}
+                  sx={{ display: { xs: 'inline-flex', md: 'none' } }}
                 >
                   Add Staff
-                </Button>
+                </AppButton>
               </Grid>
             </Grid>
 
             {/* Mobile Summary Cards for Staff Users (xs & sm) */}
-            <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+            <Box sx={{ display: { xs: 'block', md: 'none' }, px: 2.5, pb: 2.5 }}>
               {filteredStaff.length === 0 ? (
-                <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-                  <Typography variant="body2" color="textSecondary">
+                <Paper elevation={0} sx={{ ...getSubSurfaceSx(theme), p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
                     No staff users found.
                   </Typography>
                 </Paper>
               ) : (
-                <Stack spacing={2}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {filteredStaff.map((staff) => {
                     const perms = staff.permissions || getRoleDefaultPermissions(staff.role);
                     const enabledCount = MODULE_LIST.filter((m) => Boolean(perms[m.key])).length;
                     const isProtected = staff.email?.toLowerCase() === 'admin@rehmat.com';
+                    const roleTone = getToneColors(theme, getRoleToneKey(staff.role));
 
                     return (
                       <Paper
                         key={staff.id}
-                        variant="outlined"
+                        elevation={0}
                         sx={{
-                          p: 2,
-                          borderRadius: 2,
-                          borderColor: 'divider',
-                          bgcolor: 'background.paper'
+                          ...getCardSurfaceSx(theme),
+                          borderRadius: 3,
+                          p: 2
                         }}
                       >
-                        <Stack spacing={1.5}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                             {getRoleBadge(staff.role)}
                             <Chip
                               icon={<CheckCircleOutlined />}
@@ -679,20 +604,17 @@ export default function UserManagementPage() {
                               variant="light"
                               size="small"
                             />
-                          </Stack>
+                          </Box>
 
-                          <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <Avatar
                               sx={{
                                 width: 38,
                                 height: 38,
-                                bgcolor:
-                                  staff.role === 'Super Admin'
-                                    ? 'primary.main'
-                                    : staff.role === 'Admin'
-                                    ? '#722ed1'
-                                    : '#52c41a',
-                                color: '#fff',
+                                bgcolor: roleTone.bg,
+                                color: roleTone.main,
+                                border: '1px solid',
+                                borderColor: roleTone.border,
                                 fontSize: '0.85rem',
                                 fontWeight: 700
                               }}
@@ -703,36 +625,43 @@ export default function UserManagementPage() {
                               <Typography variant="subtitle1" fontWeight={700}>
                                 {staff.name}
                               </Typography>
-                              <Typography variant="caption" color="textSecondary" display="block">
+                              <Typography variant="caption" color="text.secondary" display="block">
                                 {staff.email}
                               </Typography>
                             </Box>
-                          </Stack>
+                          </Box>
 
-                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 1.5 }}>
-                            <Typography variant="caption" fontWeight={600} color="textSecondary">
+                          <Box
+                            sx={{
+                              ...getSubSurfaceSx(theme),
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              p: 1.25,
+                              borderRadius: 2
+                            }}
+                          >
+                            <Typography variant="caption" fontWeight={600} color="text.secondary">
                               ENABLED MODULES:
                             </Typography>
                             <Chip
                               label={`${enabledCount} Modules ON`}
                               color={enabledCount > 5 ? 'success' : 'secondary'}
+                              variant="light"
                               size="small"
-                              sx={{ fontWeight: 700 }}
                             />
-                          </Stack>
+                          </Box>
 
-                          <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center" sx={{ pt: 0.5 }}>
-                            <Button
-                              variant="contained"
-                              color="warning"
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, pt: 0.5 }}>
+                            <AppButton
                               size="small"
+                              intent="secondary"
                               fullWidth
                               startIcon={<ControlOutlined />}
                               onClick={() => handleOpenPerms(staff)}
-                              sx={{ fontWeight: 700, textTransform: 'none', py: 0.75 }}
                             >
                               Toggle Access
-                            </Button>
+                            </AppButton>
                             <IconButton
                               color="primary"
                               size="small"
@@ -763,12 +692,12 @@ export default function UserManagementPage() {
                                 <DeleteOutlined />
                               </IconButton>
                             )}
-                          </Stack>
-                        </Stack>
+                          </Box>
+                        </Box>
                       </Paper>
                     );
                   })}
-                </Stack>
+                </Box>
               )}
             </Box>
 
@@ -788,35 +717,31 @@ export default function UserManagementPage() {
                   <TableBody>
                     {filteredStaff.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                          <Typography variant="body2" color="textSecondary">
+                        <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                          <Typography variant="body2" color="text.secondary">
                             No staff users found.
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStaff
-                        .slice(staffPage * staffRowsPerPage, staffPage * staffRowsPerPage + staffRowsPerPage)
-                        .map((staff) => {
+                      filteredStaff.slice(staffPage * staffRowsPerPage, staffPage * staffRowsPerPage + staffRowsPerPage).map((staff) => {
                         const perms = staff.permissions || getRoleDefaultPermissions(staff.role);
                         const enabledCount = MODULE_LIST.filter((m) => Boolean(perms[m.key])).length;
                         const isProtected = staff.email?.toLowerCase() === 'admin@rehmat.com';
+                        const roleTone = getToneColors(theme, getRoleToneKey(staff.role));
 
                         return (
                           <TableRow key={staff.id} hover>
                             <TableCell>
-                              <Stack direction="row" spacing={1.5} alignItems="center">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                 <Avatar
                                   sx={{
                                     width: 36,
                                     height: 36,
-                                    bgcolor:
-                                      staff.role === 'Super Admin'
-                                        ? 'primary.main'
-                                        : staff.role === 'Admin'
-                                        ? '#722ed1'
-                                        : '#52c41a',
-                                    color: '#fff',
+                                    bgcolor: roleTone.bg,
+                                    color: roleTone.main,
+                                    border: '1px solid',
+                                    borderColor: roleTone.border,
                                     fontSize: '0.85rem',
                                     fontWeight: 700
                                   }}
@@ -824,14 +749,14 @@ export default function UserManagementPage() {
                                   {(staff.name || 'U').charAt(0).toUpperCase()}
                                 </Avatar>
                                 <Box>
-                                  <Typography variant="subtitle2" fontWeight={700}>
+                                  <Typography variant="subtitle2" fontWeight={600} color="text.primary">
                                     {staff.name}
                                   </Typography>
-                                  <Typography variant="caption" color="textSecondary">
+                                  <Typography variant="caption" color="text.secondary">
                                     {staff.email}
                                   </Typography>
                                 </Box>
-                              </Stack>
+                              </Box>
                             </TableCell>
 
                             <TableCell>{getRoleBadge(staff.role)}</TableCell>
@@ -840,8 +765,8 @@ export default function UserManagementPage() {
                               <Chip
                                 label={`${enabledCount} Modules Active`}
                                 color={enabledCount > 5 ? 'success' : 'secondary'}
+                                variant="light"
                                 size="small"
-                                sx={{ fontWeight: 600 }}
                               />
                             </TableCell>
 
@@ -856,17 +781,15 @@ export default function UserManagementPage() {
                             </TableCell>
 
                             <TableCell align="center">
-                              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                                <Button
-                                  variant="contained"
-                                  color="warning"
+                              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
+                                <AppButton
                                   size="small"
+                                  intent="secondary"
                                   startIcon={<ControlOutlined />}
                                   onClick={() => handleOpenPerms(staff)}
-                                  sx={{ fontWeight: 700, textTransform: 'none' }}
                                 >
                                   Toggle Access
-                                </Button>
+                                </AppButton>
 
                                 <Tooltip title="Edit Staff User">
                                   <IconButton
@@ -903,7 +826,7 @@ export default function UserManagementPage() {
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                              </Stack>
+                              </Box>
                             </TableCell>
                           </TableRow>
                         );
@@ -924,15 +847,16 @@ export default function UserManagementPage() {
                   setStaffRowsPerPage(parseInt(e.target.value, 10));
                   setStaffPage(0);
                 }}
+                sx={{ borderTop: '1px solid', borderColor: 'divider' }}
               />
             </Box>
-          </Stack>
+          </Box>
         )}
 
         {/* TAB 1: ACTIVITY AUDIT LOGS (IMMUTABLE & TAMPER-PROOF) */}
         {activeTab === 1 && (
-          <Stack spacing={2}>
-            <Grid container spacing={2} alignItems="center">
+          <Box>
+            <Grid container spacing={2} alignItems="center" sx={{ p: 2.5 }}>
               <Grid size={{ xs: 12, sm: 7 }}>
                 <OutlinedInput
                   fullWidth
@@ -945,16 +869,11 @@ export default function UserManagementPage() {
                       <SearchOutlined />
                     </InputAdornment>
                   }
+                  sx={{ height: 38 }}
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 5 }} textAlign={{ xs: 'left', sm: 'right' }}>
-                <Chip
-                  icon={<LockOutlined />}
-                  label="Immutable Audit Trail (Tamper-Proof)"
-                  color="success"
-                  variant="outlined"
-                  sx={{ fontWeight: 700, p: 1 }}
-                />
+              <Grid size={{ xs: 12, sm: 5 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                <Chip icon={<LockOutlined />} label="Immutable Audit Trail (Tamper-Proof)" color="success" variant="light" />
               </Grid>
             </Grid>
 
@@ -972,28 +891,26 @@ export default function UserManagementPage() {
                 <TableBody>
                   {filteredAuditLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="textSecondary">
+                      <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                        <Typography variant="body2" color="text.secondary">
                           No audit activity logs recorded.
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAuditLogs
-                      .slice(auditPage * auditRowsPerPage, auditPage * auditRowsPerPage + auditRowsPerPage)
-                      .map((log) => (
+                    filteredAuditLogs.slice(auditPage * auditRowsPerPage, auditPage * auditRowsPerPage + auditRowsPerPage).map((log) => (
                       <TableRow key={log.id} hover>
-                        <TableCell whiteSpace="nowrap">
-                          <Typography variant="caption" fontWeight={600} color="textSecondary">
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary">
                             {log.timestamp}
                           </Typography>
                         </TableCell>
 
                         <TableCell>
-                          <Typography variant="subtitle2" fontWeight={700}>
+                          <Typography variant="subtitle2" fontWeight={600}>
                             {log.userName}
                           </Typography>
-                          <Typography variant="caption" color="textSecondary">
+                          <Typography variant="caption" color="text.secondary">
                             {log.userEmail} ({log.userRole})
                           </Typography>
                         </TableCell>
@@ -1005,13 +922,13 @@ export default function UserManagementPage() {
                               log.actionType.includes('Stock Out')
                                 ? 'error'
                                 : log.actionType.includes('Stock In')
-                                ? 'success'
-                                : log.actionType.includes('Sale')
-                                ? 'primary'
-                                : 'info'
+                                  ? 'success'
+                                  : log.actionType.includes('Sale')
+                                    ? 'primary'
+                                    : 'info'
                             }
+                            variant="light"
                             size="small"
-                            sx={{ fontWeight: 700 }}
                           />
                         </TableCell>
 
@@ -1025,9 +942,8 @@ export default function UserManagementPage() {
                               icon={<LockOutlined style={{ fontSize: '0.75rem' }} />}
                               label="Locked"
                               size="small"
-                              variant="outlined"
-                              color="default"
-                              sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                              variant="light"
+                              color="secondary"
                             />
                           </Tooltip>
                         </TableCell>
@@ -1049,106 +965,301 @@ export default function UserManagementPage() {
                 setAuditRowsPerPage(parseInt(e.target.value, 10));
                 setAuditPage(0);
               }}
+              sx={{ borderTop: '1px solid', borderColor: 'divider' }}
             />
-          </Stack>
+          </Box>
         )}
       </MainCard>
 
-      {/* MANAGE PERMISSIONS TOGGLES DRAWER */}
-      <Drawer anchor="right" open={permsDrawerOpen} onClose={() => setPermsDrawerOpen(false)}>
-        <Box sx={{ width: { xs: '100vw', sm: 500 }, p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h4" fontWeight={700} sx={{ mb: 0.5 }}>
-            Customize Access Toggles
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Turn ON or OFF specific pages & actions for <strong>{targetStaffPerms?.name}</strong> ({targetStaffPerms?.role}).
-          </Typography>
+      {/* CUSTOMIZE ACCESS BY MODULE DIALOG */}
+      <Dialog
+        open={permsDrawerOpen}
+        onClose={() => setPermsDrawerOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            px: { xs: 2.5, sm: 3.5 },
+            pt: 2.5,
+            pb: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 2
+          }}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight={700} color="text.primary">
+              Customize access by module
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+              Staff member: <strong>{targetStaffPerms?.name}</strong> ({targetStaffPerms?.role}). Turn a whole module on or off, or choose
+              individual pages.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setPermsDrawerOpen(false)} sx={{ color: 'text.secondary' }}>
+            <CloseOutlined />
+          </IconButton>
+        </DialogTitle>
 
-          {/* Preset Buttons */}
-          <Paper
-            variant="outlined"
+        <DialogContent sx={{ px: { xs: 2.5, sm: 3.5 }, py: 2.5 }}>
+          {/* Quick Preset Row + Module Status Legend */}
+          <Box
             sx={{
-              p: 1.5,
-              mb: 2.5,
-              bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f9fafb'),
-              borderRadius: 1.5
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 1.5,
+              mb: 2.5
             }}
           >
-            <Typography variant="caption" fontWeight={700} color="textSecondary" sx={{ display: 'block', mb: 1 }}>
-              QUICK ROLE PRESETS:
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-              <Button size="small" variant="outlined" color="error" onClick={() => handlePresetPreset('strict')}>
-                Strict Keeper
-              </Button>
-              <Button size="small" variant="outlined" color="warning" onClick={() => handlePresetPreset('fullKeeper')}>
-                Standard Keeper
-              </Button>
-              <Button size="small" variant="outlined" color="info" onClick={() => handlePresetPreset('admin')}>
-                Store Admin
-              </Button>
-              <Button size="small" variant="outlined" color="success" onClick={() => handlePresetPreset('superAdmin')}>
-                Super Admin
-              </Button>
-            </Stack>
-          </Paper>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: '0.05em', mr: 0.5 }}>
+                QUICK PRESET
+              </Typography>
+              {PRESET_OPTIONS.map((preset) => {
+                const isSelected = activePresetKey === preset.key;
+                return (
+                  <Box
+                    key={preset.key}
+                    component="button"
+                    type="button"
+                    onClick={() => handlePresetPreset(preset.key)}
+                    sx={{
+                      px: 1.5,
+                      py: 0.75,
+                      borderRadius: 2,
+                      fontSize: '0.8125rem',
+                      fontWeight: isSelected ? 700 : 500,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: isSelected ? 'primary.main' : 'divider',
+                      bgcolor: isSelected ? primaryTone.bg : 'background.paper',
+                      color: isSelected ? 'primary.main' : 'text.primary',
+                      transition: 'all 0.15s ease',
+                      '&:hover': {
+                        borderColor: 'primary.main'
+                      }
+                    }}
+                  >
+                    {preset.label}
+                  </Box>
+                );
+              })}
+            </Box>
 
-          <Divider sx={{ mb: 2 }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Chip
+                label="All on"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  bgcolor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#dcfce7',
+                  color: isDark ? '#34d399' : '#15803d'
+                }}
+              />
+              <Chip
+                label="Some pages"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  bgcolor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#fef3c7',
+                  color: isDark ? '#fbbf24' : '#b45309'
+                }}
+              />
+              <Chip
+                label="Module off"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  bgcolor: isDark ? 'rgba(148, 163, 184, 0.14)' : '#f1f5f9',
+                  color: 'text.secondary'
+                }}
+              />
+            </Box>
+          </Box>
 
-          <Stack spacing={1.5} sx={{ maxHeight: 'calc(100vh - 240px)', overflowY: 'auto', pr: 1 }}>
-            {MODULE_LIST.map((mod) => {
-              const isChecked = Boolean(tempPerms[mod.key]);
+          {/* 2x2 Module Cards Grid */}
+          <Grid container spacing={2.5}>
+            {MODULE_GROUPS.map((group) => {
+              const totalCount = group.pages.length;
+              const enabledCount = group.pages.filter((p) => Boolean(tempPerms[p.key])).length;
+              const isAllOn = enabledCount === totalCount;
+              const isOff = enabledCount === 0;
+              const accentColor = isDark ? group.accentDark : group.accentLight;
+              const headerBg = isOff
+                ? isDark
+                  ? 'rgba(148, 163, 184, 0.08)'
+                  : '#fef9c3'
+                : isDark
+                  ? group.headerBgDark
+                  : group.headerBgLight;
+
+              const statusBadge = isAllOn
+                ? {
+                    label: `All ${totalCount} pages on`,
+                    bg: isDark ? 'rgba(16, 185, 129, 0.18)' : '#dcfce7',
+                    color: isDark ? '#34d399' : '#15803d'
+                  }
+                : isOff
+                  ? {
+                      label: 'Module off',
+                      bg: isDark ? 'rgba(148, 163, 184, 0.16)' : '#f1f5f9',
+                      color: isDark ? '#94a3b8' : '#64748b'
+                    }
+                  : {
+                      label: `${enabledCount} of ${totalCount} pages on`,
+                      bg: isDark ? 'rgba(245, 158, 11, 0.18)' : '#fef3c7',
+                      color: isDark ? '#fbbf24' : '#b45309'
+                    };
 
               return (
-                <Paper
-                  key={mod.key}
-                  variant="outlined"
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 1.5,
-                    borderColor: (theme) => (isChecked ? 'primary.main' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'divider'),
-                    bgcolor: (theme) =>
-                      isChecked
-                        ? theme.palette.mode === 'dark'
-                          ? 'rgba(24, 144, 255, 0.15)'
-                          : 'primary.lighter'
-                        : theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.02)'
-                        : '#ffffff',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                    <Box sx={{ flexGrow: 1, textAlign: 'left' }}>
-                      <Typography variant="subtitle2" fontWeight={700} align="left">
-                        {mod.label}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" align="left" sx={{ display: 'block', mt: 0.25 }}>
-                        {mod.desc}
-                      </Typography>
+                <Grid key={group.id} size={{ xs: 12, md: 6 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      borderRadius: 3,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderTop: `3px solid ${accentColor}`,
+                      overflow: 'hidden',
+                      bgcolor: 'background.paper',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    {/* Module Group Header */}
+                    <Box
+                      sx={{
+                        px: 2.25,
+                        py: 1.75,
+                        bgcolor: headerBg,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 1.5
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="h5" fontWeight={700} color="text.primary">
+                          {group.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                          {isOff ? 'Hidden from the sidebar for this user' : group.description}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.75, flexShrink: 0 }}>
+                        <Switch checked={!isOff} onChange={() => handleToggleModuleGroup(group)} color="primary" size="small" />
+                        <Chip
+                          label={statusBadge.label}
+                          size="small"
+                          sx={{
+                            height: 22,
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            bgcolor: statusBadge.bg,
+                            color: statusBadge.color
+                          }}
+                        />
+                      </Box>
                     </Box>
 
-                    <Switch
-                      checked={isChecked}
-                      onChange={() => handleTogglePerm(mod.key)}
-                      color="primary"
-                    />
-                  </Stack>
-                </Paper>
+                    {/* Individual Pages Checklist */}
+                    <Box sx={{ flex: 1 }}>
+                      {group.pages.map((page, idx) => {
+                        const checked = Boolean(tempPerms[page.key]);
+                        return (
+                          <Box
+                            key={page.key}
+                            onClick={() => handleTogglePerm(page)}
+                            sx={{
+                              px: 2.25,
+                              py: 1.1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 1.5,
+                              cursor: 'pointer',
+                              borderBottom: idx < group.pages.length - 1 ? '1px solid' : 'none',
+                              borderColor: 'divider',
+                              transition: 'background-color 0.12s ease',
+                              '&:hover': {
+                                bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#f9fafb'
+                              }
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ color: checked ? 'text.primary' : 'text.secondary' }}
+                            >
+                              {page.label}
+                            </Typography>
+                            <Switch
+                              checked={checked}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => handleTogglePerm(page)}
+                              color="primary"
+                              size="small"
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Paper>
+                </Grid>
               );
             })}
-          </Stack>
+          </Grid>
+        </DialogContent>
 
-          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 3 }}>
-            <Button variant="outlined" color="secondary" onClick={() => setPermsDrawerOpen(false)}>
+        <DialogActions
+          sx={{
+            px: { xs: 2.5, sm: 3.5 },
+            py: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Administration pages (User Management, Backup, License) stay Super Admin only.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <AppButton intent="cancel" onClick={() => setPermsDrawerOpen(false)}>
               Cancel
-            </Button>
-            <Button variant="contained" color="primary" onClick={handleSavePerms} sx={{ fontWeight: 700 }}>
-              Save Toggles & Update Access
-            </Button>
-          </Stack>
-        </Box>
-      </Drawer>
+            </AppButton>
+            <AppButton intent="primary" onClick={handleSavePerms}>
+              Save access
+            </AppButton>
+          </Box>
+        </DialogActions>
+      </Dialog>
 
       {/* Add Staff Drawer */}
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
@@ -1158,7 +1269,7 @@ export default function UserManagementPage() {
           </Typography>
 
           <form onSubmit={handleCreateStaff}>
-            <Stack spacing={2.5}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               <TextField
                 label="Full Name *"
                 fullWidth
@@ -1212,15 +1323,15 @@ export default function UserManagementPage() {
                 <MenuItem value="Technician">Workshop Technician (Repairs Access)</MenuItem>
               </TextField>
 
-              <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                <Button variant="outlined" color="secondary" onClick={() => setDrawerOpen(false)}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1.5, pt: 1.5 }}>
+                <AppButton intent="cancel" onClick={() => setDrawerOpen(false)}>
                   Cancel
-                </Button>
-                <Button variant="contained" color="primary" type="submit" sx={{ fontWeight: 700 }}>
+                </AppButton>
+                <AppButton intent="primary" type="submit">
                   Save Staff User
-                </Button>
-              </Stack>
-            </Stack>
+                </AppButton>
+              </Box>
+            </Box>
           </form>
         </Box>
       </Drawer>
@@ -1234,7 +1345,7 @@ export default function UserManagementPage() {
 
           {editingStaff && (
             <form onSubmit={handleUpdateStaff}>
-              <Stack spacing={2.5}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <TextField
                   label="Full Name *"
                   fullWidth
@@ -1285,15 +1396,15 @@ export default function UserManagementPage() {
                   <MenuItem value="Technician">Workshop Technician (Repairs Access)</MenuItem>
                 </TextField>
 
-                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1.5, pt: 1.5 }}>
+                  <AppButton intent="cancel" onClick={() => setEditDrawerOpen(false)}>
                     Cancel
-                  </Button>
-                  <Button variant="contained" color="primary" type="submit" sx={{ fontWeight: 700 }}>
+                  </AppButton>
+                  <AppButton intent="primary" type="submit">
                     Update Staff User
-                  </Button>
-                </Stack>
-              </Stack>
+                  </AppButton>
+                </Box>
+              </Box>
             </form>
           )}
         </Box>
@@ -1308,14 +1419,14 @@ export default function UserManagementPage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="secondary">
+          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmDeleteStaff} color="error" variant="contained">
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmDeleteStaff}>
             Delete Staff
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }

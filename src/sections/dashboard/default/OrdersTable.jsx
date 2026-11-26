@@ -5,7 +5,6 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 // material-ui
 import Checkbox from '@mui/material/Checkbox';
 import Link from '@mui/material/Link';
-import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -15,9 +14,6 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-
-// project imports
-import Dot from 'components/@extended/Dot';
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {

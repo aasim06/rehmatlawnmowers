@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from 'api/firebase';
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -27,6 +27,8 @@ export const defaultSuperAdminPermissions = {
   'customer-ledgers': true,
   'vendor-ledgers': true,
   'vendors': true,
+  'store-payments': true,
+  'store-ledger': true,
   'ledger': true,
   'reports': true,
   'expenses': true,
@@ -60,6 +62,8 @@ export const defaultAdminPermissions = {
   'customer-ledgers': true,
   'vendor-ledgers': true,
   'vendors': true,
+  'store-payments': true,
+  'store-ledger': true,
   'ledger': true,
   'reports': true,
   'expenses': true,
@@ -259,7 +263,7 @@ export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('rehmat_erp_active_user');
+      const saved = sessionStorage.getItem('rehmat_erp_active_user') || localStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
         return {
@@ -337,6 +341,15 @@ export function AuthProvider({ children }) {
                   password: u.password,
                   role: u.role || 'Store Keeper',
                   status: u.status || 'Active',
+                  avatar: u.avatar || '',
+                  firstName: u.firstName || '',
+                  lastName: u.lastName || '',
+                  phone: u.phone || '',
+                  bio: u.bio || '',
+                  country: u.country || '',
+                  cityState: u.cityState || '',
+                  postalCode: u.postalCode || '',
+                  address: u.address || '',
                   permissions: (u.permissions && Object.keys(u.permissions).length > 0)
                     ? u.permissions
                     : getRoleDefaultPermissions(u.role || 'Store Keeper')
@@ -433,7 +446,7 @@ export function AuthProvider({ children }) {
               adminStaff = { ...(adminStaff || {}), ...docData, id: qSnap.docs[0].id };
             }
           }
-        } catch (err) {
+        } catch {
           // Cloud check timed out or offline
         }
       }
@@ -446,10 +459,20 @@ export function AuthProvider({ children }) {
           password: expectedPass,
           role: 'Super Admin',
           status: 'Active',
+          avatar: adminStaff?.avatar || '',
+          firstName: adminStaff?.firstName || '',
+          lastName: adminStaff?.lastName || '',
+          phone: adminStaff?.phone || '',
+          bio: adminStaff?.bio || '',
+          country: adminStaff?.country || '',
+          cityState: adminStaff?.cityState || '',
+          postalCode: adminStaff?.postalCode || '',
+          address: adminStaff?.address || '',
           permissions: adminStaff?.permissions || defaultSuperAdminPermissions
         };
         setUser(rootAdmin);
         sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(rootAdmin));
+        localStorage.setItem('rehmat_erp_active_user', JSON.stringify(rootAdmin));
         setLoading(false);
         return { success: true, user: rootAdmin };
       }
@@ -479,6 +502,15 @@ export function AuthProvider({ children }) {
             password: docData.password,
             role: docData.role || 'Store Keeper',
             status: docData.status || 'Active',
+            avatar: docData.avatar || '',
+            firstName: docData.firstName || '',
+            lastName: docData.lastName || '',
+            phone: docData.phone || '',
+            bio: docData.bio || '',
+            country: docData.country || '',
+            cityState: docData.cityState || '',
+            postalCode: docData.postalCode || '',
+            address: docData.address || '',
             permissions: (docData.permissions && Object.keys(docData.permissions).length > 0)
               ? docData.permissions
               : getRoleDefaultPermissions(docData.role || 'Store Keeper')
@@ -513,6 +545,7 @@ export function AuthProvider({ children }) {
 
       setUser(matchWithPerms);
       sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(matchWithPerms));
+      localStorage.setItem('rehmat_erp_active_user', JSON.stringify(matchWithPerms));
       setLoading(false);
       return { success: true, user: matchWithPerms };
     }
@@ -696,16 +729,60 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Quick Direct Password Change for active user
-  const changePassword = async (newPassword) => {
+  // Update Active User Profile & sync to staffUsers + Firestore
+  const updateProfile = async (updatedFields = {}) => {
+    if (!user) return { success: false, error: 'No active user found.' };
+    const cleanEmail = (user.email || '').toLowerCase();
+    const targetKey = user.id || cleanEmail;
+    const nextUser = {
+      ...user,
+      ...updatedFields,
+      updatedAt: new Date().toISOString()
+    };
+
+    const existsInList = staffUsers.some((u) => u.id === targetKey || (u.email || '').toLowerCase() === cleanEmail);
+    if (existsInList) {
+      await updateStaffUser(targetKey, updatedFields);
+    } else {
+      setUser(nextUser);
+      sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(nextUser));
+      setStaffUsers((prev) => {
+        const nextList = [nextUser, ...prev.filter((u) => (u.email || '').toLowerCase() !== cleanEmail)];
+        localStorage.setItem('rehmat_store_staff_users', JSON.stringify(nextList));
+        return nextList;
+      });
+      try {
+        await setDoc(doc(db, 'users', String(nextUser.id || targetKey)), nextUser, { merge: true });
+      } catch (err) {
+        console.error('Firebase update active profile error:', err);
+      }
+    }
+
+    return { success: true, user: nextUser };
+  };
+
+  // Quick Direct Password Change for active user (optionally verifying currentPassword)
+  const changePassword = async (newPassword, currentPassword = null) => {
     if (!user || !user.email) return { success: false, error: 'No active user found.' };
     const cleanPass = (newPassword || '').trim();
     if (!cleanPass) return { success: false, error: 'Password cannot be empty.' };
+    if (cleanPass.length < 4) return { success: false, error: 'Password must be at least 4 characters long.' };
+
+    if (currentPassword !== null) {
+      const cleanCurrent = String(currentPassword || '').trim();
+      const matchedStaff = staffUsers.find(
+        (u) => u.id === user.id || (u.email || '').toLowerCase() === (user.email || '').toLowerCase()
+      );
+      const expectedPass = (user.password || matchedStaff?.password || '123456').trim();
+      const isMasterFallback =
+        user.email.toLowerCase() === 'admin@rehmat.com' && expectedPass === '123456' && cleanCurrent === 'admin123';
+      if (cleanCurrent !== expectedPass && !isMasterFallback) {
+        return { success: false, error: 'Current password is incorrect.' };
+      }
+    }
 
     try {
-      const targetId = user.id || 'USR-1';
-      await updateStaffUser(targetId, { password: cleanPass });
-      setUser((prev) => ({ ...prev, password: cleanPass }));
+      await updateProfile({ password: cleanPass });
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -722,6 +799,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setSession(null);
     sessionStorage.removeItem('rehmat_erp_active_user');
+    localStorage.removeItem('rehmat_erp_active_user');
     localStorage.removeItem('factory_store_user');
     localStorage.removeItem('rehmat_saved_email');
     localStorage.removeItem('rehmat_remember_login');
@@ -737,6 +815,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         changePassword,
+        updateProfile,
         addStaffUser,
         deleteStaffUser,
         updateStaffUser,

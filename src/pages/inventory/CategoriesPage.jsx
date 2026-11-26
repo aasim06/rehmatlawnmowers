@@ -4,7 +4,6 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 // material-ui
 import {
   Box,
-  Button,
   Checkbox,
   Dialog,
   DialogActions,
@@ -12,7 +11,6 @@ import {
   DialogContentText,
   DialogTitle,
   Drawer,
-  Grid,
   IconButton,
   InputAdornment,
   OutlinedInput,
@@ -30,10 +28,11 @@ import {
 } from '@mui/material';
 
 // icons
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
+import { AppButton } from 'components/common';
 import usePermission from 'hooks/usePermission';
 
 export default function CategoriesPage() {
@@ -192,24 +191,14 @@ export default function CategoriesPage() {
       secondary={
         <Stack direction="row" spacing={1.5}>
           {selected.length > 0 && canDelete && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteOutlined />}
-              onClick={() => setBulkDeleteDialogOpen(true)}
-            >
+            <AppButton intent="danger" startIcon={<DeleteOutlined />} onClick={() => setBulkDeleteDialogOpen(true)}>
               Delete Selected ({selected.length})
-            </Button>
+            </AppButton>
           )}
 
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<PlusOutlined />}
-            onClick={() => setAddDrawerOpen(true)}
-          >
+          <AppButton intent="primary" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
             Add Category
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
@@ -354,7 +343,7 @@ export default function CategoriesPage() {
       {/* Drawer 1: Add Category */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
             Add New Category
           </Typography>
 
@@ -380,12 +369,12 @@ export default function CategoriesPage() {
               />
 
               <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
+                <AppButton intent="cancel" onClick={() => setAddDrawerOpen(false)}>
                   Cancel
-                </Button>
-                <Button variant="contained" type="submit">
+                </AppButton>
+                <AppButton intent="primary" type="submit">
                   Save Category
-                </Button>
+                </AppButton>
               </Stack>
             </Stack>
           </form>
@@ -395,7 +384,7 @@ export default function CategoriesPage() {
       {/* Drawer 2: Edit Category */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
             Edit Category Details
           </Typography>
 
@@ -427,12 +416,12 @@ export default function CategoriesPage() {
                 />
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
+                  <AppButton intent="cancel" onClick={() => setEditDrawerOpen(false)}>
                     Cancel
-                  </Button>
-                  <Button variant="contained" color="primary" type="submit">
+                  </AppButton>
+                  <AppButton intent="primary" type="submit">
                     Update Category
-                  </Button>
+                  </AppButton>
                 </Stack>
               </Stack>
             </form>
@@ -451,12 +440,12 @@ export default function CategoriesPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="secondary">
+          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmSingleDelete} variant="contained" color="error">
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmSingleDelete}>
             Confirm Delete
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
 
@@ -471,12 +460,12 @@ export default function CategoriesPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBulkDeleteDialogOpen(false)} color="secondary">
+          <AppButton intent="cancel" onClick={() => setBulkDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmBulkDelete} variant="contained" color="error">
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmBulkDelete}>
             Delete All {selected.length} Categories
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
     </MainCard>

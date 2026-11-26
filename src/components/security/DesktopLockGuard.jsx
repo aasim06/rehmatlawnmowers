@@ -13,7 +13,6 @@ import {
   LockOutlined,
   ReloadOutlined,
   WhatsAppOutlined,
-  PhoneOutlined,
   SafetyCertificateOutlined,
   CustomerServiceOutlined
 } from '@ant-design/icons';

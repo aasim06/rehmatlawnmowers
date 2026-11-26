@@ -36,16 +36,16 @@ export default function NavGroup({ item }) {
       subheader={
         item.title &&
         drawerOpen && (
-          <Box sx={{ pl: 3, mb: 1.5 }}>
+          <Box sx={{ px: 2.5, mb: 1, mt: 0.5 }}>
             <Typography
               variant="subtitle2"
-              sx={(theme) => ({
-                color: theme.vars.palette.text.secondary,
+              sx={{
+                color: 'text.disabled',
                 textTransform: 'uppercase',
-                fontSize: '0.65rem',
-                letterSpacing: '0.08em',
+                fontSize: '0.68rem',
+                letterSpacing: '0.07em',
                 fontWeight: 600
-              })}
+              }}
             >
               {item.title}
             </Typography>

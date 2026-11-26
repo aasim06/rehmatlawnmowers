@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types';
 
 // material-ui
-import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 
 // project imports
@@ -10,8 +9,6 @@ import MainCard from 'components/MainCard';
 // ==============================|| AUTHENTICATION - CARD WRAPPER ||============================== //
 
 export default function AuthCard({ children, ...other }) {
-  const theme = useTheme();
-
   return (
     <MainCard
       sx={{

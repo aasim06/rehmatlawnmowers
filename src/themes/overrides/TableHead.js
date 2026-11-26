@@ -2,23 +2,29 @@
 
 export default function TableHead(theme) {
   const isDark = theme.palette.mode === 'dark';
+  const headBg = isDark ? '#1d2939' : '#f9fafb';
+  const borderCol = isDark ? '#2e3a47' : '#e4e7ec';
+  const textCol = isDark ? '#98a2b3' : '#667085';
+
   return {
     MuiTableHead: {
       styleOverrides: {
         root: {
-          backgroundColor: isDark ? '#162033' : '#ffffff',
+          backgroundColor: headBg,
           borderTop: '1px solid',
-          borderTopColor: isDark ? '#1e293b' : theme.vars.palette.divider,
+          borderTopColor: borderCol,
           borderBottom: '1px solid',
-          borderBottomColor: isDark ? '#1e293b' : theme.vars.palette.divider,
+          borderBottomColor: borderCol,
           '& .MuiTableCell-root': {
-            backgroundColor: isDark ? '#162033' : '#ffffff',
-            color: isDark ? '#94a3b8' : theme.vars.palette.text.primary,
-            fontWeight: 600,
+            backgroundColor: headBg,
+            color: textCol,
+            fontWeight: 700,
             fontSize: '0.75rem',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.05em',
             textTransform: 'uppercase',
-            borderBottom: `1px solid ${isDark ? '#1e293b' : theme.vars.palette.divider}`
+            paddingTop: 12,
+            paddingBottom: 12,
+            borderBottom: `1px solid ${borderCol}`
           }
         }
       }

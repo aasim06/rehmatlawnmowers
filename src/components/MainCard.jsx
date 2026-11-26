@@ -6,6 +6,9 @@ import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Divider from '@mui/material/Divider';
 
+// project imports
+import { getCardSurfaceSx } from 'utils/themeSurface';
+
 export default function MainCard({
   border = true,
   boxShadow,
@@ -29,16 +32,17 @@ export default function MainCard({
     <Card
       elevation={elevation || 0}
       sx={(theme) => ({
+        ...getCardSurfaceSx(theme),
         position: 'relative',
-        ...(border && {
-          border: '1px solid',
-          borderColor: theme.palette.mode === 'dark' ? '#1e293b' : theme.vars.palette.divider
+        ...(!border && {
+          border: 'none',
+          boxShadow: 'none'
         }),
-        borderRadius: 2,
-        backgroundImage: 'none',
-        bgcolor: theme.palette.mode === 'dark' ? '#131b2e' : theme.vars.palette.background.paper,
-        boxShadow: theme.palette.mode === 'dark' ? '0 1px 3px 0 rgba(0, 0, 0, 0.35)' : (boxShadow && !border ? shadow || theme.vars.customShadows?.z1 : 'none'),
-        ':hover': { boxShadow: boxShadow ? shadow || theme.vars.customShadows?.z1 : 'inherit' },
+        ...(boxShadow &&
+          !border && {
+            boxShadow: shadow || theme.vars.customShadows?.z1
+          }),
+        ':hover': { boxShadow: boxShadow ? shadow || theme.vars.customShadows?.z1 : undefined },
         ...(codeHighlight && {
           '& pre': { margin: 0, padding: '12px !important', fontFamily: theme.typography.fontFamily, fontSize: '0.75rem' }
         }),
@@ -59,7 +63,7 @@ export default function MainCard({
       {title && (
         <CardHeader
           sx={{ p: 2.5 }}
-          slotProps={{ title: { variant: 'subtitle1' }, action: { sx: { m: '0px auto', alignSelf: 'center' } } }}
+          slotProps={{ title: { variant: 'h5', fontWeight: 700 }, action: { sx: { m: '0px auto', alignSelf: 'center' } } }}
           title={title}
           action={secondary}
           subheader={subheader}

@@ -1,10 +1,22 @@
 // project import
-import inventoryMenu from './inventoryMenu';
+import {
+  factoryStoreGroup,
+  machineGroup,
+  shopGroup,
+  accountsGroup,
+  adminGroup
+} from './inventoryMenu';
 
 // ==============================|| MENU ITEMS ||============================== //
 
 const menuItems = {
-  items: [inventoryMenu]
+  items: [
+    factoryStoreGroup,
+    machineGroup,
+    shopGroup,
+    accountsGroup,
+    adminGroup
+  ]
 };
 
 export default menuItems;

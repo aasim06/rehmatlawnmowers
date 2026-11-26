@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // material-ui
+import { useTheme } from '@mui/material/styles';
 import {
   Autocomplete,
   Box,
   Button,
-  ButtonGroup,
   Checkbox,
   Chip,
   Dialog,
@@ -36,13 +36,16 @@ import MainCard from 'components/MainCard';
 import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import CeoSignature from 'components/CeoSignature';
+import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx } from 'utils/themeSurface';
 
 // assets
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import PrinterOutlined from '@ant-design/icons/PrinterOutlined';
-import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import ClearOutlined from '@ant-design/icons/ClearOutlined';
+
+// project imports
+import { AppButton } from 'components/common';
 
 const DEFAULT_EXPENSE_CATEGORIES = [
   'Tea & Refreshment',
@@ -66,7 +69,10 @@ const QUICK_EXPENSE_SUGGESTIONS = [
 
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
+const tableHeadCellSx = getTableHeadCellSx();
+
 export default function ExpensesPage() {
+  const theme = useTheme();
   const {
     expenses = [],
     addExpense,
@@ -441,7 +447,7 @@ export default function ExpensesPage() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <TextField
                 fullWidth
-                label="AMOUNT (PKR) *"
+                label="AMOUNT (PKR)"
                 type="number"
                 placeholder="0"
                 value={amount}
@@ -530,137 +536,120 @@ export default function ExpensesPage() {
                 }}
               />
             </Grid>
-
-            {/* ROW 3: Action Buttons */}
-            <Grid size={12}>
-              <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ pt: 1 }}>
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<ClearOutlined />}
-                  onClick={handleClearForm}
-                  sx={{ height: '40px', px: 2.5, fontWeight: 600 }}
-                >
-                  Clear Form
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="success"
-                  startIcon={<PlusOutlined />}
-                  sx={{
-                    height: '40px',
-                    px: 3.5,
-                    fontWeight: 700,
-                    bgcolor: '#10b981',
-                    '&:hover': { bgcolor: '#059669' }
-                  }}
-                >
-                  Save Expense Voucher
-                </Button>
-              </Stack>
-            </Grid>
           </Grid>
+
+          {/* ROW 3: Action Buttons (Right Aligned) */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, pt: 2.5, width: '100%' }}>
+            <AppButton intent="cancel" startIcon={<ClearOutlined />} onClick={handleClearForm}>
+              Clear Form
+            </AppButton>
+            <AppButton intent="primary" type="submit" startIcon={<PlusOutlined />}>
+              Save Expense Voucher
+            </AppButton>
+          </Box>
         </form>
       </MainCard>
 
       {/* 3. EXPENSES REGISTER & TABLE CARD */}
-      <MainCard
-        title={
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1.5}>
-            <Stack direction="row" alignItems="center" spacing={1.5}>
-              <Typography variant="h5" fontWeight={700}>
-                Expenses History & Daily Register
-              </Typography>
-              <Chip label={`${filteredExpenses.length} Records`} size="small" color="primary" variant="light" />
-              {selected.length > 0 && (
-                <Chip
-                  label={`${selected.length} Selected`}
-                  size="small"
-                  color="error"
-                  onDelete={handleBulkDelete}
-                  deleteIcon={<DeleteOutlined />}
-                />
-              )}
-            </Stack>
-
-            <Stack direction="row" spacing={1.5}>
-              {selected.length > 0 && (
-                <Button
-                  variant="contained"
-                  color="error"
-                  size="small"
-                  startIcon={<DeleteOutlined />}
-                  onClick={handleBulkDelete}
-                  sx={{ height: '36px', fontWeight: 600 }}
-                >
-                  Delete ({selected.length})
-                </Button>
-              )}
-              <Button
-                variant="outlined"
-                color="secondary"
-                size="small"
-                startIcon={<PrinterOutlined />}
-                onClick={() => handleOpenPrint(null)}
-                sx={{ height: '36px', fontWeight: 600 }}
-              >
-                Print Expense Sheet
-              </Button>
-            </Stack>
-          </Stack>
-        }
-        sx={{
-          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
-          borderRadius: 2
-        }}
-      >
-        {/* Search & Filter Toolbar */}
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          sx={{ mb: 2.5 }}
-          alignItems={{ xs: 'stretch', md: 'center' }}
-          justifyContent="space-between"
+      <MainCard content={false} sx={getCardSurfaceSx(theme, { overflow: 'hidden' })}>
+        {/* Card Header */}
+        <Box
+          sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5
+          }}
         >
-          {/* Quick Date Filters */}
-          <ButtonGroup variant="outlined" size="small">
-            <Button
-              variant={dateFilter === 'today' ? 'contained' : 'outlined'}
-              onClick={() => setDateFilter('today')}
+          <Stack direction="row" alignItems="center" spacing={1.25} flexWrap="wrap">
+            <Typography variant="h5" fontWeight={700} color="text.primary">
+              Expenses history &amp; daily register
+            </Typography>
+            <Chip
+              label={`${filteredExpenses.length} ${filteredExpenses.length === 1 ? 'record' : 'records'}`}
+              size="small"
+              color="primary"
+              variant="light"
               sx={{ fontWeight: 600 }}
-            >
-              Today&apos;s Expenses
-            </Button>
-            <Button
-              variant={dateFilter === 'month' ? 'contained' : 'outlined'}
-              onClick={() => setDateFilter('month')}
-              sx={{ fontWeight: 600 }}
-            >
-              This Month
-            </Button>
-            <Button
-              variant={dateFilter === 'all' ? 'contained' : 'outlined'}
-              onClick={() => setDateFilter('all')}
-              sx={{ fontWeight: 600 }}
-            >
-              All Records
-            </Button>
-          </ButtonGroup>
+            />
+            {selected.length > 0 && (
+              <Chip
+                label={`${selected.length} Selected`}
+                size="small"
+                color="error"
+                onDelete={handleBulkDelete}
+                deleteIcon={<DeleteOutlined />}
+              />
+            )}
+          </Stack>
 
-          {/* Search Input & Category Dropdown */}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            {selected.length > 0 && (
+              <AppButton intent="danger" size="small" startIcon={<DeleteOutlined />} onClick={handleBulkDelete}>
+                Delete ({selected.length})
+              </AppButton>
+            )}
+            <AppButton intent="secondary" size="small" onClick={() => handleOpenPrint(null)}>
+              Print expense sheet
+            </AppButton>
+          </Stack>
+        </Box>
+
+        <Box sx={{ p: { xs: 2, sm: 3 } }}>
+          {/* Search & Filter Toolbar */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 1.5,
+              mb: 2
+            }}
+          >
+            {/* Segmented Date Filter Pills */}
+            <Box sx={getSubSurfaceSx(theme, { display: 'inline-flex', p: 0.5, borderRadius: 2, gap: 0.5 })}>
+              {[
+                { key: 'today', label: 'Today' },
+                { key: 'month', label: 'This month' },
+                { key: 'all', label: 'All records' }
+              ].map((tab) => {
+                const isActive = dateFilter === tab.key;
+                return (
+                  <Box
+                    key={tab.key}
+                    component="button"
+                    type="button"
+                    onClick={() => setDateFilter(tab.key)}
+                    sx={{
+                      border: 0,
+                      px: 1.5,
+                      py: 0.65,
+                      borderRadius: 1.5,
+                      fontSize: '0.8125rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      bgcolor: isActive ? 'background.paper' : 'transparent',
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                      boxShadow: isActive ? theme.shadows[1] : 'none'
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
+
             <OutlinedInput
               size="small"
               placeholder="Search title, person, notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              startAdornment={
-                <InputAdornment position="start">
-                  <SearchOutlined />
-                </InputAdornment>
-              }
-              sx={{ minWidth: { sm: 240 }, height: '36px' }}
+              sx={{ flex: 1, minWidth: { xs: '100%', sm: 240 } }}
             />
 
             <TextField
@@ -668,202 +657,198 @@ export default function ExpensesPage() {
               size="small"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              sx={{
-                minWidth: { sm: 180 },
-                '& .MuiOutlinedInput-root': {
-                  height: '36px'
-                }
-              }}
+              sx={{ width: { xs: '100%', sm: 185 } }}
             >
-              <MenuItem value="All">All Categories</MenuItem>
+              <MenuItem value="All">All categories</MenuItem>
               {expenseCategories.map((cat) => (
                 <MenuItem key={cat} value={cat}>
                   {cat}
                 </MenuItem>
               ))}
             </TextField>
-          </Stack>
-        </Stack>
+          </Box>
 
-        {/* Expenses Data Table */}
-        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-          <Table size="small">
-            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50') }}>
-              <TableRow>
-                <TableCell padding="checkbox" sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Checkbox
-                    color="primary"
-                    indeterminate={selected.length > 0 && selected.length < filteredExpenses.length}
-                    checked={filteredExpenses.length > 0 && selected.length === filteredExpenses.length}
-                    onChange={handleSelectAllClick}
-                  />
-                </TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 50, borderBottom: '1px solid', borderColor: 'divider' }}>SR</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 110, borderBottom: '1px solid', borderColor: 'divider' }}>DATE</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', borderBottom: '1px solid', borderColor: 'divider' }}>EXPENSE TITLE / DESCRIPTION</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 160, borderBottom: '1px solid', borderColor: 'divider' }}>CATEGORY</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 130, borderBottom: '1px solid', borderColor: 'divider' }}>PAID TO</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: 120, borderBottom: '1px solid', borderColor: 'divider' }}>PAYMENT MODE</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', width: 130, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  AMOUNT (PKR)
-                </TableCell>
-                <TableCell align="center" sx={{ fontWeight: 700, color: 'text.primary', width: 90, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  ACTION
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredExpenses.length === 0 ? (
+          {/* Expenses Data Table */}
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                    No expense records found for the selected filter.
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      color="primary"
+                      indeterminate={selected.length > 0 && selected.length < filteredExpenses.length}
+                      checked={filteredExpenses.length > 0 && selected.length === filteredExpenses.length}
+                      onChange={handleSelectAllClick}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ ...tableHeadCellSx, width: 56 }}>SR</TableCell>
+                  <TableCell sx={{ ...tableHeadCellSx, width: 115 }}>DATE</TableCell>
+                  <TableCell sx={tableHeadCellSx}>TITLE / DESCRIPTION</TableCell>
+                  <TableCell sx={{ ...tableHeadCellSx, width: 165 }}>CATEGORY</TableCell>
+                  <TableCell sx={{ ...tableHeadCellSx, width: 135 }}>PAID TO</TableCell>
+                  <TableCell sx={{ ...tableHeadCellSx, width: 120 }}>PAYMENT</TableCell>
+                  <TableCell align="right" sx={{ ...tableHeadCellSx, width: 135 }}>
+                    AMOUNT (PKR)
+                  </TableCell>
+                  <TableCell align="center" sx={{ ...tableHeadCellSx, width: 95, pr: 2 }}>
+                    ACTION
                   </TableCell>
                 </TableRow>
-              ) : (
-                filteredExpenses
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((exp, idx) => {
-                  const isItemSelected = isSelected(exp.id);
-                  return (
-                    <TableRow
-                      key={exp.id || idx}
-                      hover
-                      selected={isItemSelected}
-                      sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
-                    >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          color="primary"
-                          checked={isItemSelected}
-                          onChange={(event) => handleSelectOne(event, exp.id)}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>{idx + 1}</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>{exp.expenseDate}</TableCell>
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'text.primary' }}>
-                          {exp.title}
-                        </Typography>
-                        {exp.notes && (
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {exp.notes}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={exp.category || 'General'}
-                          size="small"
-                          sx={{
-                            fontWeight: 600,
-                            bgcolor: (theme) =>
-                              theme.palette.mode === 'dark'
-                                ? exp.category === 'Tea & Refreshment'
-                                  ? 'rgba(245, 158, 11, 0.2)'
-                                  : exp.category === 'Fuel & Transport'
-                                  ? 'rgba(239, 68, 68, 0.2)'
-                                  : exp.category === 'Utilities & Bills'
-                                  ? 'rgba(59, 130, 246, 0.2)'
-                                  : exp.category === 'Staff Wages & Labor'
-                                  ? 'rgba(99, 102, 241, 0.2)'
-                                  : 'rgba(255, 255, 255, 0.1)'
-                                : exp.category === 'Tea & Refreshment'
-                                ? '#fef3c7'
-                                : exp.category === 'Fuel & Transport'
-                                ? '#fee2e2'
-                                : exp.category === 'Utilities & Bills'
-                                ? '#dbeafe'
-                                : exp.category === 'Staff Wages & Labor'
-                                ? '#e0e7ff'
-                                : '#f1f5f9',
-                            color: (theme) =>
-                              theme.palette.mode === 'dark'
-                                ? exp.category === 'Tea & Refreshment'
-                                  ? '#fbbf24'
-                                  : exp.category === 'Fuel & Transport'
-                                  ? '#f87171'
-                                  : exp.category === 'Utilities & Bills'
-                                  ? '#60a5fa'
-                                  : exp.category === 'Staff Wages & Labor'
-                                  ? '#818cf8'
-                                  : '#e2e8f0'
-                                : exp.category === 'Tea & Refreshment'
-                                ? '#b45309'
-                                : exp.category === 'Fuel & Transport'
-                                ? '#b91c1c'
-                                : exp.category === 'Utilities & Bills'
-                                ? '#1d4ed8'
-                                : exp.category === 'Staff Wages & Labor'
-                                ? '#4338ca'
-                                : '#475569'
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.primary' }}>{exp.paidTo || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Chip label={exp.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, color: (theme) => (theme.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '0.95rem' }}>
-                        PKR {parseFloat(exp.amount || 0).toLocaleString()}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center">
-                          <Tooltip title="Print Voucher">
-                            <IconButton size="small" color="primary" onClick={() => handleOpenPrint(exp)}>
-                              <PrinterOutlined style={{ fontSize: 15 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete Expense">
-                            <IconButton
+              </TableHead>
+              <TableBody>
+                {filteredExpenses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                      No expense records found for the selected filter.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredExpenses
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((exp, idx) => {
+                      const isItemSelected = isSelected(exp.id);
+                      return (
+                        <TableRow
+                          key={exp.id || idx}
+                          hover
+                          selected={isItemSelected}
+                          sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              color="primary"
+                              checked={isItemSelected}
+                              onChange={(event) => handleSelectOne(event, exp.id)}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ color: 'text.secondary' }}>{page * rowsPerPage + idx + 1}</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: 'text.primary', whiteSpace: 'nowrap' }}>{exp.expenseDate}</TableCell>
+                          <TableCell>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'text.primary' }}>
+                              {exp.title}
+                            </Typography>
+                            {exp.notes && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {exp.notes}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={exp.category || 'General'}
                               size="small"
-                              color="error"
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete "${exp.title}"?`)) {
-                                  deleteExpense(exp.id);
-                                }
+                              sx={{
+                                fontWeight: 600,
+                                bgcolor: (t) =>
+                                  t.palette.mode === 'dark'
+                                    ? exp.category === 'Tea & Refreshment'
+                                      ? 'rgba(245, 158, 11, 0.2)'
+                                      : exp.category === 'Fuel & Transport'
+                                        ? 'rgba(239, 68, 68, 0.2)'
+                                        : exp.category === 'Utilities & Bills'
+                                          ? 'rgba(59, 130, 246, 0.2)'
+                                          : exp.category === 'Staff Wages & Labor'
+                                            ? 'rgba(99, 102, 241, 0.2)'
+                                            : 'rgba(255, 255, 255, 0.1)'
+                                    : exp.category === 'Tea & Refreshment'
+                                      ? '#fef3c7'
+                                      : exp.category === 'Fuel & Transport'
+                                        ? '#fee2e2'
+                                        : exp.category === 'Utilities & Bills'
+                                          ? '#dbeafe'
+                                          : exp.category === 'Staff Wages & Labor'
+                                            ? '#e0e7ff'
+                                            : '#f1f5f9',
+                                color: (t) =>
+                                  t.palette.mode === 'dark'
+                                    ? exp.category === 'Tea & Refreshment'
+                                      ? '#fbbf24'
+                                      : exp.category === 'Fuel & Transport'
+                                        ? '#f87171'
+                                        : exp.category === 'Utilities & Bills'
+                                          ? '#60a5fa'
+                                          : exp.category === 'Staff Wages & Labor'
+                                            ? '#818cf8'
+                                            : '#e2e8f0'
+                                    : exp.category === 'Tea & Refreshment'
+                                      ? '#b45309'
+                                      : exp.category === 'Fuel & Transport'
+                                        ? '#b91c1c'
+                                        : exp.category === 'Utilities & Bills'
+                                          ? '#1d4ed8'
+                                          : exp.category === 'Staff Wages & Labor'
+                                            ? '#4338ca'
+                                            : '#475569'
                               }}
-                            >
-                              <DeleteOutlined style={{ fontSize: 15 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ color: 'text.primary' }}>{exp.paidTo || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Chip label={exp.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: (t) => (t.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '0.875rem' }}>
+                            PKR {parseFloat(exp.amount || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell align="center" sx={{ pr: 2 }}>
+                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                              <Tooltip title="Print Voucher">
+                                <IconButton size="small" color="primary" onClick={() => handleOpenPrint(exp)}>
+                                  <PrinterOutlined style={{ fontSize: 15 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete Expense">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete "${exp.title}"?`)) {
+                                      deleteExpense(exp.id);
+                                    }
+                                  }}
+                                >
+                                  <DeleteOutlined style={{ fontSize: 15 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                )}
 
-              {/* Total Summary Row */}
-              {filteredExpenses.length > 0 && (
-                <TableRow
-                  sx={{
-                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'grey.50'),
-                    borderTop: '2px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  <TableCell colSpan={7} align="right" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem' }}>
-                    Total Amount:
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 900, color: (theme) => (theme.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '1.05rem' }}>
-                    PKR {filteredTotal.toLocaleString()}
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                {/* Total Summary Row */}
+                {filteredExpenses.length > 0 && (
+                  <TableRow
+                    sx={{
+                      bgcolor: getSubSurfaceSx(theme).bgcolor,
+                      borderTop: '1px solid',
+                      borderColor: 'divider'
+                    }}
+                  >
+                    <TableCell colSpan={7} align="right" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.875rem' }}>
+                      Total Amount:
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: (t) => (t.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '1rem' }}>
+                      PKR {filteredTotal.toLocaleString()}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          component="div"
-          count={filteredExpenses.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={filteredExpenses.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={{ mt: 0.5 }}
+          />
+        </Box>
       </MainCard>
 
       {/* 4. PRINTABLE VOUCHER / STATEMENT DIALOG */}

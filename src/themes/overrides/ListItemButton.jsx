@@ -6,17 +6,18 @@ export default function ListItemButton(theme) {
     MuiListItemButton: {
       styleOverrides: {
         root: {
+          borderRadius: 8,
           '&:hover': {
-            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : undefined
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f9fafb'
           },
           '&.Mui-selected': {
-            backgroundColor: isDark ? 'rgba(99, 102, 241, 0.12)' : theme.vars.palette.primary.lighter,
-            color: isDark ? '#818cf8' : theme.vars.palette.primary.main,
+            backgroundColor: isDark ? 'rgba(70, 95, 255, 0.14)' : '#ecf3ff',
+            color: isDark ? '#8098f9' : '#465fff',
             '& .MuiListItemIcon-root': {
-              color: isDark ? '#818cf8' : theme.vars.palette.primary.main
+              color: isDark ? '#8098f9' : '#465fff'
             },
             '&:hover': {
-              backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : undefined
+              backgroundColor: isDark ? 'rgba(70, 95, 255, 0.2)' : '#dde9ff'
             }
           }
         }

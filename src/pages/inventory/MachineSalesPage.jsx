@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
@@ -8,7 +8,6 @@ import CeoSignature from 'components/CeoSignature';
 import {
   Autocomplete,
   Box,
-  Button,
   Checkbox,
   Chip,
   Dialog,
@@ -16,14 +15,12 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Divider,
   Drawer,
-  Grid,
   IconButton,
   InputAdornment,
   MenuItem,
   OutlinedInput,
-  Paper,
-  Stack,
   Table,
   TableBody,
   TableCell,
@@ -37,23 +34,45 @@ import {
 } from '@mui/material';
 
 // icons
-import {
-  PlusOutlined,
-  SearchOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  PrinterOutlined,
-  CloseOutlined,
-  FileTextOutlined
-} from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PrinterOutlined, CloseOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
+import { AppButton, PageHeader } from 'components/common';
+import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx, getToneColors } from 'utils/themeSurface';
+import { formatPKR } from 'utils/dashboardHelpers';
+import {
+  buildCustomerLedgers,
+  formatItemsSummaryLabel,
+  getCustomerDirectorySuggestions,
+  resolveAllocatedInvoiceMap,
+  resolveSaleFinancials
+} from 'utils/machineLedgerHelpers';
 
+const DEFAULT_WARRANTY_TERMS = '1 Year Motor & Frame Free Service Warranty';
+
+const createEmptySaleItem = () => ({
+  machineName: '',
+  serialNo: '',
+  qty: 1,
+  unitPrice: 0,
+  discount: 0
+});
+
+const createInitialFormState = () => ({
+  customerName: '',
+  customerPhone: '',
+  cityAddress: '',
+  items: [createEmptySaleItem()],
+  paidAmount: 0,
+  warrantyTerms: DEFAULT_WARRANTY_TERMS
+});
+
+/** Formats sale ISO or legacy time text into consistent ledger timestamps. */
 const formatFullDate = (timeStr, dateISO) => {
   if (dateISO) {
     const d = new Date(dateISO);
-    if (!isNaN(d.getTime())) {
+    if (!Number.isNaN(d.getTime())) {
       const dateFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       return `${dateFormatted}, ${timeFormatted}`;
@@ -66,6 +85,7 @@ const formatFullDate = (timeStr, dateISO) => {
   return timeStr || '';
 };
 
+/** Normalizes invoice number into compact MS-XXXXX format. */
 const formatInvoiceNo = (sale) => {
   if (!sale) return 'MS-10001';
   const num = typeof sale === 'string' ? sale : sale.saleNo || sale.sale_no || sale.id;
@@ -81,13 +101,63 @@ const formatInvoiceNo = (sale) => {
   return `MS-${cleanHex || '10001'}`;
 };
 
+/** Computes per-line net total after percentage discount. */
+const calcLineNetTotal = (item) => {
+  const q = Math.max(1, parseInt(item?.qty, 10) || 1);
+  const p = Math.max(0, parseFloat(item?.unitPrice) || 0);
+  const discPercent = Math.min(100, Math.max(0, parseFloat(item?.discount) || 0));
+  const gross = q * p;
+  return Math.max(0, gross - (gross * discPercent) / 100);
+};
+
+const getPaymentChipColor = (status) => {
+  if (status === 'Paid') return 'success';
+  if (status === 'Partial') return 'warning';
+  return 'error';
+};
+
+const sectionEyebrowSx = {
+  display: 'block',
+  mb: 1.5,
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'primary.main'
+};
+
+const fieldLabelSx = {
+  display: 'block',
+  mb: 0.75,
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  color: 'text.primary'
+};
+
+const tableHeadCellSx = getTableHeadCellSx();
+
+const inlineActionBtnSx = {
+  border: 0,
+  background: 'none',
+  px: 0.75,
+  py: 0.35,
+  borderRadius: 1,
+  cursor: 'pointer',
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  transition: 'background-color 0.15s ease'
+};
+
 export default function MachineSalesPage() {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
   const { canDelete, canEditPrice } = usePermission();
   const {
     machineSales = [],
+    machineRepairs = [],
     machineModels = [],
+    machineCustomers = [],
+    customerPayments = [],
     addMachineModel,
     addMachineSale,
     updateMachineSale,
@@ -95,112 +165,95 @@ export default function MachineSalesPage() {
     deleteMultipleMachineSales
   } = useStoreInventory();
 
+  const customerSuggestions = getCustomerDirectorySuggestions({
+    machineCustomers,
+    machineSales,
+    machineRepairs
+  });
+
+  const customerLedgers = buildCustomerLedgers({
+    machineCustomers,
+    machineSales,
+    machineRepairs,
+    customerPayments
+  });
+
+  const allocationMap = resolveAllocatedInvoiceMap({
+    machineCustomers,
+    machineSales,
+    machineRepairs,
+    customerPayments
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState([]);
-
-  // Pagination State
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
+  // Add model dialog state
+  const [newModelDialogOpen, setNewModelDialogOpen] = useState(false);
+  const [newModelNameInput, setNewModelNameInput] = useState('');
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  // Form state
+  const [form, setForm] = useState(() => createInitialFormState());
+  const [customerNameError, setCustomerNameError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const matchedCustomerLedger = customerLedgers.find(
+    (c) => c.customerName.toLowerCase() === (form.customerName || '').trim().toLowerCase()
+  );
+
+  // Drawer & dialog states
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printData, setPrintData] = useState(null);
+
+  const customerInputRef = useRef(null);
 
   useEffect(() => {
     setPage(0);
   }, [searchTerm, statusFilter]);
 
-  // New Machine Model Dialog State
-  const [newModelDialogOpen, setNewModelDialogOpen] = useState(false);
-  const [newModelNameInput, setNewModelNameInput] = useState('');
-
-  // Form State with Multi-Item Array Support
-  const [form, setForm] = useState({
-    customerName: '',
-    customerPhone: '',
-    cityAddress: '',
-    items: [
-      {
-        machineName: '',
-        serialNo: '',
-        qty: 1,
-        unitPrice: 0,
-        discount: 0
-      }
-    ],
-    discountAmount: 0,
-    paidAmount: 0,
-    warrantyTerms: '1 Year Motor & Frame Free Service Warranty'
-  });
-
-  // Edit Drawer Form State
-  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
-  const [editingSale, setEditingSale] = useState(null);
-
-  // Delete Dialog State
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [saleToDelete, setSaleToDelete] = useState(null);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-
-  // Print Invoice Modal State
-  const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [printData, setPrintData] = useState(null);
-
-  // Filtered Sales List
   const filteredSales = machineSales.filter((item) => {
+    const q = searchTerm.trim().toLowerCase();
     const matchesSearch =
-      (item.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.machineName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.cityAddress || '').toLowerCase().includes(searchTerm.toLowerCase());
+      !q ||
+      (item.customerName || '').toLowerCase().includes(q) ||
+      (item.customerPhone || '').toLowerCase().includes(q) ||
+      (item.machineName || '').toLowerCase().includes(q) ||
+      (item.serialNo || '').toLowerCase().includes(q) ||
+      (item.saleNo || '').toLowerCase().includes(q) ||
+      (item.id || '').toLowerCase().includes(q) ||
+      (item.cityAddress || '').toLowerCase().includes(q);
 
     const matchesStatus = statusFilter === 'ALL' || item.paymentStatus === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
-  // Calculations for Form
-  const subTotalVal = form.items.reduce((sum, i) => {
-    const q = parseInt(i.qty) || 1;
-    const p = parseFloat(i.unitPrice) || 0;
-    const discPercent = parseFloat(i.discount) || 0;
-    const gross = q * p;
-    const discAmount = (gross * discPercent) / 100;
-    return sum + Math.max(0, gross - discAmount);
-  }, 0);
-
-  const paidVal = parseFloat(form.paidAmount) || 0;
+  // Invoice totals
+  const subTotalVal = form.items.reduce((sum, item) => sum + calcLineNetTotal(item), 0);
+  const paidVal = Math.max(0, parseFloat(form.paidAmount) || 0);
   const balanceVal = Math.max(0, subTotalVal - paidVal);
 
-  // New Model Handler
   const handleAddNewModelSubmit = (e) => {
     if (e) e.preventDefault();
-    if (!newModelNameInput.trim()) return;
-    addMachineModel(newModelNameInput.trim());
+    const trimmed = newModelNameInput.trim();
+    if (!trimmed) return;
+    addMachineModel(trimmed);
     setNewModelNameInput('');
     setNewModelDialogOpen(false);
   };
 
-  // Multi-Item Handlers
+  // Multi-item handlers
   const handleAddItemRow = () => {
     setForm((prev) => ({
       ...prev,
-      items: [
-        ...prev.items,
-        {
-          machineName: '',
-          serialNo: '',
-          qty: 1,
-          unitPrice: 0,
-          discount: 0
-        }
-      ]
+      items: [...prev.items, createEmptySaleItem()]
     }));
   };
 
@@ -220,7 +273,7 @@ export default function MachineSalesPage() {
     });
   };
 
-  // Checkbox Selection
+  // Checkbox selection
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
       setSelected(filteredSales.map((n) => n.id));
@@ -231,63 +284,64 @@ export default function MachineSalesPage() {
 
   const handleSelectOne = (event, id) => {
     event.stopPropagation();
-    const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-    }
-    setSelected(newSelected);
+    setSelected((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const isSelected = (id) => selected.indexOf(id) !== -1;
+  const handleSelectCustomerName = (selectedName) => {
+    const trimmed = (selectedName || '').trim();
+    const match = customerSuggestions.find((c) => c.name.toLowerCase() === trimmed.toLowerCase());
+    if (customerNameError) setCustomerNameError('');
+    setForm((prev) => ({
+      ...prev,
+      customerName: selectedName || '',
+      customerPhone: match?.phone && !prev.customerPhone ? match.phone : prev.customerPhone,
+      cityAddress: match?.city && !prev.cityAddress ? match.city : prev.cityAddress
+    }));
+  };
 
-  // Submit New Sale Handler
-  const handleCreateSale = async (e) => {
-    if (e) e.preventDefault();
+  const handleClearForm = () => {
+    setCustomerNameError('');
+    setForm(createInitialFormState());
+  };
+
+  const submitSale = async (shouldPrint = false) => {
+    if (isSubmitting) return;
     if (!form.customerName.trim()) {
-      alert('Please enter Customer Name');
+      setCustomerNameError('Customer name is required');
+      customerInputRef.current?.focus();
       return;
     }
 
-    const created = await addMachineSale({
-      customerName: form.customerName,
-      customerPhone: form.customerPhone,
-      cityAddress: form.cityAddress,
-      items: form.items,
-      paidAmount: paidVal,
-      warrantyTerms: form.warrantyTerms
-    });
+    setCustomerNameError('');
+    setIsSubmitting(true);
 
-    setPrintData(created);
-    setPrintModalOpen(true);
+    try {
+      const created = await addMachineSale({
+        customerName: form.customerName.trim(),
+        customerPhone: form.customerPhone.trim(),
+        cityAddress: form.cityAddress.trim(),
+        items: form.items,
+        paidAmount: paidVal,
+        warrantyTerms: form.warrantyTerms
+      });
 
-    // Reset Form
-    setForm({
-      customerName: '',
-      customerPhone: '',
-      cityAddress: '',
-      items: [
-        {
-          machineName: '',
-          serialNo: '',
-          qty: 1,
-          unitPrice: 0,
-          discount: 0
-        }
-      ],
-      paidAmount: 0,
-      warrantyTerms: '1 Year Motor & Frame Free Service Warranty'
-    });
+      if (shouldPrint) {
+        setPrintData(created);
+        setPrintModalOpen(true);
+      }
+
+      setForm(createInitialFormState());
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Open Edit Drawer
+  const handleCreateSale = (e) => {
+    e.preventDefault();
+    submitSale(false);
+  };
+
+  // Edit drawer handlers
   const handleOpenEdit = (sale) => {
     const itemsArray =
       sale.items && sale.items.length > 0
@@ -297,7 +351,8 @@ export default function MachineSalesPage() {
               machineName: sale.machineName,
               serialNo: sale.serialNo,
               qty: sale.qty,
-              unitPrice: sale.unitPrice
+              unitPrice: sale.unitPrice,
+              discount: sale.discount || 0
             }
           ];
 
@@ -309,49 +364,42 @@ export default function MachineSalesPage() {
     e.preventDefault();
     if (!editingSale) return;
 
-    const itemsList =
+    const sourceItems =
       editingSale.items && editingSale.items.length > 0
-        ? editingSale.items.map((i) => {
-            const q = parseInt(i.qty) || 1;
-            const p = parseFloat(i.unitPrice) || 0;
-            const discPercent = parseFloat(i.discount) || 0;
-            const gross = q * p;
-            const discAmount = (gross * discPercent) / 100;
-            const lineTotal = Math.max(0, gross - discAmount);
-            return {
-              machineName: i.machineName || 'Machine',
-              serialNo: i.serialNo || '',
-              qty: q,
-              unitPrice: p,
-              discount: discPercent,
-              discountAmount: discAmount,
-              lineTotal
-            };
-          })
+        ? editingSale.items
         : [
             {
               machineName: editingSale.machineName,
               serialNo: editingSale.serialNo,
-              qty: parseInt(editingSale.qty) || 1,
-              unitPrice: parseFloat(editingSale.unitPrice) || 0,
-              discount: parseFloat(editingSale.discount) || 0,
-              discountAmount:
-                ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) * (parseFloat(editingSale.discount) || 0)) /
-                100,
-              lineTotal: Math.max(
-                0,
-                (parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) -
-                  ((parseInt(editingSale.qty) || 1) * (parseFloat(editingSale.unitPrice) || 0) * (parseFloat(editingSale.discount) || 0)) /
-                    100
-              )
+              qty: editingSale.qty,
+              unitPrice: editingSale.unitPrice,
+              discount: editingSale.discount || 0
             }
           ];
+
+    const itemsList = sourceItems.map((i) => {
+      const q = Math.max(1, parseInt(i.qty, 10) || 1);
+      const p = Math.max(0, parseFloat(i.unitPrice) || 0);
+      const discPercent = Math.min(100, Math.max(0, parseFloat(i.discount) || 0));
+      const gross = q * p;
+      const discAmount = (gross * discPercent) / 100;
+      const lineTotal = Math.max(0, gross - discAmount);
+      return {
+        machineName: i.machineName || 'Machine',
+        serialNo: i.serialNo || '',
+        qty: q,
+        unitPrice: p,
+        discount: discPercent,
+        discountAmount: discAmount,
+        lineTotal
+      };
+    });
 
     const subTotal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
     const discSum = itemsList.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
     const total = subTotal;
     const totalQtySum = itemsList.reduce((sum, i) => sum + i.qty, 0);
-    const paid = parseFloat(editingSale.paidAmount) || 0;
+    const paid = Math.max(0, parseFloat(editingSale.paidAmount) || 0);
     const bal = Math.max(0, total - paid);
     const status = paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
     const firstMachine = itemsList[0] || {};
@@ -361,7 +409,7 @@ export default function MachineSalesPage() {
       customerPhone: editingSale.customerPhone,
       cityAddress: editingSale.cityAddress,
       items: itemsList,
-      machineName: itemsList.length > 1 ? `${firstMachine.machineName} (+${itemsList.length - 1} more)` : firstMachine.machineName,
+      machineName: formatItemsSummaryLabel(itemsList, 'Machine'),
       serialNo: firstMachine.serialNo,
       qty: totalQtySum,
       unitPrice: firstMachine.unitPrice,
@@ -389,24 +437,17 @@ export default function MachineSalesPage() {
   const handleAddEditItemRow = () => {
     setEditingSale((prev) => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        items: [...(prev.items || []), { machineName: '', serialNo: '', qty: 1, unitPrice: 0, discount: 0 }]
-      };
+      return { ...prev, items: [...(prev.items || []), createEmptySaleItem()] };
     });
   };
 
   const handleRemoveEditItemRow = (index) => {
     setEditingSale((prev) => {
       if (!prev || (prev.items || []).length <= 1) return prev;
-      return {
-        ...prev,
-        items: prev.items.filter((_, idx) => idx !== index)
-      };
+      return { ...prev, items: prev.items.filter((_, idx) => idx !== index) };
     });
   };
 
-  // Delete Handlers
   const handleConfirmDelete = () => {
     if (saleToDelete) {
       deleteMachineSale(saleToDelete.id);
@@ -424,450 +465,554 @@ export default function MachineSalesPage() {
     }
   };
 
-  // Open Print Modal for Row
   const handleOpenPrint = (sale) => {
     setPrintData(sale);
     setPrintModalOpen(true);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const primaryTone = getToneColors(theme, 'primary');
+  const errorTone = getToneColors(theme, 'error');
+  const successTone = getToneColors(theme, 'success');
+
+  const machineCountLabel = `${form.items.length} ${form.items.length === 1 ? 'machine' : 'machines'}`;
+  const itemHeaderCountLabel = `${form.items.length} ${form.items.length === 1 ? 'ITEM' : 'ITEMS'}`;
 
   return (
-    <Stack spacing={3}>
-      {/* 1. TOP SECTION: Record Machine Sale Card */}
-      <MainCard
-        title="Record Customer Machine Sale (Invoice Generator)"
-        secondary={
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<PlusOutlined />}
-            onClick={() => setNewModelDialogOpen(true)}
-            sx={{ fontWeight: 700 }}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <PageHeader
+        title="Machine Sales"
+        count={machineSales.length}
+        countLabel="Invoices"
+        subtitle="Create customer machine sale bills, record serial numbers, and manage payment settlements."
+        sx={{ mb: 0 }}
+      />
+
+      {/* 1. NEW MACHINE SALE (INVOICE) CARD */}
+      <MainCard content={false} sx={getCardSurfaceSx(theme)}>
+        <Box
+          sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5
+          }}
+        >
+          <Typography variant="h5" fontWeight={700} color="text.primary">
+            New Machine Sale (Invoice)
+          </Typography>
+          <AppButton intent="secondary" size="small" startIcon={<PlusOutlined />} onClick={() => setNewModelDialogOpen(true)}>
+            Add new machine model
+          </AppButton>
+        </Box>
+
+        <Box component="form" onSubmit={handleCreateSale} sx={{ p: { xs: 2, sm: 3 } }}>
+          {/* 1. CUSTOMER DETAILS */}
+          <Typography component="span" sx={sectionEyebrowSx}>
+            1. Customer Details
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gap: 2
+            }}
           >
-            Add New Machine Model
-          </Button>
-        }
-        sx={{
-          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
-          borderRadius: 2
-        }}
-      >
-        <form onSubmit={handleCreateSale}>
-          <Grid container spacing={2.5} alignItems="center">
-            {/* ROW 1: Customer Details */}
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TextField
-                label="CUSTOMER NAME *"
-                fullWidth
-                required
-                placeholder="e.g. Asim Ameer"
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75, gap: 1 }}>
+                <Typography component="label" htmlFor="sale-customer-name" sx={{ ...fieldLabelSx, mb: 0 }}>
+                  Customer name{' '}
+                  <Box component="span" sx={{ color: 'error.main' }}>
+                    *
+                  </Box>
+                </Typography>
+                {matchedCustomerLedger && matchedCustomerLedger.balanceVal > 0 && (
+                  <Chip
+                    label={`Balance Due: ${formatPKR(matchedCustomerLedger.balanceVal)}`}
+                    size="small"
+                    color="warning"
+                    variant="light"
+                    sx={{ height: 22, fontSize: '0.75rem', fontWeight: 700 }}
+                  />
+                )}
+              </Box>
+              <Autocomplete
+                freeSolo
+                size="small"
+                options={customerSuggestions.map((c) => c.name)}
                 value={form.customerName}
-                onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+                onChange={(e, val) => handleSelectCustomerName(val || '')}
+                onInputChange={(e, val) => handleSelectCustomerName(val || '')}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    id="sale-customer-name"
+                    inputRef={customerInputRef}
+                    placeholder="Full name or pick registered party..."
+                    error={Boolean(customerNameError)}
+                    helperText={customerNameError}
+                  />
+                )}
               />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
+            </Box>
+
+            <Box>
+              <Typography component="label" htmlFor="sale-customer-phone" sx={fieldLabelSx}>
+                Phone no
+              </Typography>
               <TextField
-                label="CUSTOMER PHONE NO"
+                id="sale-customer-phone"
                 fullWidth
-                placeholder="e.g. +92 300 1234567"
+                size="small"
+                placeholder="0300-1234567"
                 value={form.customerPhone}
                 onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
               />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
+            </Box>
+
+            <Box>
+              <Typography component="label" htmlFor="sale-city-address" sx={fieldLabelSx}>
+                City / Address
+              </Typography>
               <TextField
-                label="CITY / ADDRESS"
+                id="sale-city-address"
                 fullWidth
-                placeholder="e.g. Lahore / Faisalabad"
+                size="small"
+                placeholder="City"
                 value={form.cityAddress}
                 onChange={(e) => setForm({ ...form, cityAddress: e.target.value })}
               />
-            </Grid>
+            </Box>
+          </Box>
 
-            {/* ROW 2: Multi-Item Machine Rows Section */}
-            <Grid size={{ xs: 12 }}>
-              <Box
-                sx={{
-                  p: 2,
-                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'),
-                  borderRadius: 1.5,
-                  border: '1px solid',
-                  borderColor: (theme) => (theme.palette.mode === 'dark' ? '#1e293b' : '#e2e8f0')
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, color: 'primary.main' }}>
-                  Machines Purchased ({form.items.length} Items)
-                </Typography>
+          <Divider sx={{ my: 2.5 }} />
 
-                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, bgcolor: 'background.paper', mb: 1 }}>
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
-                      <TableRow>
-                        <TableCell style={{ width: '32%' }}>
-                          <strong>MACHINE MODEL*</strong>
-                        </TableCell>
-                        <TableCell style={{ width: '18%' }}>
-                          <strong>SERIAL NO</strong>
-                        </TableCell>
-                        <TableCell align="center" style={{ width: '8%' }}>
-                          <strong>QTY *</strong>
-                        </TableCell>
-                        <TableCell align="right" style={{ width: '14%' }}>
-                          <strong>RATE *</strong>
-                        </TableCell>
-                        <TableCell align="right" style={{ width: '12%' }}>
-                          <strong>DISC (%)</strong>
-                        </TableCell>
-                        <TableCell align="right" style={{ width: '12%' }}>
-                          <strong>TOTAL</strong>
-                        </TableCell>
-                        <TableCell align="center" style={{ width: '4%' }}></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {form.items.map((rowItem, idx) => {
-                        const rowGross = (parseInt(rowItem.qty) || 1) * (parseFloat(rowItem.unitPrice) || 0);
-                        const rowDiscPercent = parseFloat(rowItem.discount) || 0;
-                        const rowDiscAmount = (rowGross * rowDiscPercent) / 100;
-                        const rowLineTotal = Math.max(0, rowGross - rowDiscAmount);
+          {/* 2. MACHINES PURCHASED */}
+          <Typography component="span" sx={sectionEyebrowSx}>
+            2. Machines Purchased ({itemHeaderCountLabel})
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.25fr) minmax(270px, 1fr)' },
+              gap: 3,
+              alignItems: 'start'
+            }}
+          >
+            {/* Left Side: Machine Rows + Warranty */}
+            <Box sx={{ minWidth: 0 }}>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box sx={{ minWidth: 640 }}>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '28px minmax(180px, 1.4fr) minmax(115px, 0.9fr) 64px 100px 76px 84px 28px',
+                      gap: 1.25,
+                      pb: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider'
+                    }}
+                  >
+                    <Typography sx={tableHeadCellSx}>SR</Typography>
+                    <Typography sx={tableHeadCellSx}>
+                      Machine Model{' '}
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        *
+                      </Box>
+                    </Typography>
+                    <Typography sx={tableHeadCellSx}>Serial No</Typography>
+                    <Typography sx={{ ...tableHeadCellSx, textAlign: 'center' }}>
+                      QTY{' '}
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        *
+                      </Box>
+                    </Typography>
+                    <Typography sx={{ ...tableHeadCellSx, textAlign: 'right' }}>
+                      Rate (Rs.){' '}
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        *
+                      </Box>
+                    </Typography>
+                    <Typography sx={{ ...tableHeadCellSx, textAlign: 'right' }}>Disc (%)</Typography>
+                    <Typography sx={{ ...tableHeadCellSx, textAlign: 'right' }}>Total</Typography>
+                    <Box />
+                  </Box>
 
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell>
-                              <Autocomplete
-                                freeSolo
-                                options={machineModels}
-                                value={rowItem.machineName}
-                                onChange={(event, newValue) => handleItemRowChange(idx, 'machineName', newValue || '')}
-                                onInputChange={(event, newInputValue) => handleItemRowChange(idx, 'machineName', newInputValue || '')}
-                                renderInput={(params) => <TextField {...params} placeholder="Select Model..." size="small" required />}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                fullWidth
-                                placeholder="RLM-2026-904"
-                                value={rowItem.serialNo}
-                                onChange={(e) => handleItemRowChange(idx, 'serialNo', e.target.value)}
-                              />
-                            </TableCell>
-                            <TableCell align="center">
-                              <TextField
-                                type="number"
-                                size="small"
-                                fullWidth
-                                required
-                                inputProps={{ min: 1, style: { textAlign: 'center' } }}
-                                value={rowItem.qty}
-                                onChange={(e) => handleItemRowChange(idx, 'qty', parseInt(e.target.value) || 1)}
-                              />
-                            </TableCell>
-                            <TableCell align="right">
-                              <TextField
-                                type="number"
-                                size="small"
-                                fullWidth
-                                required
-                                disabled={!canEditPrice}
-                                inputProps={{ min: 0, style: { textAlign: 'right' } }}
-                                value={rowItem.unitPrice}
-                                onChange={(e) => handleItemRowChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                              />
-                            </TableCell>
-                            <TableCell align="right">
-                              <TextField
-                                type="number"
-                                size="small"
-                                fullWidth
-                                inputProps={{ min: 0, max: 100, style: { textAlign: 'right' } }}
-                                InputProps={{
-                                  endAdornment: <InputAdornment position="end">%</InputAdornment>
-                                }}
-                                placeholder="0"
-                                value={rowItem.discount || ''}
-                                onChange={(e) => handleItemRowChange(idx, 'discount', parseFloat(e.target.value) || 0)}
-                              />
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                                Rs. {rowLineTotal.toLocaleString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              {form.items.length > 1 && (
-                                <IconButton color="error" size="small" onClick={() => handleRemoveItemRow(idx)}>
-                                  <DeleteOutlined />
-                                </IconButton>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                  {form.items.map((rowItem, idx) => {
+                    const rowLineTotal = calcLineNetTotal(rowItem);
+                    return (
+                      <Box
+                        key={idx}
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: '28px minmax(180px, 1.4fr) minmax(115px, 0.9fr) 64px 100px 76px 84px 28px',
+                          gap: 1.25,
+                          alignItems: 'center',
+                          py: 1.1,
+                          borderBottom: '1px solid',
+                          borderColor: 'divider'
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary" fontWeight={600} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {String(idx + 1).padStart(2, '0')}
+                        </Typography>
 
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<PlusOutlined />}
-                  onClick={handleAddItemRow}
-                  sx={{ mt: 1, fontWeight: 700 }}
-                >
-                  Add Another Machine to Bill
-                </Button>
+                        <Autocomplete
+                          freeSolo
+                          size="small"
+                          options={machineModels}
+                          value={rowItem.machineName}
+                          onChange={(event, newValue) => handleItemRowChange(idx, 'machineName', newValue || '')}
+                          onInputChange={(event, newInputValue) => handleItemRowChange(idx, 'machineName', newInputValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="Select model..." required />}
+                        />
+
+                        <TextField
+                          size="small"
+                          placeholder="RLM-2026-904"
+                          value={rowItem.serialNo}
+                          onChange={(e) => handleItemRowChange(idx, 'serialNo', e.target.value)}
+                        />
+
+                        <TextField
+                          type="number"
+                          size="small"
+                          required
+                          inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                          value={rowItem.qty}
+                          onChange={(e) => handleItemRowChange(idx, 'qty', parseInt(e.target.value, 10) || 1)}
+                        />
+
+                        <TextField
+                          type="number"
+                          size="small"
+                          required
+                          disabled={!canEditPrice}
+                          inputProps={{ min: 0, style: { textAlign: 'right' } }}
+                          value={rowItem.unitPrice}
+                          onChange={(e) => handleItemRowChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                        />
+
+                        <TextField
+                          type="number"
+                          size="small"
+                          inputProps={{ min: 0, max: 100, style: { textAlign: 'right' } }}
+                          placeholder="0"
+                          value={rowItem.discount ?? 0}
+                          onChange={(e) => handleItemRowChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                        />
+
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={700}
+                          color="text.primary"
+                          sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {formatPKR(rowLineTotal)}
+                        </Typography>
+
+                        {form.items.length > 1 ? (
+                          <Tooltip title="Remove machine">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleRemoveItemRow(idx)}
+                              sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                            >
+                              <DeleteOutlined style={{ fontSize: 13 }} />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Box />
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
-            </Grid>
 
-            {/* ROW 3: Financials & Balance Calculations */}
-            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-              <TextField
-                label="TOTAL INVOICE (RS.)"
-                fullWidth
-                value={`Rs. ${subTotalVal.toLocaleString()}`}
-                InputProps={{
-                  readOnly: true,
-                  style: { fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }
-                }}
+              <Box sx={{ mt: 1.75 }}>
+                <AppButton intent="secondary" size="small" startIcon={<PlusOutlined />} onClick={handleAddItemRow}>
+                  Add another machine to bill
+                </AppButton>
+              </Box>
+
+              <Box sx={{ mt: 2.25 }}>
+                <Typography component="label" htmlFor="sale-warranty-terms" sx={fieldLabelSx}>
+                  Warranty & terms note
+                </Typography>
+                <TextField
+                  id="sale-warranty-terms"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  size="small"
+                  placeholder={DEFAULT_WARRANTY_TERMS}
+                  value={form.warrantyTerms}
+                  onChange={(e) => setForm({ ...form, warrantyTerms: e.target.value })}
+                />
+              </Box>
+            </Box>
+
+            {/* Right Side: Summary Box */}
+            <Box sx={getSubSurfaceSx(theme, { p: 2.25, borderRadius: 2 })}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.75 }}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                  Total invoice
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {formatPKR(subTotalVal)}
+                </Typography>
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" htmlFor="sale-paid-amount" sx={fieldLabelSx}>
+                  Paid amount (Rs.)
+                </Typography>
+                <TextField
+                  id="sale-paid-amount"
+                  type="number"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0 }}
+                  value={form.paidAmount}
+                  onChange={(e) => setForm({ ...form, paidAmount: parseFloat(e.target.value) || 0 })}
+                />
+              </Box>
+
+              <Divider sx={{ mb: 1.75 }} />
+
+              <Typography
                 sx={{
-                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'),
-                  borderRadius: 1
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-              <TextField
-                label="PAID AMOUNT (RS.)"
-                type="number"
-                fullWidth
-                inputProps={{ min: 0 }}
-                value={form.paidAmount}
-                onChange={(e) => setForm({ ...form, paidAmount: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-              <TextField
-                label="REMAINING BALANCE"
-                fullWidth
-                value={`Rs. ${balanceVal.toLocaleString()}`}
-                InputProps={{
-                  readOnly: true,
-                  style: { fontWeight: 800, color: balanceVal > 0 ? '#ef4444' : '#10b981', fontSize: '1.05rem' }
-                }}
-                sx={{
-                  bgcolor:
-                    balanceVal > 0
-                      ? (theme) => (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2')
-                      : (theme) => (theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5'),
-                  borderRadius: 1
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 12, md: 3 }}>
-              <Button
-                variant="contained"
-                type="submit"
-                fullWidth
-                startIcon={<FileTextOutlined />}
-                sx={{
-                  height: '41.38px',
-                  bgcolor: '#52c41a',
-                  '&:hover': { bgcolor: '#389e0d' },
-                  fontSize: '0.9rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
-                  boxShadow: '0 4px 14px rgba(82, 196, 26, 0.3)'
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  color: 'text.secondary',
+                  mb: 0.25
                 }}
               >
-                Generate Bill ({form.items.length} Machines) & Save
-              </Button>
-            </Grid>
+                Remaining Balance
+              </Typography>
+              <Typography
+                variant="h4"
+                fontWeight={700}
+                sx={{
+                  fontVariantNumeric: 'tabular-nums',
+                  color: balanceVal > 0 ? errorTone.main : successTone.main
+                }}
+              >
+                {formatPKR(balanceVal)}
+              </Typography>
+            </Box>
+          </Box>
 
-            {/* ROW 4: Warranty Terms Note */}
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="WARRANTY & TERMS NOTE"
-                fullWidth
-                placeholder="e.g. 1 Year Motor & Frame Free Service Warranty"
-                value={form.warrantyTerms}
-                onChange={(e) => setForm({ ...form, warrantyTerms: e.target.value })}
-              />
-            </Grid>
-          </Grid>
-        </form>
+          {/* Form Footer Actions */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end',
+              gap: 1.25,
+              mt: 3,
+              pt: 2.5,
+              borderTop: '1px solid',
+              borderColor: 'divider'
+            }}
+          >
+            <AppButton intent="cancel" onClick={handleClearForm} disabled={isSubmitting}>
+              Clear form
+            </AppButton>
+            <AppButton intent="secondary" startIcon={<PrinterOutlined />} onClick={() => submitSale(true)} disabled={isSubmitting}>
+              Save & print bill
+            </AppButton>
+            <AppButton intent="primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : `Generate bill (${machineCountLabel})`}
+            </AppButton>
+          </Box>
+        </Box>
       </MainCard>
 
-      {/* 2. BOTTOM SECTION: Machine Sales History Logs Table Card */}
-      <MainCard
-        title="Machine Sales & Billing History Logs"
-        secondary={
-          selected.length > 0 &&
-          canDelete && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteOutlined />}
-              onClick={() => setBulkDeleteDialogOpen(true)}
-              size="small"
-              sx={{ fontWeight: 700 }}
-            >
-              Delete Selected ({selected.length})
-            </Button>
-          )
-        }
-      >
-        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+      {/* 2. MACHINE SALES & BILLING HISTORY */}
+      <MainCard content={false} sx={getCardSurfaceSx(theme, { overflow: 'hidden' })}>
+        <Box sx={{ p: { xs: 2, sm: 2.5 }, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 2,
+              mb: 2
+            }}
+          >
+            <Typography variant="h5" fontWeight={700} color="text.primary">
+              Machine Sales & Billing History
+            </Typography>
+
+            {selected.length > 0 && canDelete && (
+              <AppButton intent="danger-outlined" size="small" startIcon={<DeleteOutlined />} onClick={() => setBulkDeleteDialogOpen(true)}>
+                Delete selected ({selected.length})
+              </AppButton>
+            )}
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 2
+            }}
+          >
             <OutlinedInput
+              size="small"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by Customer, Phone, Machine Model, City..."
+              placeholder="Search by customer, phone, machine model, city..."
               startAdornment={
                 <InputAdornment position="start">
-                  <SearchOutlined />
+                  <SearchOutlined style={{ color: theme.palette.text.secondary }} />
                 </InputAdornment>
               }
-              sx={{ height: '42px', width: '100%' }}
+              sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 } }}
             />
-          </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <TextField
               select
-              fullWidth
-              label="Filter by Status"
+              size="small"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  height: '42px',
-                  minHeight: '42px'
-                }
-              }}
+              sx={{ width: { xs: '100%', sm: 210 } }}
             >
-              <MenuItem value="ALL">All Payment Statuses</MenuItem>
+              <MenuItem value="ALL">All payment statuses</MenuItem>
               <MenuItem value="Paid">Paid</MenuItem>
               <MenuItem value="Partial">Partial</MenuItem>
               <MenuItem value="Unpaid">Unpaid</MenuItem>
             </TextField>
-          </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }} sx={{ textAlign: 'right' }}>
-            <Typography variant="caption" color="textSecondary">
-              Showing <strong>{filteredSales.length}</strong> Machine Sales Log Records
+            <Typography variant="body2" color="text.secondary" sx={{ ml: { md: 'auto' } }}>
+              Showing <strong>{filteredSales.length}</strong> sales {filteredSales.length === 1 ? 'record' : 'records'}
             </Typography>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/* Mobile View Cards */}
-        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+        <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2 }}>
           {filteredSales.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body2" color="textSecondary">
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
                 No Machine Sales records found.
               </Typography>
-            </Paper>
+            </Box>
           ) : (
-            <Stack spacing={2}>
-              {filteredSales.map((sale) => {
-                const isItemSel = isSelected(sale.id);
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {filteredSales.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((sale) => {
+                const isItemSel = selected.includes(sale.id);
+                const fin = allocationMap.get(`Sale:${sale.id}`) || resolveSaleFinancials(sale, customerPayments);
+                const statusLabel = fin.paymentStatus;
                 return (
-                  <Paper
+                  <Box
                     key={sale.id}
-                    variant="outlined"
                     sx={{
                       p: 2,
                       borderRadius: 2,
+                      border: '1px solid',
                       borderColor: isItemSel ? 'primary.main' : 'divider',
-                      bgcolor: isItemSel ? 'action.selected' : 'background.paper'
+                      bgcolor: isItemSel ? primaryTone.bg : 'background.paper',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1.5
                     }}
                   >
-                    <Stack spacing={1.5}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                          {sale.saleNo || sale.id}
-                        </Typography>
-                        <Chip
-                          label={sale.paymentStatus || 'Paid'}
-                          color={sale.paymentStatus === 'Paid' ? 'success' : sale.paymentStatus === 'Partial' ? 'warning' : 'error'}
-                          size="small"
-                          sx={{ fontWeight: 700 }}
-                        />
-                      </Stack>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                        {formatInvoiceNo(sale)}
+                      </Typography>
+                      <Chip
+                        label={statusLabel}
+                        color={getPaymentChipColor(statusLabel)}
+                        variant="light"
+                        size="small"
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Box>
 
-                      <Box>
-                        <Typography variant="h6" fontWeight={800}>
-                          {sale.customerName}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {sale.customerPhone ? `${sale.customerPhone} | ` : ''}
-                          {sale.cityAddress || 'Local'}
-                        </Typography>
-                      </Box>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                        {sale.customerName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {sale.customerPhone ? `${sale.customerPhone} • ` : ''}
+                        {sale.cityAddress || 'Lahore'}
+                      </Typography>
+                    </Box>
 
-                      <Box sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 1.5 }}>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          {sale.machineName}
+                    <Box sx={getSubSurfaceSx(theme, { p: 1.5, borderRadius: 1.5 })}>
+                      <Typography variant="subtitle2" fontWeight={600} color="text.primary">
+                        {sale.machineName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Qty: {sale.qty || 1} {sale.serialNo ? `• S/N: ${sale.serialNo}` : ''}
+                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Bill: <strong>{formatPKR(fin.billTotal)}</strong>
                         </Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          Qty: {sale.qty || 1} {sale.serialNo ? `| S/N: ${sale.serialNo}` : ''}
-                        </Typography>
-                        <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
-                          <Typography variant="caption">
-                            Bill: <strong>Rs. {(sale.lineTotal || sale.subTotal || 0).toLocaleString()}</strong>
-                          </Typography>
-                          <Typography variant="caption" color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'} fontWeight={700}>
-                            Bal: Rs. {(sale.balanceAmount || 0).toLocaleString()}
-                          </Typography>
-                        </Stack>
-                      </Box>
-
-                      <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" sx={{ pt: 0.5 }}>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          size="small"
-                          startIcon={<PrinterOutlined />}
-                          onClick={() => handleOpenPrint(sale)}
-                          sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{ color: fin.balanceAmount > 0 ? errorTone.main : successTone.main }}
                         >
-                          Print Bill
-                        </Button>
-                        <IconButton color="primary" size="small" onClick={() => handleOpenEdit(sale)}>
-                          <EditOutlined />
+                          Bal: {formatPKR(fin.balanceAmount)}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+                      <AppButton intent="secondary" size="small" startIcon={<PrinterOutlined />} onClick={() => handleOpenPrint(sale)}>
+                        Print
+                      </AppButton>
+                      <IconButton size="small" color="primary" onClick={() => handleOpenEdit(sale)}>
+                        <EditOutlined />
+                      </IconButton>
+                      {canDelete && (
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            setSaleToDelete(sale);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <DeleteOutlined />
                         </IconButton>
-                        {canDelete && (
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {
-                              setSaleToDelete(sale);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <DeleteOutlined />
-                          </IconButton>
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Paper>
+                      )}
+                    </Box>
+                  </Box>
                 );
               })}
-            </Stack>
+            </Box>
           )}
         </Box>
 
         {/* Desktop Table View */}
         <Box sx={{ display: { xs: 'none', md: 'block' } }}>
           <TableContainer>
-            <Table sx={{ minWidth: 700 }}>
+            <Table sx={{ minWidth: 880 }}>
               <TableHead>
-                <TableRow>
+                <TableRow
+                  sx={{
+                    bgcolor: getSubSurfaceSx(theme).bgcolor,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider'
+                  }}
+                >
                   {canDelete && (
-                    <TableCell padding="checkbox">
+                    <TableCell padding="checkbox" sx={{ pl: 2.5 }}>
                       <Checkbox
                         color="primary"
                         indeterminate={selected.length > 0 && selected.length < filteredSales.length}
@@ -876,113 +1021,158 @@ export default function MachineSalesPage() {
                       />
                     </TableCell>
                   )}
-                  <TableCell>SALE NO / ID</TableCell>
-                  <TableCell>CUSTOMER &amp; CITY</TableCell>
-                  <TableCell>MACHINE MODEL &amp; QTY</TableCell>
-                  <TableCell align="right">TOTAL BILL</TableCell>
-                  <TableCell align="right">PAID</TableCell>
-                  <TableCell align="right">BALANCE</TableCell>
-                  <TableCell align="center">STATUS</TableCell>
-                  <TableCell align="right">DATE &amp; TIME</TableCell>
-                  <TableCell align="center">ACTIONS</TableCell>
+                  <TableCell sx={tableHeadCellSx}>Sale No</TableCell>
+                  <TableCell sx={tableHeadCellSx}>Customer</TableCell>
+                  <TableCell sx={tableHeadCellSx}>Machine & Qty</TableCell>
+                  <TableCell align="right" sx={tableHeadCellSx}>
+                    Total Bill
+                  </TableCell>
+                  <TableCell align="right" sx={tableHeadCellSx}>
+                    Paid
+                  </TableCell>
+                  <TableCell align="right" sx={tableHeadCellSx}>
+                    Balance
+                  </TableCell>
+                  <TableCell align="center" sx={tableHeadCellSx}>
+                    Status
+                  </TableCell>
+                  <TableCell sx={tableHeadCellSx}>Date & Time</TableCell>
+                  <TableCell align="center" sx={{ ...tableHeadCellSx, pr: 2.5 }}>
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredSales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body2" color="textSecondary">
+                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
+                      <Typography variant="body2" color="text.secondary" fontWeight={600}>
                         No Machine Sales records found.
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredSales.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((sale) => {
-                    const isItemSel = isSelected(sale.id);
+                    const isItemSel = selected.includes(sale.id);
+                    const fin = allocationMap.get(`Sale:${sale.id}`) || resolveSaleFinancials(sale, customerPayments);
+                    const statusLabel = fin.paymentStatus;
+                    const balanceNum = fin.balanceAmount;
+
                     return (
-                      <TableRow key={sale.id} hover selected={isItemSel} onClick={(e) => canDelete && handleSelectOne(e, sale.id)}>
+                      <TableRow
+                        key={sale.id}
+                        hover
+                        selected={isItemSel}
+                        onClick={(e) => canDelete && handleSelectOne(e, sale.id)}
+                        sx={{ cursor: canDelete ? 'pointer' : 'default', '& td': { py: 1.75 } }}
+                      >
                         {canDelete && (
-                          <TableCell padding="checkbox">
+                          <TableCell padding="checkbox" sx={{ pl: 2.5 }}>
                             <Checkbox color="primary" checked={isItemSel} onChange={(e) => handleSelectOne(e, sale.id)} />
                           </TableCell>
                         )}
                         <TableCell>
-                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                          <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                             {formatInvoiceNo(sale)}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="subtitle2" fontWeight={800}>
+                          <Typography variant="subtitle2" fontWeight={700} color="text.primary">
                             {sale.customerName}
                           </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {sale.customerPhone ? `${sale.customerPhone} | ` : ''}
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {sale.customerPhone ? `${sale.customerPhone} · ` : ''}
                             {sale.cityAddress || 'Lahore'}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="subtitle2" fontWeight={700}>
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
                             {sale.machineName}
                           </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            Qty: <strong>{sale.qty || 1}</strong> {sale.serialNo ? `| S/N: ${sale.serialNo}` : ''}
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Qty: {sale.qty || 1} {sale.serialNo ? `· S/N: ${sale.serialNo}` : ''}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="subtitle2" fontWeight={700} color="success.main">
-                            Rs. {(sale.lineTotal || sale.subTotal || 0).toLocaleString()}
+                          <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {formatPKR(fin.billTotal)}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2" fontWeight={600}>
-                            Rs. {(sale.paidAmount || 0).toLocaleString()}
+                          <Typography variant="body2" fontWeight={500} color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {formatPKR(fin.paidAmount)}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="subtitle2" fontWeight={800} color={sale.balanceAmount > 0 ? 'error.main' : 'success.main'}>
-                            Rs. {(sale.balanceAmount || 0).toLocaleString()}
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight={700}
+                            sx={{
+                              fontVariantNumeric: 'tabular-nums',
+                              color: balanceNum > 0 ? errorTone.main : successTone.main
+                            }}
+                          >
+                            {formatPKR(balanceNum)}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={sale.paymentStatus || 'Paid'}
-                            color={sale.paymentStatus === 'Paid' ? 'success' : sale.paymentStatus === 'Partial' ? 'warning' : 'error'}
+                            label={statusLabel}
+                            color={getPaymentChipColor(statusLabel)}
+                            variant="light"
                             size="small"
-                            sx={{ fontWeight: 700 }}
+                            sx={{ fontWeight: 700, fontSize: '0.75rem' }}
                           />
                         </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="caption" color="textSecondary">
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                             {formatFullDate(sale.time, sale.created_at || sale.dateISO)}
                           </Typography>
                         </TableCell>
-                        <TableCell align="center">
-                          <Stack direction="row" spacing={1} justifyContent="center">
-                            <Tooltip title="Print Machine Invoice">
-                              <IconButton color="info" size="small" onClick={() => handleOpenPrint(sale)}>
-                                <PrinterOutlined />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit Sale Record">
-                              <IconButton color="primary" size="small" onClick={() => handleOpenEdit(sale)}>
-                                <EditOutlined />
-                              </IconButton>
-                            </Tooltip>
+                        <TableCell align="center" sx={{ pr: 2.5 }} onClick={(e) => e.stopPropagation()}>
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            <Box
+                              component="button"
+                              type="button"
+                              onClick={() => handleOpenPrint(sale)}
+                              sx={{
+                                ...inlineActionBtnSx,
+                                color: primaryTone.main,
+                                '&:hover': { bgcolor: primaryTone.bg }
+                              }}
+                            >
+                              Print
+                            </Box>
+                            <Box
+                              component="button"
+                              type="button"
+                              onClick={() => handleOpenEdit(sale)}
+                              sx={{
+                                ...inlineActionBtnSx,
+                                color: primaryTone.main,
+                                '&:hover': { bgcolor: primaryTone.bg }
+                              }}
+                            >
+                              Edit
+                            </Box>
                             {canDelete && (
-                              <Tooltip title="Delete Sale Record">
-                                <IconButton
-                                  color="error"
-                                  size="small"
-                                  onClick={() => {
-                                    setSaleToDelete(sale);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <DeleteOutlined />
-                                </IconButton>
-                              </Tooltip>
+                              <Box
+                                component="button"
+                                type="button"
+                                onClick={() => {
+                                  setSaleToDelete(sale);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                sx={{
+                                  ...inlineActionBtnSx,
+                                  color: errorTone.main,
+                                  '&:hover': { bgcolor: errorTone.bg }
+                                }}
+                              >
+                                Delete
+                              </Box>
                             )}
-                          </Stack>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -991,31 +1181,33 @@ export default function MachineSalesPage() {
               </TableBody>
             </Table>
           </TableContainer>
-
-          <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            component="div"
-            count={filteredSales.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
         </Box>
+
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredSales.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(event, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+        />
       </MainCard>
 
-      {/* ── EDIT MACHINE SALE DRAWER (Right Side Drawer like Stock Out) ──────────── */}
+      {/* EDIT MACHINE SALE DRAWER */}
       <Drawer
         anchor="right"
         open={editDrawerOpen}
         onClose={() => setEditDrawerOpen(false)}
         PaperProps={{
           sx: {
-            width: { xs: '100%', sm: 600, md: 740, lg: 820 },
+            width: { xs: '100%', sm: 620, md: 760, lg: 840 },
             boxSizing: 'border-box',
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.15)'
+            flexDirection: 'column'
           }
         }}
       >
@@ -1025,532 +1217,291 @@ export default function MachineSalesPage() {
             py: 2.2,
             borderBottom: '1px solid',
             borderColor: 'divider',
-            bgcolor: isDark ? 'background.paper' : '#ffffff',
+            bgcolor: 'background.paper',
             position: 'sticky',
             top: 0,
-            zIndex: 10
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <Stack direction="row" spacing={1.75} alignItems="center">
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  bgcolor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#ecfdf5',
-                  color: '#005F56',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 20
-                }}
-              >
-                <EditOutlined />
-              </Box>
-              <Box>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary', fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
-                    Edit Machine Sale Record
-                  </Typography>
-                  <Chip
-                    label={formatInvoiceNo(editingSale)}
-                    size="small"
-                    sx={{
-                      bgcolor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea',
-                      color: '#005F56',
-                      fontWeight: 800,
-                      fontSize: '0.82rem',
-                      borderRadius: 1.5,
-                      border: '1px solid',
-                      borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0'
-                    }}
-                  />
-                </Stack>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.3, fontSize: '0.84rem' }}>
-                  Modify customer contact, machine models, quantities, rates, discounts, or warranty terms.
-                </Typography>
-              </Box>
-            </Stack>
-            <IconButton
-              size="small"
-              onClick={() => setEditDrawerOpen(false)}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
+            <Box
               sx={{
-                color: 'text.secondary',
-                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
-                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0', color: 'text.primary' }
+                width: 42,
+                height: 42,
+                borderRadius: 2,
+                bgcolor: primaryTone.bg,
+                color: primaryTone.main,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18
               }}
             >
-              <CloseOutlined style={{ fontSize: 15 }} />
-            </IconButton>
+              <EditOutlined />
+            </Box>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+                <Typography variant="h5" fontWeight={700} color="text.primary">
+                  Edit Machine Sale Record
+                </Typography>
+                <Chip label={formatInvoiceNo(editingSale)} size="small" color="primary" variant="light" sx={{ fontWeight: 700 }} />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                Modify customer contact, machine models, quantities, rates, discounts, or warranty terms.
+              </Typography>
+            </Box>
           </Box>
+          <IconButton
+            size="small"
+            onClick={() => setEditDrawerOpen(false)}
+            sx={{ color: 'text.secondary', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}
+          >
+            <CloseOutlined style={{ fontSize: 14 }} />
+          </IconButton>
         </Box>
 
-        <Box sx={{ px: 3, pt: 3, pb: 4, flex: 1, overflowY: 'auto', bgcolor: isDark ? 'background.default' : '#ffffff' }}>
+        <Box sx={{ px: 3, py: 3, flex: 1, overflowY: 'auto', bgcolor: 'background.default' }}>
           {editingSale && (
-            <form id="edit-machine-sale-form" onSubmit={handleEditSubmit}>
-              <Stack spacing={3}>
-                {/* Customer Info Card */}
+            <Box
+              component="form"
+              id="edit-machine-sale-form"
+              onSubmit={handleEditSubmit}
+              sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
+            >
+              <Box sx={getSubSurfaceSx(theme, { p: 2.25, borderRadius: 2 })}>
+                <Typography component="span" sx={sectionEyebrowSx}>
+                  Customer & Warranty Details
+                </Typography>
                 <Box
                   sx={{
-                    p: 2.5,
-                    borderRadius: 2.5,
-                    bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
-                    border: '1px solid',
-                    borderColor: isDark ? 'divider' : '#e2e8f0'
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' },
+                    gap: 1.75
                   }}
                 >
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={800}
-                    sx={{ color: 'text.primary', mb: 1.75, display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <FileTextOutlined style={{ color: '#005F56' }} /> Customer & Warranty Details
+                  <TextField
+                    size="small"
+                    required
+                    label="Customer Name"
+                    value={editingSale.customerName || ''}
+                    onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
+                  />
+                  <TextField
+                    size="small"
+                    label="Phone Number"
+                    value={editingSale.customerPhone || ''}
+                    onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
+                  />
+                  <TextField
+                    size="small"
+                    label="City / Address"
+                    value={editingSale.cityAddress || ''}
+                    onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
+                  />
+                  <TextField
+                    size="small"
+                    label="Warranty Terms"
+                    value={editingSale.warrantyTerms || ''}
+                    onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
+                  />
+                </Box>
+              </Box>
+
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography component="span" sx={{ ...sectionEyebrowSx, mb: 0 }}>
+                    Purchased Machines ({(editingSale.items || []).length || 1} Items)
                   </Typography>
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
-                        CUSTOMER NAME *
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        required
-                        placeholder="Customer Name"
-                        value={editingSale.customerName || ''}
-                        onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
-                        sx={{
-                          bgcolor: isDark ? 'background.paper' : '#ffffff',
-                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                        }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
-                        PHONE NUMBER
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="0300-XXXXXXX"
-                        value={editingSale.customerPhone || ''}
-                        onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
-                        sx={{
-                          bgcolor: isDark ? 'background.paper' : '#ffffff',
-                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                        }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
-                        CITY / ADDRESS
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="e.g. Lahore, Pakistan"
-                        value={editingSale.cityAddress || ''}
-                        onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
-                        sx={{
-                          bgcolor: isDark ? 'background.paper' : '#ffffff',
-                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                        }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" fontWeight={700} sx={{ color: '#64748b', mb: 0.6, display: 'block' }}>
-                        WARRANTY TERMS
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="1 Year Motor & Frame Warranty"
-                        value={editingSale.warrantyTerms || ''}
-                        onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
-                        sx={{
-                          bgcolor: isDark ? 'background.paper' : '#ffffff',
-                          '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
+                  <AppButton intent="secondary" size="small" startIcon={<PlusOutlined />} onClick={handleAddEditItemRow}>
+                    Add Machine Row
+                  </AppButton>
                 </Box>
 
-                {/* Items Section Header with Add Machine Button */}
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1.5 }}>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight={800}
-                      sx={{ color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}
-                    >
-                      <FileTextOutlined style={{ color: '#005F56' }} /> Purchased Machines ({(editingSale.items || []).length || 1} Items)
-                    </Typography>
+                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: getSubSurfaceSx(theme).bgcolor }}>
+                      <TableRow>
+                        <TableCell sx={tableHeadCellSx}>Machine Model</TableCell>
+                        <TableCell sx={tableHeadCellSx} width={140}>
+                          Serial No
+                        </TableCell>
+                        <TableCell align="center" sx={tableHeadCellSx} width={80}>
+                          Qty
+                        </TableCell>
+                        <TableCell align="right" sx={tableHeadCellSx} width={130}>
+                          Rate (PKR)
+                        </TableCell>
+                        <TableCell align="right" sx={tableHeadCellSx} width={90}>
+                          Disc (%)
+                        </TableCell>
+                        <TableCell align="right" sx={tableHeadCellSx} width={120}>
+                          Line Total
+                        </TableCell>
+                        <TableCell align="center" sx={tableHeadCellSx} width={48} />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(editingSale.items || []).map((editItem, idx) => {
+                        const lineTotal = calcLineNetTotal(editItem);
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              <Autocomplete
+                                freeSolo
+                                size="small"
+                                options={machineModels}
+                                value={editItem.machineName || ''}
+                                onChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                onInputChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
+                                renderInput={(params) => <TextField {...params} placeholder="Select model..." required />}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Serial #"
+                                value={editItem.serialNo || ''}
+                                onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <TextField
+                                size="small"
+                                type="number"
+                                required
+                                inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                                value={editItem.qty || 1}
+                                onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value, 10) || 1)}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                type="number"
+                                required
+                                disabled={!canEditPrice}
+                                inputProps={{ min: 0, style: { textAlign: 'right' } }}
+                                value={editItem.unitPrice || 0}
+                                onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                type="number"
+                                inputProps={{ min: 0, max: 100, style: { textAlign: 'right' } }}
+                                value={editItem.discount || 0}
+                                onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography
+                                variant="subtitle2"
+                                fontWeight={700}
+                                color="text.primary"
+                                sx={{ fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                {formatPKR(lineTotal)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <IconButton
+                                size="small"
+                                disabled={(editingSale.items || []).length <= 1}
+                                onClick={() => handleRemoveEditItemRow(idx)}
+                                sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                              >
+                                <DeleteOutlined style={{ fontSize: 13 }} />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
 
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<PlusOutlined />}
-                      onClick={handleAddEditItemRow}
-                      sx={{
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        borderRadius: 1.5,
-                        borderColor: isDark ? 'divider' : '#cbd5e1',
-                        color: isDark ? 'text.primary' : '#334155',
-                        bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#ffffff',
-                        '&:hover': {
-                          borderColor: '#005F56',
-                          color: '#005F56',
-                          bgcolor: isDark ? 'rgba(0, 95, 86, 0.1)' : '#f0fdf4'
-                        }
-                      }}
-                    >
-                      Add Machine Row
-                    </Button>
-                  </Box>
+              {(() => {
+                const subTotal = (editingSale.items || []).reduce((sum, i) => sum + calcLineNetTotal(i), 0);
+                const paid = Math.max(0, parseFloat(editingSale.paidAmount) || 0);
+                const balance = Math.max(0, subTotal - paid);
 
-                  {/* Items Table */}
-                  <TableContainer
-                    component={Paper}
-                    variant="outlined"
+                return (
+                  <Box
                     sx={{
-                      borderRadius: 2,
-                      borderColor: isDark ? 'divider' : '#e2e8f0',
-                      overflow: 'hidden'
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                      gap: 2
                     }}
                   >
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f1f5f9' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}>
-                            MACHINE MODEL
-                          </TableCell>
-                          <TableCell
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                            width={150}
-                          >
-                            SERIAL NO
-                          </TableCell>
-                          <TableCell
-                            align="center"
-                            width={90}
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                          >
-                            QTY
-                          </TableCell>
-                          <TableCell
-                            align="center"
-                            width={150}
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                          >
-                            UNIT PRICE (PKR)
-                          </TableCell>
-                          <TableCell
-                            align="center"
-                            width={110}
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                          >
-                            DISCOUNT (%)
-                          </TableCell>
-                          <TableCell
-                            align="right"
-                            width={140}
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                          >
-                            LINE TOTAL
-                          </TableCell>
-                          <TableCell
-                            align="center"
-                            width={60}
-                            sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#475569', py: 1.25, letterSpacing: '0.04em' }}
-                          >
-                            DEL
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {(editingSale.items || []).map((editItem, idx) => {
-                          const q = parseInt(editItem.qty) || 1;
-                          const p = parseFloat(editItem.unitPrice) || 0;
-                          const discPercent = parseFloat(editItem.discount) || 0;
-                          const gross = q * p;
-                          const lineTotal = Math.max(0, gross - (gross * discPercent) / 100);
-
-                          return (
-                            <TableRow
-                              key={idx}
-                              sx={{
-                                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#fafafa' },
-                                '&:last-child td, &:last-child th': { border: 0 }
-                              }}
-                            >
-                              <TableCell sx={{ py: 1.5 }}>
-                                <Autocomplete
-                                  freeSolo
-                                  size="small"
-                                  options={machineModels}
-                                  value={editItem.machineName || ''}
-                                  onChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
-                                  onInputChange={(_, val) => handleEditItemChange(idx, 'machineName', val || '')}
-                                  renderInput={(params) => (
-                                    <TextField
-                                      {...params}
-                                      placeholder="Select or type model..."
-                                      required
-                                      size="small"
-                                      sx={{
-                                        bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                                      }}
-                                    />
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell sx={{ py: 1.5 }}>
-                                <TextField
-                                  fullWidth
-                                  size="small"
-                                  placeholder="Serial #"
-                                  value={editItem.serialNo || ''}
-                                  onChange={(e) => handleEditItemChange(idx, 'serialNo', e.target.value)}
-                                  sx={{
-                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell align="center" sx={{ py: 1.5 }}>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  required
-                                  inputProps={{ min: 1, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 700 } }}
-                                  value={editItem.qty || 1}
-                                  onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 1)}
-                                  sx={{
-                                    width: 70,
-                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell align="center" sx={{ py: 1.5 }}>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  required
-                                  disabled={!canEditPrice}
-                                  inputProps={{ min: 0, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 600 } }}
-                                  value={editItem.unitPrice || 0}
-                                  onChange={(e) => handleEditItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                  sx={{
-                                    width: 110,
-                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell align="center" sx={{ py: 1.5 }}>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  inputProps={{ min: 0, max: 100, style: { textAlign: 'center', padding: '6px 4px' } }}
-                                  value={editItem.discount || 0}
-                                  onChange={(e) => handleEditItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
-                                  sx={{
-                                    width: 75,
-                                    bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell align="right" sx={{ py: 1.5 }}>
-                                <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#005F56', fontSize: '0.95rem' }}>
-                                  Rs. {lineTotal.toLocaleString()}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="center" sx={{ py: 1.5 }}>
-                                {(editingSale.items || []).length > 1 ? (
-                                  <Tooltip title="Remove machine">
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleRemoveEditItemRow(idx)}
-                                      sx={{
-                                        color: '#ef4444',
-                                        bgcolor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
-                                        border: '1px solid',
-                                        borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#fee2e2',
-                                        '&:hover': { bgcolor: '#fee2e2', color: '#dc2626' }
-                                      }}
-                                    >
-                                      <DeleteOutlined style={{ fontSize: 14 }} />
-                                    </IconButton>
-                                  </Tooltip>
-                                ) : (
-                                  <IconButton size="small" disabled sx={{ color: 'text.disabled' }}>
-                                    <DeleteOutlined style={{ fontSize: 14 }} />
-                                  </IconButton>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Box>
-
-                {/* Bottom Calculations & Financial Summary */}
-                {(() => {
-                  const subTotal = (editingSale.items || []).reduce((sum, i) => {
-                    const q = parseInt(i.qty) || 1;
-                    const p = parseFloat(i.unitPrice) || 0;
-                    const d = parseFloat(i.discount) || 0;
-                    const gross = q * p;
-                    return sum + Math.max(0, gross - (gross * d) / 100);
-                  }, 0);
-                  const paid = parseFloat(editingSale.paidAmount) || 0;
-                  const balance = Math.max(0, subTotal - paid);
-
-                  return (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', md: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: 'stretch',
-                        gap: 2.5,
-                        width: '100%'
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Box
-                          sx={{
-                            p: 2.5,
-                            height: '100%',
-                            borderRadius: 2.5,
-                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
-                            border: '1px solid',
-                            borderColor: isDark ? 'divider' : '#e2e8f0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            fontWeight={800}
-                            sx={{ color: '#64748b', mb: 1.5, display: 'block', letterSpacing: '0.04em' }}
-                          >
-                            PAYMENT DISBURSEMENT
-                          </Typography>
-
-                          <Stack direction="row" spacing={2} alignItems="center">
-                            <TextField
-                              size="small"
-                              type="number"
-                              label="Paid Amount (PKR)"
-                              value={editingSale.paidAmount || 0}
-                              onChange={(e) => setEditingSale({ ...editingSale, paidAmount: parseFloat(e.target.value) || 0 })}
-                              sx={{
-                                flex: 1,
-                                bgcolor: isDark ? 'background.paper' : '#ffffff',
-                                '& .MuiOutlinedInput-root': { borderRadius: 1.5 }
-                              }}
-                            />
-                            <Box
-                              sx={{
-                                px: 2,
-                                py: 1,
-                                borderRadius: 1.5,
-                                bgcolor: balance > 0 ? '#fff1f0' : '#f6ffed',
-                                border: '1px solid',
-                                borderColor: balance > 0 ? '#ffa39e' : '#b7eb8f'
-                              }}
-                            >
-                              <Typography
-                                variant="caption"
-                                sx={{ color: balance > 0 ? '#cf1322' : '#389e0d', fontWeight: 800, display: 'block' }}
-                              >
-                                {balance > 0 ? `Remaining: Rs. ${balance.toLocaleString()}` : 'Fully Paid'}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </Box>
-                      </Box>
-
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Box
-                          sx={{
-                            p: 2.5,
-                            height: '100%',
-                            borderRadius: 2.5,
-                            bgcolor: isDark ? 'rgba(0, 95, 86, 0.08)' : '#f0fdf4',
-                            border: '1px solid',
-                            borderColor: isDark ? 'rgba(0, 95, 86, 0.3)' : '#bbf7d0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between'
-                          }}
-                        >
-                          <Stack spacing={1}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 600 }}>
-                                Total Bill Amount:
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#111827', fontWeight: 700 }}>
-                                Rs. {subTotal.toLocaleString()}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 600 }}>
-                                Received / Paid:
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#047857', fontWeight: 700 }}>
-                                Rs. {paid.toLocaleString()}
-                              </Typography>
-                            </Box>
-                          </Stack>
-
-                          <Box sx={{ pt: 1.5, mt: 1.5, borderTop: '1px solid', borderColor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#bbf7d0' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  fontWeight={800}
-                                  sx={{ color: '#047857', letterSpacing: '0.04em', display: 'block' }}
-                                >
-                                  NET PAYABLE
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                                  Balance: Rs. {balance.toLocaleString()}
-                                </Typography>
-                              </Box>
-                              <Typography
-                                variant="h4"
-                                fontWeight={900}
-                                sx={{ color: '#005F56', letterSpacing: '-0.02em', fontSize: '1.5rem' }}
-                              >
-                                Rs. {subTotal.toLocaleString()}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Box>
+                    <Box sx={getSubSurfaceSx(theme, { p: 2.25, borderRadius: 2 })}>
+                      <Typography component="span" sx={sectionEyebrowSx}>
+                        Payment Disbursement
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                        <TextField
+                          size="small"
+                          type="number"
+                          label="Paid Amount (PKR)"
+                          inputProps={{ min: 0 }}
+                          value={editingSale.paidAmount || 0}
+                          onChange={(e) => setEditingSale({ ...editingSale, paidAmount: parseFloat(e.target.value) || 0 })}
+                          sx={{ flex: 1, minWidth: 160 }}
+                        />
+                        <Chip
+                          label={balance > 0 ? `Remaining: ${formatPKR(balance)}` : 'Fully Paid'}
+                          color={balance > 0 ? 'error' : 'success'}
+                          variant="light"
+                          size="small"
+                          sx={{ fontWeight: 700 }}
+                        />
                       </Box>
                     </Box>
-                  );
-                })()}
-              </Stack>
-            </form>
+
+                    <Box sx={getSubSurfaceSx(theme, { p: 2.25, borderRadius: 2 })}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                          Total Bill Amount
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {formatPKR(subTotal)}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.25 }}>
+                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                          Received / Paid
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} sx={{ color: successTone.main, fontVariantNumeric: 'tabular-nums' }}>
+                          {formatPKR(paid)}
+                        </Typography>
+                      </Box>
+                      <Divider sx={{ mb: 1.25 }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+                          Remaining Balance
+                        </Typography>
+                        <Typography
+                          variant="h5"
+                          fontWeight={700}
+                          sx={{ color: balance > 0 ? errorTone.main : successTone.main, fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {formatPKR(balance)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })()}
+            </Box>
           )}
         </Box>
 
-        {/* Fixed Bottom Actions */}
         <Box
           sx={{
             px: 3,
@@ -1560,101 +1511,77 @@ export default function MachineSalesPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            bgcolor: isDark ? 'background.paper' : '#f8fafc',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            bgcolor: 'background.paper',
             position: 'sticky',
             bottom: 0,
             zIndex: 10
           }}
         >
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" color="text.secondary">
             Updates customer ledger balance & sales records.
           </Typography>
-
-          <Stack direction="row" spacing={1.5}>
-            <Button
-              onClick={() => setEditDrawerOpen(false)}
-              variant="outlined"
-              sx={{
-                fontWeight: 700,
-                color: 'text.secondary',
-                borderColor: isDark ? 'divider' : '#cbd5e1',
-                px: 2.5,
-                py: 0.8,
-                borderRadius: 1.5,
-                textTransform: 'none',
-                fontSize: '0.9rem',
-                '&:hover': { bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9' }
-              }}
-            >
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <AppButton intent="cancel" onClick={() => setEditDrawerOpen(false)}>
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              type="submit"
-              form="edit-machine-sale-form"
-              sx={{
-                fontWeight: 700,
-                borderRadius: 1.5,
-                px: 3.5,
-                py: 0.9,
-                bgcolor: '#003830',
-                color: '#ffffff',
-                textTransform: 'none',
-                fontSize: '0.9rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 56, 48, 0.25)',
-                '&:hover': { bgcolor: '#002620', boxShadow: '0 6px 10px -1px rgba(0, 56, 48, 0.35)' }
-              }}
-            >
+            </AppButton>
+            <AppButton intent="primary" type="submit" form="edit-machine-sale-form">
               Save Changes
-            </Button>
-          </Stack>
+            </AppButton>
+          </Box>
         </Box>
       </Drawer>
 
-      {/* Single Delete Dialog */}
+      {/* SINGLE DELETE DIALOG */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Confirm Delete Sale Record</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete Sale Record</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete the machine sale invoice for <strong>{saleToDelete?.customerName}</strong> (
             {saleToDelete?.machineName})?
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleConfirmDelete} sx={{ fontWeight: 700 }}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
+            Cancel
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmDelete}>
             Delete Sale Invoice
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
 
-      {/* Bulk Delete Dialog */}
+      {/* BULK DELETE DIALOG */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Bulk Delete Selected Sales Records</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete Selected Sales Records?</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete <strong>{selected.length}</strong> selected machine sales records? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setBulkDeleteDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleConfirmBulkDelete} sx={{ fontWeight: 700 }}>
-            Delete Selected Records ({selected.length})
-          </Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <AppButton intent="cancel" onClick={() => setBulkDeleteDialogOpen(false)}>
+            Cancel
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmBulkDelete}>
+            Delete Selected ({selected.length})
+          </AppButton>
         </DialogActions>
       </Dialog>
 
-      {/* Add New Machine Model Dialog */}
+      {/* ADD NEW MACHINE MODEL DIALOG */}
       <Dialog open={newModelDialogOpen} onClose={() => setNewModelDialogOpen(false)} maxWidth="xs" fullWidth>
-        <form onSubmit={handleAddNewModelSubmit}>
+        <Box component="form" onSubmit={handleAddNewModelSubmit}>
           <DialogTitle sx={{ fontWeight: 700 }}>Add New Machine Model</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Add a new machine model to your master catalog dropdown list for quick invoice generation.
             </Typography>
             <TextField
-              label="MACHINE MODEL NAME *"
+              label="Machine Model Name *"
               fullWidth
+              size="small"
               required
               autoFocus
               placeholder="e.g. Rehmat 30'' Tractor Tow Lawn Mower"
@@ -1662,18 +1589,18 @@ export default function MachineSalesPage() {
               onChange={(e) => setNewModelNameInput(e.target.value)}
             />
           </DialogContent>
-          <DialogActions sx={{ p: 2.5 }}>
-            <Button onClick={() => setNewModelDialogOpen(false)} color="secondary">
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <AppButton intent="cancel" onClick={() => setNewModelDialogOpen(false)}>
               Cancel
-            </Button>
-            <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 700 }}>
+            </AppButton>
+            <AppButton type="submit" intent="primary">
               Save Machine Model
-            </Button>
+            </AppButton>
           </DialogActions>
-        </form>
+        </Box>
       </Dialog>
 
-      {/* Printable Machine Sale Invoice Dialog */}
+      {/* PRINTABLE MACHINE SALE INVOICE DIALOG */}
       <Dialog open={printModalOpen} onClose={() => setPrintModalOpen(false)} maxWidth="md" fullWidth>
         <style>
           {`
@@ -1682,8 +1609,8 @@ export default function MachineSalesPage() {
                 size: A4 portrait;
                 margin: 4mm 5mm;
               }
-            #root { display: none !important; }
-                body * {
+              #root { display: none !important; }
+              body * {
                 visibility: hidden !important;
               }
               #printable-machine-invoice, #printable-machine-invoice * {
@@ -1720,13 +1647,14 @@ export default function MachineSalesPage() {
         </style>
 
         <DialogTitle
+          component="div"
           className="no-print"
           sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
         >
           <Typography variant="h5" fontWeight={700}>
             Official Customer Machine Sale Invoice
           </Typography>
-          <Chip label="Sales Invoice" color="success" size="small" />
+          <Chip label="Sales Invoice" color="success" variant="light" size="small" />
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: { xs: 1, sm: 1.5 } }}>
@@ -1760,7 +1688,6 @@ export default function MachineSalesPage() {
                   }}
                 >
                   <Box sx={{ position: 'relative', zIndex: 1 }}>
-                    {/* Structured Professional Customer & Invoice Metadata Card */}
                     <div
                       style={{
                         border: '1.5px solid #111827',
@@ -1771,7 +1698,6 @@ export default function MachineSalesPage() {
                       }}
                     >
                       <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-                        {/* Left Column: Customer Details */}
                         <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
                           <div
                             style={{
@@ -1802,7 +1728,6 @@ export default function MachineSalesPage() {
                           </div>
                         </div>
 
-                        {/* Right Column: Invoice Meta */}
                         <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
                             <span style={{ color: '#6b7280', fontWeight: 700 }}>Invoice No:</span>
@@ -1821,7 +1746,6 @@ export default function MachineSalesPage() {
                         </div>
                       </div>
 
-                      {/* Machine Model Highlight Strip */}
                       {printData.machineName && (
                         <div
                           style={{
@@ -1839,7 +1763,6 @@ export default function MachineSalesPage() {
                       )}
                     </div>
 
-                    {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
                     <table
                       style={{
                         width: '100%',
@@ -1855,7 +1778,7 @@ export default function MachineSalesPage() {
                             style={{
                               width: '8%',
                               borderRight: '1.5px solid #111827',
-                              padding: '4px 4px',
+                              padding: '4px',
                               textAlign: 'center',
                               fontSize: '0.82rem'
                             }}
@@ -1877,7 +1800,7 @@ export default function MachineSalesPage() {
                             style={{
                               width: '12%',
                               borderRight: '1.5px solid #111827',
-                              padding: '4px 4px',
+                              padding: '4px',
                               textAlign: 'center',
                               fontSize: '0.82rem'
                             }}
@@ -1902,14 +1825,10 @@ export default function MachineSalesPage() {
                       </thead>
                       <tbody>
                         {displayItems.map((item, idx) => {
-                          const q = parseInt(item.qty) || 1;
+                          const q = parseInt(item.qty, 10) || 1;
                           const p = parseFloat(item.unitPrice) || 0;
-                          const d = parseFloat(item.discount) || 0;
-                          const gross = q * p;
                           const lineAmt =
-                            item.lineTotal !== undefined && !isNaN(item.lineTotal)
-                              ? item.lineTotal
-                              : Math.max(0, gross - (gross * d) / 100);
+                            item.lineTotal !== undefined && !Number.isNaN(item.lineTotal) ? item.lineTotal : calcLineNetTotal(item);
 
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
@@ -1965,7 +1884,6 @@ export default function MachineSalesPage() {
                           );
                         })}
 
-                        {/* Total Amount Bottom Row */}
                         <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
                           <td
                             colSpan={2}
@@ -1979,8 +1897,8 @@ export default function MachineSalesPage() {
                           >
                             Total amount
                           </td>
-                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }} />
+                          <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }} />
                           <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
                             {(printData.lineTotal || 0).toLocaleString()}
                           </td>
@@ -1988,22 +1906,21 @@ export default function MachineSalesPage() {
                       </tbody>
                     </table>
 
-                    {/* Financial Summary Box */}
                     <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <Box>
-                          <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
+                          <Typography variant="body2" fontWeight={700} color="#4b5563" display="block">
                             PAID AMOUNT: Rs. {(printData.paidAmount || 0).toLocaleString()}
                           </Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
+                          <Typography variant="subtitle1" fontWeight={800} color="#166534" sx={{ lineHeight: 1.2 }}>
                             NET TOTAL: Rs. {(printData.lineTotal || 0).toLocaleString()}
                           </Typography>
                           <Typography
                             variant="caption"
                             fontWeight={800}
-                            color={(printData.balanceAmount || 0) > 0 ? 'error.main' : 'success.main'}
+                            color={(printData.balanceAmount || 0) > 0 ? '#dc2626' : '#16a34a'}
                             display="block"
                           >
                             {(printData.balanceAmount || 0) > 0
@@ -2014,12 +1931,12 @@ export default function MachineSalesPage() {
                       </Box>
                     </Box>
 
-                    {/* Signatures Footer */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', mt: 1.5, pt: 1 }}>
                       <Box>
                         <Typography
                           variant="caption"
                           display="block"
+                          color="#374151"
                           sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}
                         >
                           Customer Signature
@@ -2037,23 +1954,18 @@ export default function MachineSalesPage() {
             })()}
         </DialogContent>
 
-        <DialogActions className="no-print" sx={{ p: 2.5, justifyContent: 'space-between' }}>
-          <Button variant="outlined" color="secondary" onClick={() => setPrintModalOpen(false)} size="large" className="no-print">
-            Close & Continue
-          </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<PrinterOutlined />}
-            onClick={handlePrint}
-            size="large"
-            className="no-print"
-            sx={{ px: 3, fontWeight: 700 }}
-          >
+        <DialogActions
+          className="no-print"
+          sx={{ p: 2, bgcolor: getSubSurfaceSx(theme).bgcolor, borderTop: '1px solid', borderColor: 'divider' }}
+        >
+          <AppButton intent="cancel" onClick={() => setPrintModalOpen(false)}>
+            Close &amp; Continue
+          </AppButton>
+          <AppButton intent="print" startIcon={<PrinterOutlined />} onClick={() => window.print()}>
             Print Customer Machine Bill
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }

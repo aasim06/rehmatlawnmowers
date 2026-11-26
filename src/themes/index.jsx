@@ -6,6 +6,7 @@ import { createTheme, StyledEngineProvider, ThemeProvider } from '@mui/material/
 import CssBaseline from '@mui/material/CssBaseline';
 
 // project imports
+import defaultConfig from 'config';
 import useConfig from 'hooks/useConfig';
 import CustomShadows from './custom-shadows';
 import componentsOverride from './overrides';
@@ -18,7 +19,7 @@ export default function ThemeCustomization({ children }) {
   const { state } = useConfig();
   const mode = state?.mode || 'light';
 
-  const themeTypography = useMemo(() => Typography(state?.fontFamily), [state?.fontFamily]);
+  const themeTypography = useMemo(() => Typography(defaultConfig.fontFamily), []);
   const palettes = useMemo(() => buildPalette(state?.presetColor), [state?.presetColor]);
   const currentPalette = mode === 'dark' ? palettes.dark : palettes.light;
 

@@ -80,7 +80,7 @@ export default function AnalyticEcommerce({
             fontWeight: 600,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             lineHeight: 1.3
           }}
         >
@@ -117,7 +117,7 @@ export default function AnalyticEcommerce({
             color: 'text.primary',
             fontWeight: 700,
             letterSpacing: '-0.02em',
-            fontSize: { xs: '1.4rem', sm: '1.65rem' }
+            fontSize: { xs: '1.45rem', sm: '1.65rem' }
           }}
         >
           {count}

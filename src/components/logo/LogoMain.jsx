@@ -5,12 +5,15 @@ import { useTheme } from '@mui/material/styles';
 // assets
 import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 
+// Global cache for transparent logo to avoid re-running canvas loop on every mount
+let cachedTransparentLogoSrc = null;
+
 // Helper hook to convert white background pixels to transparent PNG in real-time
 export function useTransparentLogo(src) {
-  const [transparentSrc, setTransparentSrc] = useState(src);
+  const [transparentSrc, setTransparentSrc] = useState(cachedTransparentLogoSrc || src);
 
   useEffect(() => {
-    if (!src) return;
+    if (cachedTransparentLogoSrc || !src) return;
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     img.src = src;
@@ -38,7 +41,9 @@ export function useTransparentLogo(src) {
         }
 
         ctx.putImageData(imageData, 0, 0);
-        setTransparentSrc(canvas.toDataURL('image/png'));
+        const resultUrl = canvas.toDataURL('image/png');
+        cachedTransparentLogoSrc = resultUrl;
+        setTransparentSrc(resultUrl);
       } catch (err) {
         console.error('Error creating transparent logo:', err);
       }

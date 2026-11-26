@@ -1,144 +1,133 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
-import {
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Drawer,
-  Grid,
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  OutlinedInput,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TablePagination,
-  TableRow,
-  TextField,
-  Typography,
-  Tooltip
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
+import Snackbar from '@mui/material/Snackbar';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 
 // icons
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PlusSquareOutlined } from '@ant-design/icons';
+import PlusOutlined from '@ant-design/icons/PlusOutlined';
+import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
+import EditOutlined from '@ant-design/icons/EditOutlined';
+import PlusSquareOutlined from '@ant-design/icons/PlusSquareOutlined';
+import ReloadOutlined from '@ant-design/icons/ReloadOutlined';
 
-// project imports
-import MainCard from 'components/MainCard';
+// project imports (New Master Components)
+import { PageHeader, AppDataTable, FormDialog, AppButton } from 'components/common';
+import { formatCategoryLabel } from 'utils/formatText';
 
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
-export default function AddItemNamePage() {
-  const { items, categories = [], masterItemNames, addMasterItemName, updateMasterItemName, deleteMasterItemName, deleteMultipleMasterItemNames } = useStoreInventory();
+const modalMenuProps = {
+  PaperProps: {
+    sx: {
+      maxHeight: 240,
+      borderRadius: 1.5,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+      mt: 0.5,
+      '& .MuiMenuItem-root': {
+        fontSize: '0.875rem',
+        py: 0.8,
+        px: 1.5
+      }
+    }
+  },
+  anchorOrigin: {
+    vertical: 'bottom',
+    horizontal: 'left'
+  },
+  transformOrigin: {
+    vertical: 'top',
+    horizontal: 'left'
+  }
+};
 
-  const [searchTerm, setSearchTerm] = useState('');
+export default function AddItemNamePage() {
+  const {
+    items = [],
+    categories = [],
+    masterItemNames = [],
+    addMasterItemName,
+    updateMasterItemName,
+    deleteMasterItemName,
+    deleteMultipleMasterItemNames,
+    restoreDefaultMasterItemNames
+  } = useStoreInventory();
+
+  // Search & Category filter state
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selected, setSelected] = useState([]);
+  const [restoring, setRestoring] = useState(false);
+  const [restoredSnackbar, setRestoredSnackbar] = useState(false);
 
-  // Pagination State
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, selectedCategory]);
-
-  // Category options list from StoreInventoryContext
-  const categoryOptions = Array.from(
-    new Set([
-      'General',
-      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
-    ])
-  );
-
-  // Add Master Item Drawer State (7 inputs)
-  const [addDrawerOpen, setAddDrawerOpen] = useState(false);
+  // Add Item Dialog State
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newItemName, setNewItemName] = useState({
     name: '',
-    skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
-    totalBillAmount: 1250,
-    unitPrice: 25,
-    category: 'Electrical & Motors',
+    skuCode: '',
+    totalBillAmount: '',
+    unitPrice: 0,
+    category: 'General',
     defaultUnit: 'PCS',
-    initialStock: 50,
-    minThreshold: 10
+    initialStock: '',
+    minThreshold: '10'
   });
 
-  // Edit Master Item Drawer State
-  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  // Edit Item Dialog State
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItemName, setEditingItemName] = useState(null);
 
-  // Single Delete Confirmation Dialog State
+  // Delete Dialog States
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
-
-  // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const filteredMasterNames = masterItemNames.filter((m) => {
-    const matchesSearch =
-      (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (m.category || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || (m.category || 'General') === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Category filter options
+  const categoryOptions = useMemo(() => {
+    const rawSet = new Set([
+      'General',
+      ...(categories || []).map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean)
+    ]);
+    return Array.from(rawSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [categories]);
 
-  // Checkbox Selection Handlers
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = filteredMasterNames.map((n) => n.id);
-      setSelected(newSelected);
-      return;
+  // Filter master items by Category (search is handled automatically by AppDataTable)
+  const displayItems = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'All') return masterItemNames;
+    return masterItemNames.filter((m) => (m.category || 'General') === selectedCategory);
+  }, [masterItemNames, selectedCategory]);
+
+  // Restore Default Item Names Handler
+  const handleRestoreDefaults = async () => {
+    setRestoring(true);
+    if (restoreDefaultMasterItemNames) {
+      await restoreDefaultMasterItemNames();
     }
-    setSelected([]);
+    setRestoring(false);
+    setRestoredSnackbar(true);
   };
 
-  const handleSelectOne = (event, id) => {
-    event.stopPropagation();
-    const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-    }
-    setSelected(newSelected);
-  };
-
-  const isSelected = (id) => selected.indexOf(id) !== -1;
-
-  // Submit Add Handler
+  // Add Submit Handler
   const handleAddSubmit = (e) => {
     e.preventDefault();
     if (!newItemName.name.trim()) return;
+
     const stock = parseInt(newItemName.initialStock) || 0;
     const bill = parseFloat(newItemName.totalBillAmount) || 0;
-    const computedUnitPrice = stock > 0 ? (bill / stock) : (parseFloat(newItemName.unitPrice) || 0);
+    const computedUnitPrice = stock > 0 ? bill / stock : parseFloat(newItemName.unitPrice) || 0;
 
     addMasterItemName({
       ...newItemName,
@@ -146,26 +135,28 @@ export default function AddItemNamePage() {
       totalBillAmount: bill,
       unitPrice: computedUnitPrice
     });
+
     setNewItemName({
       name: '',
-      skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
-      totalBillAmount: 1250,
-      unitPrice: 25,
-      category: 'Electrical & Motors',
+      skuCode: '',
+      totalBillAmount: '',
+      unitPrice: 0,
+      category: 'General',
       defaultUnit: 'PCS',
-      initialStock: 50,
-      minThreshold: 10
+      initialStock: '',
+      minThreshold: '10'
     });
-    setAddDrawerOpen(false);
+    setAddDialogOpen(false);
   };
 
-  // Submit Edit Handler
+  // Edit Submit Handler
   const handleEditSubmit = (e) => {
     e.preventDefault();
     if (!editingItemName || !editingItemName.name.trim()) return;
+
     const stock = parseInt(editingItemName.initialStock) || 0;
     const bill = parseFloat(editingItemName.totalBillAmount) || 0;
-    const computedUnitPrice = stock > 0 ? (bill / stock) : (parseFloat(editingItemName.unitPrice) || 0);
+    const computedUnitPrice = stock > 0 ? bill / stock : parseFloat(editingItemName.unitPrice) || 0;
 
     updateMasterItemName(editingItemName.id, {
       ...editingItemName,
@@ -173,7 +164,7 @@ export default function AddItemNamePage() {
       totalBillAmount: bill,
       unitPrice: computedUnitPrice
     });
-    setEditDrawerOpen(false);
+    setEditDialogOpen(false);
     setEditingItemName(null);
   };
 
@@ -196,501 +187,464 @@ export default function AddItemNamePage() {
     setBulkDeleteDialogOpen(false);
   };
 
-  return (
-    <MainCard
-      title="Master Item Names Directory"
-      secondary={
-        <Stack direction="row" spacing={1.5}>
-          {selected.length > 0 && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteOutlined />}
-              onClick={() => setBulkDeleteDialogOpen(true)}
-            >
-              Delete Selected ({selected.length})
-            </Button>
-          )}
-          <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
-            Add Master Item Name
-          </Button>
-        </Stack>
+  // Table Columns Definition
+  const columns = useMemo(
+    () => [
+      {
+        id: 'id',
+        label: 'ID',
+        minWidth: 90,
+        sortable: true,
+        render: (row) => (
+          <Typography variant="caption" fontWeight={600} color="text.secondary">
+            {row.id}
+          </Typography>
+        )
+      },
+      {
+        id: 'name',
+        label: 'Pre-saved Master Item Name',
+        minWidth: 220,
+        sortable: true,
+        render: (row) => (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <PlusSquareOutlined style={{ color: '#52c41a', fontSize: 16 }} />
+            <Typography variant="subtitle2" fontWeight={700}>
+              {row.name}
+            </Typography>
+          </Stack>
+        )
+      },
+      {
+        id: 'category',
+        label: 'Category',
+        minWidth: 150,
+        sortable: true,
+        render: (row) => <Chip label={formatCategoryLabel(row.category || 'General')} size="small" variant="light" color="primary" />
+      },
+      {
+        id: 'defaultUnit',
+        label: 'Default Unit',
+        minWidth: 110,
+        align: 'center',
+        sortable: true,
+        render: (row) => <Chip label={row.defaultUnit || 'PCS'} size="small" sx={{ bgcolor: 'grey.100' }} />
+      },
+      {
+        id: 'usedCount',
+        label: 'Store Items Using This Name',
+        minWidth: 180,
+        align: 'center',
+        render: (row) => {
+          const count = items.filter((i) => i.name && i.name.toLowerCase() === (row.name || '').toLowerCase()).length;
+          return (
+            <Typography variant="subtitle2" fontWeight={700} color={count > 0 ? 'success.main' : 'text.secondary'}>
+              {count} active store item{count === 1 ? '' : 's'}
+            </Typography>
+          );
+        }
       }
-    >
-      {/* Description Banner */}
-      <Box sx={{ p: 2, mb: 3, bgcolor: 'primary.lighter', borderRadius: 1, border: '1px dashed', borderColor: 'primary.main' }}>
-        <Typography variant="subtitle2" color="primary.main" fontWeight={700}>
-          Quick Setup: Master Item Names
-        </Typography>
-        <Typography variant="caption" color="textSecondary">
-          Save your factory store item names here once. When adding new items, receiving stock, or issuing items, you will not need to retype the name every time!
-        </Typography>
-      </Box>
+    ],
+    [items]
+  );
 
-      {/* Search Header */}
-      <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} sm={5}>
-          <OutlinedInput
-            fullWidth
-            placeholder="Search saved item names, categories..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchOutlined />
-              </InputAdornment>
-            }
-          />
-        </Grid>
+  return (
+    <Box>
+      {/* 1. Universal Page Header */}
+      <PageHeader
+        title="Master Item Names Directory"
+        subtitle="Save your factory store item names here once so you don't need to retype them when receiving or issuing stock."
+        count={displayItems.length}
+        countLabel="Item Names"
+        actions={
+          <>
+            {selected.length > 0 && (
+              <AppButton intent="danger" startIcon={<DeleteOutlined />} onClick={() => setBulkDeleteDialogOpen(true)}>
+                Delete Selected ({selected.length})
+              </AppButton>
+            )}
+            <AppButton
+              intent="secondary"
+              loading={restoring}
+              loadingText="Restoring..."
+              startIcon={<ReloadOutlined />}
+              onClick={handleRestoreDefaults}
+            >
+              Restore Defaults (40+ Items)
+            </AppButton>
+            <AppButton intent="primary" startIcon={<PlusOutlined />} onClick={() => setAddDialogOpen(true)}>
+              Add Master Item Name
+            </AppButton>
+          </>
+        }
+      />
 
-        <Grid item xs={12} sm={4}>
+      {/* 2. Universal Master Data Table */}
+      <AppDataTable
+        columns={columns}
+        data={displayItems}
+        searchPlaceholder="Search saved item names, categories, IDs..."
+        searchKeys={['name', 'category', 'id', 'skuCode']}
+        selectable
+        selected={selected}
+        onSelect={setSelected}
+        defaultRowsPerPage={10}
+        toolbarRight={
           <TextField
             select
-            fullWidth
             size="small"
-            label="Category Filter"
-            value={selectedCategory}
+            value={selectedCategory || 'All'}
             onChange={(e) => setSelectedCategory(e.target.value)}
+            sx={{
+              width: { xs: '100%', sm: 220 },
+              '& .MuiOutlinedInput-root': { height: 38 }
+            }}
+            SelectProps={{
+              MenuProps: {
+                PaperProps: {
+                  sx: {
+                    maxHeight: 280,
+                    borderRadius: 2,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    mt: 0.5,
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.85rem',
+                      py: 0.8,
+                      px: 1.5,
+                      borderRadius: 1,
+                      mx: 0.5,
+                      my: 0.2,
+                      '&.Mui-selected': {
+                        fontWeight: 700,
+                        bgcolor: 'primary.lighter',
+                        color: 'primary.main'
+                      }
+                    }
+                  }
+                },
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'right'
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'right'
+                }
+              }
+            }}
           >
             <MenuItem value="All">All Categories</MenuItem>
             {categoryOptions.map((cat) => (
               <MenuItem key={cat} value={cat}>
-                {cat}
+                {formatCategoryLabel(cat)}
               </MenuItem>
             ))}
           </TextField>
-        </Grid>
+        }
+        actions={(row) => (
+          <Stack direction="row" spacing={0.5} justifyContent="center">
+            <Tooltip title="Edit Item Name">
+              <IconButton
+                color="primary"
+                size="small"
+                onClick={() => {
+                  const stock = Number(row.initialStock) || 50;
+                  const unitPrice = Number(row.unitPrice) || 0;
+                  const totalBill = row.totalBillAmount !== undefined ? row.totalBillAmount : stock * unitPrice;
+                  setEditingItemName({
+                    ...row,
+                    totalBillAmount: Math.round(totalBill * 100) / 100
+                  });
+                  setEditDialogOpen(true);
+                }}
+              >
+                <EditOutlined />
+              </IconButton>
+            </Tooltip>
 
-        <Grid item xs={12} sm={3} sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" color="textSecondary">
-            {selected.length > 0 ? (
-              <strong style={{ color: '#ff4d4f' }}>{selected.length} item names selected for deletion</strong>
-            ) : (
-              `Total ${filteredMasterNames.length} Saved Item Names`
-            )}
-          </Typography>
-        </Grid>
-      </Grid>
-
-      {/* Master Item Names Table */}
-      <TableContainer>
-        <Table sx={{ minWidth: 700 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  color="primary"
-                  indeterminate={selected.length > 0 && selected.length < filteredMasterNames.length}
-                  checked={filteredMasterNames.length > 0 && selected.length === filteredMasterNames.length}
-                  onChange={handleSelectAllClick}
-                  inputProps={{ 'aria-label': 'select all master item names' }}
-                />
-              </TableCell>
-              <TableCell>ID</TableCell>
-              <TableCell>Pre-saved Master Item Name</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell align="center">Default Unit</TableCell>
-              <TableCell align="center">Store Items Using This Name</TableCell>
-              <TableCell align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredMasterNames.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    No pre-saved item names found. Click "+ Add Master Item Name" to save item names for quick dropdown selection!
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredMasterNames
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((master) => {
-                const isMasterSelected = isSelected(master.id);
-                const countUsed = items.filter((i) => i.name.toLowerCase() === master.name.toLowerCase()).length;
-
-                return (
-                  <TableRow key={master.id} hover selected={isMasterSelected}>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        checked={isMasterSelected}
-                        onChange={(e) => handleSelectOne(e, master.id)}
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography variant="caption" fontWeight={600} color="textSecondary">
-                        {master.id}
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <PlusSquareOutlined style={{ color: '#52c41a', fontSize: 16 }} />
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          {master.name}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip label={master.category} size="small" variant="light" color="primary" />
-                    </TableCell>
-
-                    <TableCell align="center">
-                      <Chip label={master.defaultUnit} size="small" sx={{ bgcolor: 'grey.100' }} />
-                    </TableCell>
-
-                    <TableCell align="center">
-                      <Typography variant="subtitle2" fontWeight={700} color={countUsed > 0 ? 'success.main' : 'textSecondary'}>
-                        {countUsed} active store item{countUsed === 1 ? '' : 's'}
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell align="center">
-                      <Stack direction="row" spacing={1} justifyContent="center">
-                        <Tooltip title="Edit Item Name">
-                          <IconButton
-                            color="primary"
-                            size="small"
-                            onClick={() => {
-                              const stock = Number(master.initialStock) || 50;
-                              const unitPrice = Number(master.unitPrice) || 0;
-                              const totalBill = master.totalBillAmount !== undefined ? master.totalBillAmount : (stock * unitPrice);
-                              setEditingItemName({
-                                ...master,
-                                totalBillAmount: Math.round(totalBill * 100) / 100
-                              });
-                              setEditDrawerOpen(true);
-                            }}
-                          >
-                            <EditOutlined />
-                          </IconButton>
-                        </Tooltip>
-
-                        <Tooltip title="Delete Item Name">
-                          <IconButton color="error" size="small" onClick={() => { setItemToDelete(master); setDeleteDialogOpen(true); }}>
-                            <DeleteOutlined />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <TablePagination
-        rowsPerPageOptions={[10, 25, 50, 100]}
-        component="div"
-        count={filteredMasterNames.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
+            <Tooltip title="Delete Item Name">
+              <IconButton
+                color="error"
+                size="small"
+                onClick={() => {
+                  setItemToDelete(row);
+                  setDeleteDialogOpen(true);
+                }}
+              >
+                <DeleteOutlined />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
       />
 
-      {/* Drawer 1: Add New Master Item Name (7 Inputs) */}
-      <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 2.5 }}>
-            Add Master Item Name
-          </Typography>
+      {/* 3. Universal Add Form Dialog */}
+      <FormDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        title="Add Master Item Name"
+        subtitle="Create a reusable item specification for store inventory & billing."
+        saveText="Save Item Name"
+        onSubmit={handleAddSubmit}
+      >
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          <TextField
+            label="Item Name"
+            fullWidth
+            required
+            placeholder="e.g. 3HP Electric Motor (3-Phase)"
+            value={newItemName.name}
+            onChange={(e) => setNewItemName({ ...newItemName, name: e.target.value })}
+          />
 
-          <form onSubmit={handleAddSubmit}>
-            <Stack spacing={2.5}>
-              {/* 1. Item Name */}
-              <TextField
-                label="Item Name"
-                fullWidth
-                required
-                placeholder="e.g. 3HP Electric Motor (3-Phase)"
-                value={newItemName.name}
-                onChange={(e) => setNewItemName({ ...newItemName, name: e.target.value })}
-              />
+          <TextField
+            label="SKU Code / Short ID"
+            fullWidth
+            placeholder="e.g. SKU-84564564 (Auto if blank)"
+            value={newItemName.skuCode}
+            onChange={(e) => setNewItemName({ ...newItemName, skuCode: e.target.value })}
+          />
 
-              {/* 2. SKU Code */}
-              <TextField
-                label="SKU Code / Short ID"
-                fullWidth
-                required
-                placeholder="e.g. SKU-84564564 or RM-001"
-                value={newItemName.skuCode}
-                onChange={(e) => setNewItemName({ ...newItemName, skuCode: e.target.value })}
-              />
+          <TextField
+            label="Total Bill Amount (Rs.) *"
+            type="number"
+            fullWidth
+            required
+            inputProps={{ min: 0, step: 'any' }}
+            value={newItemName.totalBillAmount}
+            onChange={(e) => {
+              const val = e.target.value;
+              const billNum = parseFloat(val) || 0;
+              const stockNum = parseInt(newItemName.initialStock) || 0;
+              const unitPrice = stockNum > 0 ? billNum / stockNum : billNum;
+              setNewItemName((prev) => ({ ...prev, totalBillAmount: val, unitPrice }));
+            }}
+            helperText={
+              Number(newItemName.initialStock) > 0 && Number(newItemName.totalBillAmount) > 0
+                ? `Rate: Rs. ${(Number(newItemName.totalBillAmount) / Number(newItemName.initialStock)).toFixed(2)} / ${newItemName.defaultUnit || 'PCS'}`
+                : 'Calculates rate per unit automatically'
+            }
+          />
 
-              {/* 3. Total Bill Amount */}
-              <TextField
-                label="Total Bill Amount (Rs.) *"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 0, step: 'any' }}
-                value={newItemName.totalBillAmount !== undefined ? newItemName.totalBillAmount : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const billNum = parseFloat(val) || 0;
-                  const stockNum = parseInt(newItemName.initialStock) || 0;
-                  const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
-                  setNewItemName((prev) => ({
-                    ...prev,
-                    totalBillAmount: val,
-                    unitPrice
-                  }));
-                }}
-                helperText={
-                  Number(newItemName.initialStock) > 0 && Number(newItemName.totalBillAmount) > 0
-                    ? `Rate: Rs. ${(Number(newItemName.totalBillAmount) / Number(newItemName.initialStock)).toFixed(2)} / ${newItemName.defaultUnit || 'PCS'}`
-                    : 'Calculates rate per unit automatically'
-                }
-              />
+          <TextField
+            select
+            label="Category"
+            fullWidth
+            required
+            value={newItemName.category || 'General'}
+            onChange={(e) => setNewItemName({ ...newItemName, category: e.target.value })}
+            SelectProps={{
+              MenuProps: modalMenuProps
+            }}
+          >
+            {categoryOptions.map((cat) => (
+              <MenuItem key={cat} value={cat}>
+                {formatCategoryLabel(cat)}
+              </MenuItem>
+            ))}
+          </TextField>
 
-              {/* 4. Category */}
-              <TextField
-                select
-                label="Category"
-                fullWidth
-                required
-                value={newItemName.category || 'General'}
-                onChange={(e) => setNewItemName({ ...newItemName, category: e.target.value })}
-              >
-                {categoryOptions.map((cat) => (
-                  <MenuItem key={cat} value={cat}>
-                    {cat}
-                  </MenuItem>
-                ))}
-              </TextField>
+          <TextField
+            select
+            label="Measurement Unit"
+            fullWidth
+            required
+            value={newItemName.defaultUnit}
+            onChange={(e) => setNewItemName({ ...newItemName, defaultUnit: e.target.value })}
+            SelectProps={{
+              MenuProps: modalMenuProps
+            }}
+          >
+            {UNIT_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
 
-              {/* 5. Units */}
-              <TextField
-                select
-                id="itemUnit"
-                label="Measurement Unit"
-                fullWidth
-                required
-                value={newItemName.defaultUnit}
-                onChange={(e) => setNewItemName({ ...newItemName, defaultUnit: e.target.value })}
-              >
-                {UNIT_OPTIONS.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
+          <TextField
+            label="Initial Stock Quantity"
+            type="number"
+            fullWidth
+            required
+            inputProps={{ min: 0 }}
+            value={newItemName.initialStock}
+            onChange={(e) => {
+              const val = e.target.value;
+              const stockNum = parseInt(val) || 0;
+              const billNum = parseFloat(newItemName.totalBillAmount) || 0;
+              const unitPrice = stockNum > 0 ? billNum / stockNum : billNum;
+              setNewItemName((prev) => ({
+                ...prev,
+                initialStock: val === '' ? '' : stockNum,
+                unitPrice
+              }));
+            }}
+          />
 
-              {/* 6. Initial Stock Quantity */}
-              <TextField
-                label="Initial Stock Quantity"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 0 }}
-                value={newItemName.initialStock}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const stockNum = parseInt(val) || 0;
-                  const billNum = parseFloat(newItemName.totalBillAmount) || 0;
-                  const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
-                  setNewItemName((prev) => ({
-                    ...prev,
-                    initialStock: val === '' ? '' : stockNum,
-                    unitPrice
-                  }));
-                }}
-              />
+          <TextField
+            label="Min Threshold (Low Stock Alert Level)"
+            type="number"
+            fullWidth
+            required
+            inputProps={{ min: 1 }}
+            value={newItemName.minThreshold}
+            onChange={(e) => setNewItemName({ ...newItemName, minThreshold: e.target.value })}
+          />
+        </Stack>
+      </FormDialog>
 
-              {/* 7. Min Threshold */}
-              <TextField
-                label="Min Threshold (Low Stock Alert Level)"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 1 }}
-                value={newItemName.minThreshold}
-                onChange={(e) => setNewItemName({ ...newItemName, minThreshold: parseInt(e.target.value) || 1 })}
-              />
+      {/* 4. Universal Edit Form Dialog */}
+      <FormDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        title="Edit Master Item Name"
+        subtitle={editingItemName ? `Editing ID: ${editingItemName.id}` : ''}
+        saveText="Update Changes"
+        onSubmit={handleEditSubmit}
+      >
+        {editingItemName && (
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <TextField
+              label="Item Name"
+              fullWidth
+              required
+              value={editingItemName.name}
+              onChange={(e) => setEditingItemName({ ...editingItemName, name: e.target.value })}
+            />
 
-              <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="contained" type="submit">
-                  Save Item Name
-                </Button>
-              </Stack>
-            </Stack>
-          </form>
-        </Box>
-      </Drawer>
+            <TextField
+              label="SKU Code"
+              fullWidth
+              value={editingItemName.skuCode || ''}
+              onChange={(e) => setEditingItemName({ ...editingItemName, skuCode: e.target.value })}
+            />
 
-      {/* Drawer 2: Edit Master Item Name */}
-      <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
-            Edit Master Item Name
-          </Typography>
+            <TextField
+              label="Total Bill Amount (Rs.) *"
+              type="number"
+              fullWidth
+              value={editingItemName.totalBillAmount !== undefined ? editingItemName.totalBillAmount : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                const billNum = parseFloat(val) || 0;
+                const stockNum = parseInt(editingItemName.initialStock) || 1;
+                const unitPrice = stockNum > 0 ? billNum / stockNum : billNum;
+                setEditingItemName((prev) => ({ ...prev, totalBillAmount: val, unitPrice }));
+              }}
+            />
 
-          {editingItemName && (
-            <form onSubmit={handleEditSubmit}>
-              <Stack spacing={2.5}>
-                <TextField
-                  label="Master ID"
-                  fullWidth
-                  disabled
-                  value={editingItemName.id}
-                />
+            <TextField
+              select
+              label="Category"
+              fullWidth
+              value={editingItemName.category || 'General'}
+              onChange={(e) => setEditingItemName({ ...editingItemName, category: e.target.value })}
+              SelectProps={{
+                MenuProps: modalMenuProps
+              }}
+            >
+              {categoryOptions.map((cat) => (
+                <MenuItem key={cat} value={cat}>
+                  {formatCategoryLabel(cat)}
+                </MenuItem>
+              ))}
+            </TextField>
 
-                <TextField
-                  label="Item Name"
-                  fullWidth
-                  required
-                  value={editingItemName.name}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, name: e.target.value })}
-                />
+            <TextField
+              select
+              label="Default Unit"
+              fullWidth
+              value={editingItemName.defaultUnit || 'PCS'}
+              onChange={(e) => setEditingItemName({ ...editingItemName, defaultUnit: e.target.value })}
+              SelectProps={{
+                MenuProps: modalMenuProps
+              }}
+            >
+              {UNIT_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
 
-                <TextField
-                  label="SKU Code"
-                  fullWidth
-                  value={editingItemName.skuCode || ''}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, skuCode: e.target.value })}
-                />
+            <TextField
+              label="Initial Stock Quantity"
+              type="number"
+              fullWidth
+              value={editingItemName.initialStock || 0}
+              onChange={(e) => {
+                const val = e.target.value;
+                const stockNum = parseInt(val) || 0;
+                const billNum = parseFloat(editingItemName.totalBillAmount) || 0;
+                const unitPrice = stockNum > 0 ? billNum / stockNum : billNum;
+                setEditingItemName((prev) => ({
+                  ...prev,
+                  initialStock: val === '' ? '' : stockNum,
+                  unitPrice
+                }));
+              }}
+            />
 
-                <TextField
-                  label="Total Bill Amount (Rs.) *"
-                  type="number"
-                  fullWidth
-                  value={editingItemName.totalBillAmount !== undefined ? editingItemName.totalBillAmount : ((Number(editingItemName.initialStock) || 1) * (Number(editingItemName.unitPrice) || 0))}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const billNum = parseFloat(val) || 0;
-                    const stockNum = parseInt(editingItemName.initialStock) || 1;
-                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
-                    setEditingItemName((prev) => ({
-                      ...prev,
-                      totalBillAmount: val,
-                      unitPrice
-                    }));
-                  }}
-                  helperText={
-                    Number(editingItemName.initialStock) > 0 && Number(editingItemName.totalBillAmount) > 0
-                      ? `Rate: Rs. ${(Number(editingItemName.totalBillAmount) / Number(editingItemName.initialStock)).toFixed(2)} / ${editingItemName.defaultUnit || 'PCS'}`
-                      : 'Calculates rate per unit automatically'
-                  }
-                />
+            <TextField
+              label="Min Threshold Level"
+              type="number"
+              fullWidth
+              value={editingItemName.minThreshold || 10}
+              onChange={(e) => setEditingItemName({ ...editingItemName, minThreshold: parseInt(e.target.value) || 1 })}
+            />
+          </Stack>
+        )}
+      </FormDialog>
 
-                <TextField
-                  select
-                  label="Category"
-                  fullWidth
-                  value={editingItemName.category || 'General'}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, category: e.target.value })}
-                >
-                  {categoryOptions.map((cat) => (
-                    <MenuItem key={cat} value={cat}>
-                      {cat}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  select
-                  id="itemUnitEdit"
-                  label="Default Unit"
-                  fullWidth
-                  value={editingItemName.defaultUnit || 'PCS'}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, defaultUnit: e.target.value })}
-                >
-                  {UNIT_OPTIONS.map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  label="Initial Stock Quantity"
-                  type="number"
-                  fullWidth
-                  value={editingItemName.initialStock || 0}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const stockNum = parseInt(val) || 0;
-                    const billNum = parseFloat(editingItemName.totalBillAmount) || 0;
-                    const unitPrice = stockNum > 0 ? (billNum / stockNum) : billNum;
-                    setEditingItemName((prev) => ({
-                      ...prev,
-                      initialStock: val === '' ? '' : stockNum,
-                      unitPrice
-                    }));
-                  }}
-                />
-
-                <TextField
-                  label="Min Threshold Level"
-                  type="number"
-                  fullWidth
-                  value={editingItemName.minThreshold || 10}
-                  onChange={(e) => setEditingItemName({ ...editingItemName, minThreshold: parseInt(e.target.value) || 1 })}
-                />
-
-                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="contained" color="primary" type="submit">
-                    Update Changes
-                  </Button>
-                </Stack>
-              </Stack>
-            </form>
-          )}
-        </Box>
-      </Drawer>
-
-      {/* Modal 3: Confirm Single Delete Dialog */}
+      {/* 5. Delete Dialogs */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete Item Name Confirmation
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Delete Item Name</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete master item name <strong>"{itemToDelete?.name}"</strong>?
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="secondary">
+          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmSingleDelete} variant="contained" color="error">
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmSingleDelete}>
             Confirm Delete
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
 
-      {/* Modal 4: Confirm Bulk Delete Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete All Selected Item Names Confirmation
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Bulk Delete Confirmation</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete all <strong>{selected.length} selected item names</strong>?
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBulkDeleteDialogOpen(false)} color="secondary">
+          <AppButton intent="cancel" onClick={() => setBulkDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmBulkDelete} variant="contained" color="error">
-            Delete All {selected.length} Item Names
-          </Button>
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmBulkDelete}>
+            Delete Selected ({selected.length})
+          </AppButton>
         </DialogActions>
       </Dialog>
-    </MainCard>
+
+      {/* Snackbar for restore alert */}
+      <Snackbar
+        open={restoredSnackbar}
+        autoHideDuration={4000}
+        onClose={() => setRestoredSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setRestoredSnackbar(false)} severity="success" sx={{ width: '100%', fontWeight: 700 }}>
+          All default master item names restored successfully!
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }

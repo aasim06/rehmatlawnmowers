@@ -23,8 +23,8 @@ export default function Search() {
   };
 
   return (
-    <Box sx={{ width: '100%', ml: { xs: 0, md: 1 } }}>
-      <FormControl sx={{ width: { xs: '100%', md: 240 } }}>
+    <Box sx={{ width: '100%', ml: { xs: 0, md: 1.5 } }}>
+      <FormControl sx={{ width: { xs: '100%', md: 320, lg: 360 } }}>
         <OutlinedInput
           size="small"
           id="header-search"
@@ -32,13 +32,34 @@ export default function Search() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           startAdornment={
-            <InputAdornment position="start" sx={{ mr: -0.5 }}>
+            <InputAdornment position="start" sx={{ mr: 0.5, color: 'text.secondary' }}>
               <SearchOutlined />
             </InputAdornment>
           }
+          endAdornment={
+            <InputAdornment position="end">
+              <Box
+                component="kbd"
+                sx={{
+                  px: 0.75,
+                  py: 0.2,
+                  borderRadius: 1,
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  color: 'text.secondary',
+                  bgcolor: 'action.hover',
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}
+              >
+                Enter
+              </Box>
+            </InputAdornment>
+          }
           aria-describedby="header-search-text"
-          placeholder="Search items... (Enter)"
-          sx={{ borderRadius: 2 }}
+          placeholder="Search inventory items or SKU..."
+          sx={{ height: 38, borderRadius: 2 }}
         />
       </FormControl>
     </Box>

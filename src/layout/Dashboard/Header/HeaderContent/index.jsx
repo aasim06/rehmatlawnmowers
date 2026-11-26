@@ -1,7 +1,6 @@
 // material-ui
 import useMediaQuery from '@mui/material/useMediaQuery';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 
 // project imports
 import Search from './Search';
@@ -21,12 +20,11 @@ export default function HeaderContent() {
       {!downLG && <Search />}
       {downLG && <Box sx={{ width: '100%', ml: 1 }} />}
 
-      <Stack
-        direction="row"
-        spacing={{ xs: 1.5, sm: 2 }}
+      <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
+          gap: { xs: 1.5, sm: 2 },
           ml: 'auto',
           flexShrink: 0
         }}
@@ -40,7 +38,7 @@ export default function HeaderContent() {
         <Notification />
         {!downLG && <Profile />}
         {downLG && <MobileSection />}
-      </Stack>
+      </Box>
     </>
   );
 }

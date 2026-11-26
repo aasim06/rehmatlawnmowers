@@ -9,7 +9,26 @@ const PRECACHE_URLS = [
   '/version.json'
 ];
 
+// Never run service worker caching on localhost or development servers
+const isLocal =
+  self.location.hostname === 'localhost' ||
+  self.location.hostname === '127.0.0.1' ||
+  self.location.hostname === '[::1]' ||
+  self.location.hostname.endsWith('.local');
+
+if (isLocal) {
+  self.addEventListener('install', () => self.skipWaiting());
+  self.addEventListener('activate', (event) => {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+  });
+}
+
 self.addEventListener('install', (event) => {
+  if (isLocal) return;
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS).catch((err) => {
@@ -20,6 +39,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  if (isLocal) return;
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -35,11 +55,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // 0. Completely bypass any intercept on localhost
+  if (isLocal) return;
+
   const req = event.request;
   const url = new URL(req.url);
 
-  // 1. Never cache Firebase, Google APIs, Auth, or dynamic Firestore requests
+  // 1. Never cache Firebase, Google APIs, Auth, API calls, or Vite development modules
   if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.includes('/src/') ||
+    url.pathname.includes('/node_modules/') ||
+    url.search.includes('t=') ||
+    url.search.includes('import') ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('google.com') ||

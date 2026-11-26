@@ -35,7 +35,7 @@ export default function DashboardLayout() {
         display: 'flex',
         width: '100%',
         minHeight: '100vh',
-        bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#090d16' : 'rgb(247, 246, 242)')
+        bgcolor: 'background.default'
       }}
     >
       <ScrollTop />
@@ -45,12 +45,12 @@ export default function DashboardLayout() {
       <Box
         component="main"
         sx={{
-          width: 'calc(100% - 260px)',
+          minWidth: 0,
           flexGrow: 1,
           p: { xs: 1.5, sm: 3 },
           pb: { xs: 9, md: 3 },
           minHeight: '100vh',
-          bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#090d16' : 'rgb(247, 246, 242)')
+          bgcolor: 'background.default'
         }}
       >
         <Toolbar sx={{ mt: 'inherit' }} />

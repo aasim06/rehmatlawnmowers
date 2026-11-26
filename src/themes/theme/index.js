@@ -1,47 +1,43 @@
-import { generate } from '@ant-design/colors';
+// ==============================|| PRESET THEME - TAILADMIN ||============================== //
 
-// ==============================|| PRESET THEME - DEFAULT ||============================== //
-
-export default function Default(colors) {
-  const { blue, red, gold, cyan, green, grey } = colors;
-  const primaryShades = generate('#0096D6');
+export default function Default() {
   const greyColors = {
-    0: grey[0],
-    50: grey[1],
-    100: grey[2],
-    200: grey[3],
-    300: grey[4],
-    400: grey[5],
-    500: grey[6],
-    600: grey[7],
-    700: grey[8],
-    800: grey[9],
-    900: grey[10],
-    A50: grey[15],
-    A100: grey[11],
-    A200: grey[12],
-    A400: grey[13],
-    A700: grey[14],
-    A800: grey[16]
+    0: '#ffffff',
+    50: '#f9fafb',
+    100: '#f2f4f7',
+    200: '#e4e7ec',
+    300: '#d0d5dd',
+    400: '#98a2b3',
+    500: '#667085',
+    600: '#475467',
+    700: '#344054',
+    800: '#1d2939',
+    900: '#101828',
+    A50: '#f9fafb',
+    A100: '#f2f4f7',
+    A200: '#e4e7ec',
+    A400: '#98a2b3',
+    A700: '#344054',
+    A800: '#1d2939'
   };
-  const contrastText = '#fff';
+  const contrastText = '#ffffff';
 
   return {
     primary: {
-      lighter: primaryShades[0],
-      100: primaryShades[1],
-      200: primaryShades[2],
-      light: primaryShades[3],
-      400: primaryShades[4],
-      main: '#0096D6',
-      dark: primaryShades[6],
-      700: primaryShades[7],
-      darker: primaryShades[8],
-      900: primaryShades[9],
+      lighter: '#ecf3ff',
+      100: '#dde9ff',
+      200: '#c2d6ff',
+      light: '#7592ff',
+      400: '#7592ff',
+      main: '#465fff',
+      dark: '#3641f5',
+      700: '#2a31d8',
+      darker: '#252dae',
+      900: '#19216c',
       contrastText
     },
     secondary: {
-      lighter: greyColors[100],
+      lighter: greyColors[50],
       100: greyColors[100],
       200: greyColors[200],
       light: greyColors[300],
@@ -52,40 +48,40 @@ export default function Default(colors) {
       800: greyColors[800],
       darker: greyColors[900],
       A100: greyColors[0],
-      A200: greyColors.A400,
-      A300: greyColors.A700,
+      A200: greyColors[400],
+      A300: greyColors[700],
       contrastText: greyColors[0]
     },
     error: {
-      lighter: red[0],
-      light: red[2],
-      main: red[4],
-      dark: red[7],
-      darker: red[9],
+      lighter: '#fef3f2',
+      light: '#fecdca',
+      main: '#f04438',
+      dark: '#d92d20',
+      darker: '#912018',
       contrastText
     },
     warning: {
-      lighter: gold[0],
-      light: gold[3],
-      main: gold[5],
-      dark: gold[7],
-      darker: gold[9],
-      contrastText: greyColors[100]
+      lighter: '#fffaeb',
+      light: '#fedf89',
+      main: '#f79009',
+      dark: '#dc6803',
+      darker: '#93370d',
+      contrastText
     },
     info: {
-      lighter: cyan[0],
-      light: cyan[3],
-      main: cyan[5],
-      dark: cyan[7],
-      darker: cyan[9],
+      lighter: '#f0f9ff',
+      light: '#b9e6fe',
+      main: '#0ba5ec',
+      dark: '#0086c9',
+      darker: '#065986',
       contrastText
     },
     success: {
-      lighter: green[0],
-      light: green[3],
-      main: green[5],
-      dark: green[7],
-      darker: green[9],
+      lighter: '#ecfdf3',
+      light: '#a6f4c5',
+      main: '#12b76a',
+      dark: '#039855',
+      darker: '#05603a',
       contrastText
     },
     grey: greyColors

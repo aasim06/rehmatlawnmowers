@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from 'context/AuthContext';
-import { initialCategories } from 'data/factoryStoreData';
+import { initialCategories, defaultMasterItemNames, defaultStoreItems } from 'data/factoryStoreData';
+import { formatItemsSummaryLabel } from 'utils/machineLedgerHelpers';
 import { db } from 'api/firebase';
 import {
   collection,
@@ -10,6 +11,15 @@ import {
   setDoc,
   deleteDoc
 } from 'firebase/firestore';
+
+// Modular Data Hooks
+import {
+  useExpensesModule,
+  useRepairsModule,
+  useVendorsModule,
+  useAuditAndNotifications,
+  useStoreFinanceModule
+} from './modules';
 
 export const StoreInventoryContext = createContext();
 
@@ -20,6 +30,31 @@ const safeParseJSON = (key, fallback = []) => {
   } catch (err) {
     console.error(`SafeJSON Error parsing ${key}:`, err);
     return fallback;
+  }
+};
+
+const safeSetJSON = (key, value) => {
+  try {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => {
+        try {
+          localStorage.setItem(key, serialized);
+        } catch (e) {
+          console.warn(`LocalStorage write warning for ${key}:`, e);
+        }
+      });
+    } else {
+      setTimeout(() => {
+        try {
+          localStorage.setItem(key, serialized);
+        } catch (e) {
+          console.warn(`LocalStorage write warning for ${key}:`, e);
+        }
+      }, 0);
+    }
+  } catch (err) {
+    console.warn(`SafeSetJSON error for ${key}:`, err);
   }
 };
 
@@ -97,36 +132,11 @@ export function StoreInventoryProvider({ children }) {
   // 2. Usage & Issue Logs State (Clean Zero Start)
   const [usageLogs, setUsageLogs] = useState(() => safeParseJSON('rehmat_store_usage_logs_v2', []));
 
-  // Persistent Deleted Tracking Blacklists to prevent Supabase polling from restoring deleted items/logs/sales/vendors
-  const [deletedLogIds, setDeletedLogIds] = useState(() => safeParseJSON('rehmat_deleted_log_ids', []));
-  const [deletedItemIds, setDeletedItemIds] = useState(() => safeParseJSON('rehmat_deleted_item_ids', []));
-  const [deletedSaleIds, setDeletedSaleIds] = useState(() => safeParseJSON('rehmat_deleted_sale_ids', []));
-  const [deletedVendorIds, setDeletedVendorIds] = useState(() => safeParseJSON('rehmat_deleted_vendor_ids', []));
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_deleted_log_ids', JSON.stringify(deletedLogIds));
-  }, [deletedLogIds]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_deleted_item_ids', JSON.stringify(deletedItemIds));
-  }, [deletedItemIds]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_deleted_sale_ids', JSON.stringify(deletedSaleIds));
-  }, [deletedSaleIds]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_deleted_vendor_ids', JSON.stringify(deletedVendorIds));
-  }, [deletedVendorIds]);
-
-  const [deletedCategoryIds, setDeletedCategoryIds] = useState(() => safeParseJSON('rehmat_deleted_category_ids', []));
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(deletedCategoryIds));
-  }, [deletedCategoryIds]);
-
-  // 3. Vendors / Suppliers State (Clean Zero Start)
-  const [vendors, setVendors] = useState(() => safeParseJSON('rehmat_store_vendors_v2', []));
+  // Persistent Deleted Tracking Blacklists to prevent stale polling
+  const [, setDeletedLogIds] = useState(() => safeParseJSON('rehmat_deleted_log_ids', []));
+  const [, setDeletedItemIds] = useState(() => safeParseJSON('rehmat_deleted_item_ids', []));
+  const [, setDeletedSaleIds] = useState(() => safeParseJSON('rehmat_deleted_sale_ids', []));
+  const [, setDeletedCategoryIds] = useState(() => safeParseJSON('rehmat_deleted_category_ids', []));
 
   // 4. Categories State (Persistent Start with fallback to initialCategories)
   const [categories, setCategories] = useState(() => {
@@ -138,7 +148,7 @@ export function StoreInventoryProvider({ children }) {
       const clean = saved.filter((c) => !deletedCatSet.has(String(c.id).toLowerCase()) && !deletedCatSet.has(String(c.name || '').toLowerCase()));
       if (clean.length > 0) {
         const normalized = normalizeCategories(clean);
-        localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(normalized));
+        safeSetJSON('rehmat_store_categories_v2', JSON.stringify(normalized));
         return normalized;
       }
     }
@@ -148,10 +158,11 @@ export function StoreInventoryProvider({ children }) {
     return initialCategories;
   });
 
-  // 7. Pre-saved Master Item Names List State (Clean Zero Start)
+  // 7. Pre-saved Master Item Names List State
   const [masterItemNames, setMasterItemNames] = useState(() => {
-    const saved = safeParseJSON('rehmat_store_master_item_names_v2', []);
-    return (saved || []).filter((m) => !m.id?.startsWith('MST-') && !m.name?.includes('3HP Electric Motor'));
+    const saved = safeParseJSON('rehmat_store_master_item_names_v2', null);
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    return defaultMasterItemNames;
   });
 
   const initialMachineModels = [
@@ -205,194 +216,79 @@ export function StoreInventoryProvider({ children }) {
     ];
   });
 
-  // 11. Customer Payments & Ledger Entries State (Clean Zero Start)
+  // 11. Customer Payments & Machine Customer Directory State
   const [customerPayments, setCustomerPayments] = useState(() => safeParseJSON('rehmat_store_customer_payments_v2', []));
+  const [machineCustomers, setMachineCustomers] = useState(() => safeParseJSON('rehmat_store_machine_customers_v1', []));
 
-  // 12. Vendor Payments & Ledger Entries State (Clean Zero Start)
-  const [vendorPayments, setVendorPayments] = useState(() => safeParseJSON('rehmat_store_vendor_payments_v2', []));
+  // --- Modular Data Sub-systems (Expenses, Repairs, Vendors, Audit & Notifications) ---
+  const {
+    auditLogs,
+    logActivity,
+    deleteAuditLog,
+    clearAuditLogs,
+    notifications,
+    addNotification,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications
+  } = useAuditAndNotifications();
 
-  // 13. Machine Repairs & Job Cards State (Clean Zero Start)
-  const [machineRepairs, setMachineRepairs] = useState(() => safeParseJSON('rehmat_store_machine_repairs_v1', []));
+  const {
+    expenses,
+    setExpenses,
+    expenseCategories,
+    setExpenseCategories,
+    addExpense,
+    deleteExpense,
+    addExpenseCategory,
+    deleteExpenseCategory
+  } = useExpensesModule({ logActivity });
 
-  // 14. Expenses State & Categories
-  const [expenses, setExpenses] = useState(() => safeParseJSON('rehmat_store_expenses_v1', []));
+  const {
+    machineRepairs,
+    setMachineRepairs,
+    addMachineRepair,
+    updateMachineRepair,
+    deleteMachineRepair
+  } = useRepairsModule();
 
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(expenses));
-  }, [expenses]);
+  const {
+    vendors,
+    setVendors,
+    vendorPayments,
+    setVendorPayments,
+    addVendor,
+    updateVendor,
+    deleteVendor,
+    deleteMultipleVendors,
+    addVendorPayment,
+    deleteVendorPayment
+  } = useVendorsModule();
 
-  const defaultExpenseCategories = [
-    'Tea & Refreshment',
-    'Fuel & Transport',
-    'Utilities & Bills',
-    'Staff Wages & Labor',
-    'Shop Maintenance & Tools',
-    'Stationery & Office',
-    'Miscellaneous & Others'
-  ];
-
-  const [expenseCategories, setExpenseCategories] = useState(() => {
-    const saved = safeParseJSON('rehmat_store_expense_categories_v1', null);
-    if (Array.isArray(saved) && saved.length > 0) return saved;
-    return defaultExpenseCategories;
+  const updateLogRef = useRef(null);
+  const {
+    storeCustomers,
+    setStoreCustomers,
+    storePayments,
+    setStorePayments,
+    syncStoreFinanceFromCloud,
+    addStoreCustomer,
+    updateStoreCustomer,
+    deleteStoreCustomer,
+    addStorePayment,
+    deleteStorePayment
+  } = useStoreFinanceModule({
+    usageLogs,
+    updateLog: (...args) => updateLogRef.current?.(...args),
+    vendorPayments,
+    deleteVendorPayment
   });
 
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_expense_categories_v1', JSON.stringify(expenseCategories));
-  }, [expenseCategories]);
-
-  // 15. Audit Logs State
-  const initialAuditLogs = [
-    {
-      id: 'LOG-1',
-      userEmail: 'storekeeper@rehmat.com',
-      userName: 'Store Keeper Ali',
-      userRole: 'Store Keeper',
-      actionType: 'Stock Out',
-      details: 'Issued 2 Pcs - Rehmat 20" Lawn Mower Blade to Customer',
-      timestamp: new Date(Date.now() - 3600000).toLocaleString()
-    },
-    {
-      id: 'LOG-2',
-      userEmail: 'admin@rehmat.com',
-      userName: 'Sabeel (Admin)',
-      userRole: 'Super Admin',
-      actionType: 'Stock In',
-      details: 'Added Received Stock +10 Pcs SKF Ball Bearing',
-      timestamp: new Date(Date.now() - 7200000).toLocaleString()
-    }
-  ];
-
-  const [auditLogs, setAuditLogs] = useState(() => safeParseJSON('rehmat_store_audit_logs', initialAuditLogs));
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_audit_logs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  const logActivity = (actionType, details, userOverride = null) => {
-    const savedUser = safeParseJSON('factory_store_user', null);
-    const activeUser = userOverride || savedUser || { name: 'Admin', email: 'admin@rehmat.com', role: 'Super Admin' };
-
-    const newLog = {
-      id: 'LOG-' + Date.now(),
-      userEmail: activeUser.email || 'user@rehmat.com',
-      userName: activeUser.name || activeUser.email?.split('@')[0] || 'Staff User',
-      userRole: activeUser.role || 'Staff',
-      actionType,
-      details,
-      timestamp: new Date().toLocaleString()
-    };
-
-    setAuditLogs((prev) => [newLog, ...prev]);
-  };
-
-  const deleteAuditLog = (id) => {
-    setAuditLogs((prev) => prev.filter((l) => l.id !== id));
-  };
-
-  const clearAuditLogs = () => {
-    setAuditLogs([]);
-  };
-
-  // Real-time Super Admin Notifications State
-  const initialNotifications = [
-    {
-      id: 'notif-1',
-      senderName: 'Store Keeper Ali',
-      senderRole: 'Store Keeper',
-      title: 'Stock Out Issued',
-      message: 'Issued 25x SKF Ball Bearings for Worker Aslam',
-      type: 'stock-out',
-      timestamp: '10 mins ago',
-      read: false
-    },
-    {
-      id: 'notif-2',
-      senderName: 'Store Keeper Ali',
-      senderRole: 'Store Keeper',
-      title: 'Low Stock Reorder Request',
-      message: '3HP Electric Motor stock is below 5 units. Please reorder.',
-      type: 'alert',
-      timestamp: '1 hour ago',
-      read: false
-    }
-  ];
-
-  const [notifications, setNotifications] = useState(() => safeParseJSON('rehmat_store_notifications_v1', initialNotifications));
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_notifications_v1', JSON.stringify(notifications));
-  }, [notifications]);
-
-  const addNotification = ({ title, message, type = 'alert', senderName = 'Store Keeper Ali', senderRole = 'Store Keeper' }) => {
-    const newNotif = {
-      id: 'notif-' + Date.now(),
-      senderName,
-      senderRole,
-      title,
-      message,
-      type,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      read: false
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  const markNotificationRead = (id) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  };
-
-  const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
-
-  // Sync state to LocalStorage as secondary backup
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(items));
-  }, [items]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(machineSales));
-  }, [machineSales]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(machineRepairs));
-  }, [machineRepairs]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(usageLogs));
-  }, [usageLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(vendors));
-  }, [vendors]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(masterItemNames));
-  }, [masterItemNames]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(machineRecipes));
-  }, [machineRecipes]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(customerPayments));
-  }, [customerPayments]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
-  }, [vendorPayments]);
-
   // Parallel Data Fetching via Firebase Firestore for zero-latency initial load & clean error handling
+  const isFetchingRef = useRef(false);
   const fetchFirebaseData = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         return;
@@ -403,6 +299,9 @@ export function StoreInventoryProvider({ children }) {
       const deletedItemSet = new Set(safeParseJSON('rehmat_deleted_item_ids', []).map(String));
       const deletedLogSet = new Set(safeParseJSON('rehmat_deleted_log_ids', []).map(String));
       const deletedSaleSet = new Set(safeParseJSON('rehmat_deleted_sale_ids', []).map(String));
+      const deletedRepairSet = new Set(safeParseJSON('rehmat_deleted_repair_ids', []).map(String));
+      const deletedCustPaySet = new Set(safeParseJSON('rehmat_deleted_customer_payment_ids', []).map(String));
+      const deletedMachineCustomerSet = new Set(safeParseJSON('rehmat_deleted_machine_customer_ids', []).map(String));
       const deletedVendorSet = new Set(safeParseJSON('rehmat_deleted_vendor_ids', []).map(String));
       const deletedCategorySet = new Set(safeParseJSON('rehmat_deleted_category_ids', []).map((x) => String(x).toLowerCase()));
 
@@ -417,7 +316,8 @@ export function StoreInventoryProvider({ children }) {
         vendPaySnap,
         repairsSnap,
         expensesSnap,
-        recipesSnap
+        recipesSnap,
+        machineCustomersSnap
       ] = await Promise.allSettled([
         getDocs(collection(db, 'store_items')),
         getDocs(collection(db, 'usage_logs')),
@@ -429,7 +329,8 @@ export function StoreInventoryProvider({ children }) {
         getDocs(collection(db, 'vendor_payments')),
         getDocs(collection(db, 'machine_repairs')),
         getDocs(collection(db, 'expenses')),
-        getDocs(collection(db, 'machine_recipes'))
+        getDocs(collection(db, 'machine_recipes')),
+        getDocs(collection(db, 'machine_customers'))
       ]);
 
       const toDocs = (res) => (res.status === 'fulfilled' && res.value?.docs ? res.value.docs.map((d) => ({ id: d.id, ...d.data() })) : []);
@@ -444,6 +345,7 @@ export function StoreInventoryProvider({ children }) {
       const repairsList = toDocs(repairsSnap);
       const expensesList = toDocs(expensesSnap);
       const recipesList = toDocs(recipesSnap);
+      const machineCustomersList = toDocs(machineCustomersSnap);
 
       if (itemsSnap.status === 'fulfilled') {
         const cleanItemsData = itemsList.filter(
@@ -467,7 +369,7 @@ export function StoreInventoryProvider({ children }) {
         }));
         if (mappedItems.length > 0) {
           setItems(mappedItems);
-          localStorage.setItem('rehmat_store_items_v2', JSON.stringify(mappedItems));
+          safeSetJSON('rehmat_store_items_v2', JSON.stringify(mappedItems));
         }
       }
 
@@ -524,7 +426,7 @@ export function StoreInventoryProvider({ children }) {
         });
         if (mappedLogs.length > 0) {
           setUsageLogs(mappedLogs);
-          localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
+          safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
         }
       }
 
@@ -547,7 +449,7 @@ export function StoreInventoryProvider({ children }) {
         }));
         if (mappedVendors.length > 0) {
           setVendors(mappedVendors);
-          localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
+          safeSetJSON('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
         }
       }
 
@@ -587,7 +489,7 @@ export function StoreInventoryProvider({ children }) {
         });
         if (mappedSales.length > 0) {
           setMachineSales(mappedSales);
-          localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
+          safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
         }
       }
 
@@ -603,7 +505,7 @@ export function StoreInventoryProvider({ children }) {
         }));
         if (mappedCats.length > 0) {
           setCategories(mappedCats);
-          localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(mappedCats));
+          safeSetJSON('rehmat_store_categories_v2', JSON.stringify(mappedCats));
         }
       }
 
@@ -612,16 +514,33 @@ export function StoreInventoryProvider({ children }) {
           id: m.id,
           name: m.name,
           category: m.category || 'General',
-          defaultUnit: m.default_unit || m.defaultUnit || 'PCS'
+          defaultUnit: m.default_unit || m.defaultUnit || 'PCS',
+          skuCode: m.sku_code || m.skuCode || '',
+          unitPrice: parseFloat(m.unit_price !== undefined ? m.unit_price : m.unitPrice) || 0
         }));
-        setMasterItemNames(cleanMasterItems);
-        localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(cleanMasterItems));
+        if (cleanMasterItems.length > 0) {
+          setMasterItemNames(cleanMasterItems);
+          safeSetJSON('rehmat_store_master_item_names_v2', JSON.stringify(cleanMasterItems));
+        } else {
+          // If Firestore is empty (e.g. after factory reset), keep local or fall back to defaultMasterItemNames
+          const existing = safeParseJSON('rehmat_store_master_item_names_v2', null);
+          const toSet = Array.isArray(existing) && existing.length > 0 ? existing : defaultMasterItemNames;
+          setMasterItemNames(toSet);
+          safeSetJSON('rehmat_store_master_item_names_v2', JSON.stringify(toSet));
+        }
       }
 
       if (custPaySnap.status === 'fulfilled') {
-        const mappedCustPay = custPayList.map((p) => ({
+        const cleanCustPay = custPayList.filter((p) => !deletedCustPaySet.has(String(p.id)));
+        cleanCustPay.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+        const mappedCustPay = cleanCustPay.map((p) => ({
           id: p.id,
+          voucherNo: p.voucher_no || p.voucherNo || `PAY-${String(p.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`,
           invoiceId: p.invoice_id || p.invoiceId || '',
+          repairId: p.repair_id || p.repairId || '',
+          referenceType: p.reference_type || p.referenceType || (p.repair_id || p.repairId ? 'Repair' : p.invoice_id || p.invoiceId ? 'Sale' : 'Account'),
+          referenceLabel: p.reference_label || p.referenceLabel || '',
+          entryType: p.entry_type || p.entryType || 'Receipt',
           customerName: p.customer_name || p.customerName,
           amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
           paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
@@ -630,9 +549,42 @@ export function StoreInventoryProvider({ children }) {
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
-        if (mappedCustPay.length > 0) {
-          setCustomerPayments(mappedCustPay);
-          localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(mappedCustPay));
+
+        // Preserve any locally created vouchers whose Firestore sync is still in flight
+        const remoteIdSet = new Set(mappedCustPay.map((p) => String(p.id)));
+        const pendingIds = safeParseJSON('rehmat_pending_customer_payment_ids', []).map(String);
+        const stillPendingIds = pendingIds.filter((id) => !remoteIdSet.has(id) && !deletedCustPaySet.has(id));
+        if (stillPendingIds.length !== pendingIds.length) {
+          safeSetJSON('rehmat_pending_customer_payment_ids', JSON.stringify(stillPendingIds));
+        }
+
+        const localCustPay = safeParseJSON('rehmat_store_customer_payments_v2', []);
+        const pendingSet = new Set(stillPendingIds);
+        const unsyncedLocal = localCustPay.filter((p) => pendingSet.has(String(p.id)) && !remoteIdSet.has(String(p.id)));
+        const mergedCustPay = [...unsyncedLocal, ...mappedCustPay];
+
+        if (mergedCustPay.length > 0) {
+          setCustomerPayments(mergedCustPay);
+          safeSetJSON('rehmat_store_customer_payments_v2', JSON.stringify(mergedCustPay));
+        }
+      }
+
+      if (machineCustomersSnap.status === 'fulfilled') {
+        const cleanCustDir = machineCustomersList.filter((c) => !deletedMachineCustomerSet.has(String(c.id)));
+        cleanCustDir.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        const mappedCustDir = cleanCustDir.map((c) => ({
+          id: c.id,
+          name: (c.name || '').trim(),
+          phone: c.phone || '',
+          city: c.city || c.city_address || '',
+          address: c.address || c.city_address || '',
+          openingBalance: parseFloat(c.opening_balance !== undefined ? c.opening_balance : c.openingBalance) || 0,
+          notes: c.notes || '',
+          createdAt: c.created_at || c.createdAt || ''
+        }));
+        if (mappedCustDir.length > 0) {
+          setMachineCustomers(mappedCustDir);
+          safeSetJSON('rehmat_store_machine_customers_v1', JSON.stringify(mappedCustDir));
         }
       }
 
@@ -641,45 +593,66 @@ export function StoreInventoryProvider({ children }) {
         const cleanVendPay = vendPayList.filter((p) => !deletedVendPaySet.has(String(p.id)));
         const mappedVendPay = cleanVendPay.map((p) => ({
           id: p.id,
+          voucherNo: p.voucher_no || p.voucherNo || `VP-${String(p.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`,
           vendorName: (p.vendor_name || p.vendorName || '').trim(),
           amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
           paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
           referenceNo: p.reference_no || p.referenceNo || '',
+          items: Array.isArray(p.items) ? p.items : [],
           notes: p.notes || '',
           time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
           createdAt: p.created_at || p.createdAt
         }));
         if (mappedVendPay.length > 0) {
           setVendorPayments(mappedVendPay);
-          localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
+          safeSetJSON('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
         }
       }
 
       if (repairsSnap.status === 'fulfilled') {
-        const mappedRepairs = repairsList.map((r) => ({
-          id: r.id,
-          repairNo: r.repair_no || r.repairNo || `REP-${String(r.id).slice(0, 4)}`,
-          customerName: r.customer_name || r.customerName,
-          customerPhone: r.customer_phone || r.customerPhone || 'N/A',
-          cityAddress: r.city_address || r.cityAddress || 'Lahore',
-          machineName: r.machine_name || r.machineName,
-          serialNo: r.serial_no || r.serialNo || 'N/A',
-          faultDescription: r.fault_description || r.faultDescription || 'General Service',
-          partsCost: parseFloat(r.parts_cost !== undefined ? r.parts_cost : r.partsCost) || 0,
-          laborCost: parseFloat(r.labor_cost !== undefined ? r.labor_cost : r.laborCost) || 0,
-          discountAmount: parseFloat(r.discount_amount !== undefined ? r.discount_amount : r.discountAmount) || 0,
-          totalCost: parseFloat(r.total_cost !== undefined ? r.total_cost : r.totalCost) || 0,
-          paidAmount: parseFloat(r.paid_amount !== undefined ? r.paid_amount : r.paidAmount) || 0,
-          balanceAmount: parseFloat(r.balance_amount !== undefined ? r.balance_amount : r.balanceAmount) || 0,
-          repairStatus: r.repair_status || r.repairStatus || 'Received',
-          paymentStatus: (parseFloat(r.balance_amount !== undefined ? r.balance_amount : r.balanceAmount) || 0) <= 0 ? 'Paid' : (parseFloat(r.paid_amount !== undefined ? r.paid_amount : r.paidAmount) || 0) > 0 ? 'Partial' : 'Pending',
-          receivedDate: r.received_date || r.receivedDate || (r.created_at ? new Date(r.created_at).toLocaleDateString() : new Date().toLocaleDateString()),
-          promisedDate: r.promised_date || r.promisedDate || '1-2 Days',
-          repairItems: r.repair_items || r.repairItems || []
-        }));
+        const cleanRepairs = repairsList.filter((r) => !deletedRepairSet.has(String(r.id)));
+        cleanRepairs.sort((a, b) => new Date(b.created_at || b.dateISO || 0) - new Date(a.created_at || a.dateISO || 0));
+        const mappedRepairs = cleanRepairs.map((r) => {
+          const partsCost = Math.max(0, parseFloat(r.parts_cost !== undefined ? r.parts_cost : r.partsCost) || 0);
+          const laborCost = Math.max(0, parseFloat(r.labor_cost !== undefined ? r.labor_cost : r.laborCost) || 0);
+          const discountAmount = Math.max(0, parseFloat(r.discount_amount !== undefined ? r.discount_amount : r.discountAmount) || 0);
+          const grossCost = partsCost + laborCost;
+          const rawTotal = parseFloat(r.total_cost !== undefined ? r.total_cost : r.totalCost);
+          const totalCost =
+            !Number.isNaN(rawTotal) && !(grossCost > 0 && discountAmount > 0 && Math.abs(rawTotal - grossCost) < 0.01)
+              ? Math.max(0, rawTotal)
+              : Math.max(0, grossCost - discountAmount);
+          const paidAmount = Math.max(0, parseFloat(r.paid_amount !== undefined ? r.paid_amount : r.paidAmount) || 0);
+          const balanceAmount = Math.max(0, totalCost - paidAmount);
+
+          return {
+            id: r.id,
+            repairNo: r.repair_no || r.repairNo || `REP-${String(r.id).slice(0, 4)}`,
+            customerName: r.customer_name || r.customerName,
+            customerPhone: r.customer_phone || r.customerPhone || 'N/A',
+            cityAddress: r.city_address || r.cityAddress || 'Lahore',
+            machineName: r.machine_name || r.machineName,
+            serialNo: r.serial_no || r.serialNo || 'N/A',
+            faultDescription: r.fault_description || r.faultDescription || 'General Service',
+            partsCost,
+            laborCost,
+            discountAmount,
+            totalCost,
+            paidAmount,
+            balanceAmount,
+            repairStatus: r.repair_status || r.repairStatus || 'Received',
+            paymentStatus: totalCost > 0 && balanceAmount <= 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending',
+            receivedDate: r.received_date || r.receivedDate || (r.created_at ? new Date(r.created_at).toLocaleDateString() : new Date().toLocaleDateString()),
+            promisedDate: r.promised_date || r.promisedDate || '1-2 Days',
+            deliveredDate: r.delivered_date || r.deliveredDate || '',
+            technicianNotes: r.technician_notes || r.technicianNotes || '',
+            dateISO: r.created_at || r.dateISO || '',
+            repairItems: r.repair_items || r.repairItems || []
+          };
+        });
         if (mappedRepairs.length > 0) {
           setMachineRepairs(mappedRepairs);
-          localStorage.setItem('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
+          safeSetJSON('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
         }
       }
 
@@ -697,7 +670,7 @@ export function StoreInventoryProvider({ children }) {
         }));
         if (mappedExpenses.length > 0) {
           setExpenses(mappedExpenses);
-          localStorage.setItem('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
+          safeSetJSON('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
         }
       }
 
@@ -713,11 +686,14 @@ export function StoreInventoryProvider({ children }) {
         }));
         if (mappedRecipes.length > 0) {
           setMachineRecipes(mappedRecipes);
-          localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
+          safeSetJSON('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
         }
       }
+      await syncStoreFinanceFromCloud();
     } catch {
       // Cloud fetch notification
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
@@ -726,8 +702,15 @@ export function StoreInventoryProvider({ children }) {
 
     fetchFirebaseData();
 
-    // Auto-refetch on window focus for multi-device sync
-    const handleFocus = () => fetchFirebaseData();
+    // Throttled refetch on window focus for multi-device sync (at most once every 2 minutes)
+    let lastFocusFetch = Date.now();
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusFetch > 120000) {
+        lastFocusFetch = now;
+        fetchFirebaseData();
+      }
+    };
     window.addEventListener('focus', handleFocus);
 
     // Periodic cloud poll every 90 seconds
@@ -812,6 +795,45 @@ export function StoreInventoryProvider({ children }) {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const restoreDefaultMasterItemNames = async () => {
+    setMasterItemNames(defaultMasterItemNames);
+    safeSetJSON('rehmat_store_master_item_names_v2', JSON.stringify(defaultMasterItemNames));
+    safeSetJSON('rehmat_shop_master_item_names_v2', JSON.stringify(defaultMasterItemNames));
+    try {
+      for (const m of defaultMasterItemNames) {
+        await setDoc(
+          doc(db, 'master_item_names', String(m.id)),
+          {
+            id: m.id,
+            name: m.name,
+            category: m.category,
+            sku_code: m.skuCode,
+            unit_price: m.unitPrice,
+            default_unit: m.defaultUnit,
+            created_at: new Date().toISOString()
+          },
+          { merge: true }
+        );
+      }
+    } catch (e) {
+      console.warn('Firebase master items sync warning:', e);
+    }
+    return { success: true, count: defaultMasterItemNames.length };
+  };
+
+  const restoreDefaultStoreItems = async () => {
+    setItems(defaultStoreItems);
+    safeSetJSON('rehmat_store_items_v2', JSON.stringify(defaultStoreItems));
+    try {
+      for (const it of defaultStoreItems) {
+        await setDoc(doc(db, 'store_items', String(it.id)), it, { merge: true });
+      }
+    } catch (e) {
+      console.warn('Firebase store items sync warning:', e);
+    }
+    return { success: true, count: defaultStoreItems.length };
   };
 
   // 1. Issue Stock / Daily Usage Action
@@ -1081,7 +1103,8 @@ export function StoreInventoryProvider({ children }) {
           amountPaid: paidVal,
           paymentMethod: extraData?.paymentMethod || 'Cash',
           referenceNo: extraData?.biltyNo ? `Bill #${extraData.biltyNo}` : refNo,
-          notes: `Paid at Stock In (${targetItem.name || 'Goods'})`
+          items: [{ name: targetItem.name || 'Store Item', qty: actualQty }],
+          notes: 'Paid at Stock In (1 item)'
         });
       }
 
@@ -1192,12 +1215,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_item_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...idsToAdd]));
-    localStorage.setItem('rehmat_deleted_item_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_item_ids', JSON.stringify(updatedDeleted));
     setDeletedItemIds(updatedDeleted);
 
     const existingItems = safeParseJSON('rehmat_store_items_v2', []);
     const filteredItems = existingItems.filter((i) => String(i.id) !== stringId && String(i.itemCode) !== stringId);
-    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(filteredItems));
+    safeSetJSON('rehmat_store_items_v2', JSON.stringify(filteredItems));
     setItems((prev) => prev.filter((i) => String(i.id) !== stringId && String(i.itemCode) !== stringId));
 
     logActivity(
@@ -1224,12 +1247,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_item_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...stringIds]));
-    localStorage.setItem('rehmat_deleted_item_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_item_ids', JSON.stringify(updatedDeleted));
     setDeletedItemIds(updatedDeleted);
 
     const existingItems = safeParseJSON('rehmat_store_items_v2', []);
     const filteredItems = existingItems.filter((i) => !idsSet.has(String(i.id)) && !idsSet.has(String(i.itemCode)));
-    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(filteredItems));
+    safeSetJSON('rehmat_store_items_v2', JSON.stringify(filteredItems));
     setItems((prev) => prev.filter((i) => !idsSet.has(String(i.id)) && !idsSet.has(String(i.itemCode))));
 
     logActivity(
@@ -1257,98 +1280,12 @@ export function StoreInventoryProvider({ children }) {
     });
 
     setItems(cleaned);
-    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(cleaned));
+    safeSetJSON('rehmat_store_items_v2', JSON.stringify(cleaned));
 
     try {
       // Firebase clean duplicate placeholder
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  // 6. Vendor Actions
-  const addVendor = async (vendorData) => {
-    const vendorId = generateUUID();
-    const newVendor = {
-      ...vendorData,
-      id: vendorId
-    };
-    setVendors((prev) => [newVendor, ...prev]);
-
-    try {
-      await setDoc(doc(db, 'vendors', String(vendorId)), {
-        id: vendorId,
-        name: vendorData.name || 'Vendor',
-        contact_person: vendorData.contactPerson || vendorData.name,
-        phone: vendorData.phone || 'N/A',
-        email: vendorData.email || 'N/A',
-        address: vendorData.address || 'Local',
-        supplied_category: vendorData.suppliedCategory || 'General',
-        status: 1,
-        rating: 5.0
-      }, { merge: true });
-    } catch (e) {
-      console.error('Firebase addVendor error:', e);
-    }
-  };
-
-  const updateVendor = async (vendorId, updatedData) => {
-    setVendors((prev) =>
-      prev.map((v) => (v.id === vendorId ? { ...v, ...updatedData } : v))
-    );
-
-    try {
-      await setDoc(doc(db, 'vendors', String(vendorId)), {
-        name: updatedData.name,
-        contact_person: updatedData.contactPerson || updatedData.name,
-        phone: updatedData.phone,
-        email: updatedData.email,
-        address: updatedData.address,
-        supplied_category: updatedData.suppliedCategory
-      }, { merge: true });
-    } catch (e) {
-      console.error('Firebase updateVendor error:', e);
-    }
-  };
-
-  const deleteVendor = async (vendorId) => {
-    const stringId = String(vendorId);
-    const existingDeleted = safeParseJSON('rehmat_deleted_vendor_ids', []);
-    const updatedDeleted = Array.from(new Set([...existingDeleted, stringId]));
-    localStorage.setItem('rehmat_deleted_vendor_ids', JSON.stringify(updatedDeleted));
-    setDeletedVendorIds(updatedDeleted);
-
-    const existingVendors = safeParseJSON('rehmat_store_vendors_v2', []);
-    const filteredVendors = existingVendors.filter((v) => String(v.id) !== stringId);
-    localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(filteredVendors));
-    setVendors((prev) => prev.filter((v) => String(v.id) !== stringId));
-
-    try {
-      await deleteDoc(doc(db, 'vendors', String(vendorId)));
-    } catch (e) {
-      console.error('Firebase deleteVendor error:', e);
-    }
-  };
-
-  // Bulk Delete Vendors
-  const deleteMultipleVendors = async (vendorIds) => {
-    const stringIds = vendorIds.map(String);
-    const idsSet = new Set(stringIds);
-
-    const existingDeleted = safeParseJSON('rehmat_deleted_vendor_ids', []);
-    const updatedDeleted = Array.from(new Set([...existingDeleted, ...stringIds]));
-    localStorage.setItem('rehmat_deleted_vendor_ids', JSON.stringify(updatedDeleted));
-    setDeletedVendorIds(updatedDeleted);
-
-    const existingVendors = safeParseJSON('rehmat_store_vendors_v2', []);
-    const filteredVendors = existingVendors.filter((v) => !idsSet.has(String(v.id)));
-    localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(filteredVendors));
-    setVendors((prev) => prev.filter((v) => !idsSet.has(String(v.id))));
-
-    try {
-      await Promise.allSettled(vendorIds.map((id) => deleteDoc(doc(db, 'vendors', String(id)))));
-    } catch (e) {
-      console.error('Firebase deleteMultipleVendors error:', e);
     }
   };
 
@@ -1359,12 +1296,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_log_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...stringIds]));
-    localStorage.setItem('rehmat_deleted_log_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_log_ids', JSON.stringify(updatedDeleted));
     setDeletedLogIds(updatedDeleted);
 
     const existingLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
     const filteredLogs = existingLogs.filter((l) => !idsSet.has(String(l.id)));
-    localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(filteredLogs));
+    safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(filteredLogs));
     setUsageLogs((prev) => prev.filter((l) => !idsSet.has(String(l.id))));
 
     logActivity(
@@ -1394,7 +1331,7 @@ export function StoreInventoryProvider({ children }) {
     // Remove from deleted categories blacklist if re-added
     const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
     const updatedDeleted = existingDeleted.filter((id) => id !== categoryId && id !== newCategory.name.toLowerCase());
-    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
     setDeletedCategoryIds(updatedDeleted);
 
     setCategories((prev) => {
@@ -1402,7 +1339,7 @@ export function StoreInventoryProvider({ children }) {
       if (exists) return prev;
       const updated = [...(prev || []), newCategory];
       const normalized = normalizeCategories(updated);
-      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(normalized));
+      safeSetJSON('rehmat_store_categories_v2', JSON.stringify(normalized));
       return normalized;
     });
 
@@ -1422,7 +1359,7 @@ export function StoreInventoryProvider({ children }) {
   const updateCategory = async (categoryId, updatedData) => {
     setCategories((prev) => {
       const updated = (prev || []).map((c) => (c.id === categoryId ? { ...c, ...updatedData } : c));
-      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_store_categories_v2', JSON.stringify(updated));
       return updated;
     });
 
@@ -1447,12 +1384,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...idsToAdd]));
-    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
     setDeletedCategoryIds(updatedDeleted);
 
     setCategories((prev) => {
       const updated = (prev || []).filter((c) => String(c.id) !== stringId);
-      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_store_categories_v2', JSON.stringify(updated));
       return updated;
     });
 
@@ -1472,12 +1409,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_category_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...categoryIds.map(String), ...names]));
-    localStorage.setItem('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_category_ids', JSON.stringify(updatedDeleted));
     setDeletedCategoryIds(updatedDeleted);
 
     setCategories((prev) => {
       const updated = (prev || []).filter((c) => !idsSet.has(String(c.id)));
-      localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_store_categories_v2', JSON.stringify(updated));
       return updated;
     });
 
@@ -1502,12 +1439,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_log_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...idsToAdd]));
-    localStorage.setItem('rehmat_deleted_log_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_log_ids', JSON.stringify(updatedDeleted));
     setDeletedLogIds(updatedDeleted);
 
     const existingLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
     const filteredLogs = existingLogs.filter((l) => String(l.id) !== stringId);
-    localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(filteredLogs));
+    safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(filteredLogs));
     setUsageLogs((prev) => prev.filter((l) => String(l.id) !== stringId));
 
     logActivity(
@@ -1532,7 +1469,7 @@ export function StoreInventoryProvider({ children }) {
     // 1. Immediately update React State AND LocalStorage
     setUsageLogs((prev) => {
       const updated = prev.map((l) => (String(l.id) === stringId ? { ...l, ...updatedData } : l));
-      localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(updated));
       return updated;
     });
 
@@ -1562,6 +1499,8 @@ export function StoreInventoryProvider({ children }) {
       const payload = {};
       if (updatedData.itemName !== undefined) payload.item_name = updatedData.itemName;
       if (updatedData.usedBy !== undefined) payload.used_by = updatedData.usedBy;
+      if (updatedData.category !== undefined) payload.category = updatedData.category;
+      if (updatedData.notes !== undefined) payload.notes = updatedData.notes;
       if (updatedData.qtyUsed !== undefined) payload.qty_used = Number(updatedData.qtyUsed);
       if (updatedData.unitPrice !== undefined) payload.unit_price = Number(updatedData.unitPrice);
       if (updatedData.lineTotal !== undefined) payload.line_total = Number(updatedData.lineTotal);
@@ -1602,6 +1541,7 @@ export function StoreInventoryProvider({ children }) {
       console.error('Firebase updateLog error:', e);
     }
   };
+  updateLogRef.current = updateLog;
 
   // Machine Sales Actions
   const addMachineSale = async (newSaleData) => {
@@ -1662,7 +1602,7 @@ export function StoreInventoryProvider({ children }) {
       customerPhone: newSaleData.customerPhone || '',
       cityAddress: newSaleData.cityAddress || '',
       items: itemsList,
-      machineName: itemsList.length > 1 ? `${firstMachine.machineName} (+${itemsList.length - 1} more)` : firstMachine.machineName,
+      machineName: formatItemsSummaryLabel(itemsList, 'Machine'),
       serialNo: firstMachine.serialNo || '',
       qty: totalQtySum,
       unitPrice: firstMachine.unitPrice,
@@ -1677,28 +1617,38 @@ export function StoreInventoryProvider({ children }) {
       dateISO: now.toISOString()
     };
 
-    setMachineSales((prev) => [newEntry, ...prev]);
+    setMachineSales((prev) => {
+      const updated = [newEntry, ...prev];
+      safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(updated));
+      return updated;
+    });
 
     try {
-      await setDoc(doc(db, 'machine_sales', String(saleId)), {
-        id: saleId,
-        sale_no: saleNo,
-        customer_name: newEntry.customerName,
-        customer_phone: newEntry.customerPhone,
-        city_address: newEntry.cityAddress,
-        machine_name: newEntry.machineName,
-        serial_no: newEntry.serialNo,
-        qty: newEntry.qty,
-        unit_price: newEntry.unitPrice,
-        discount_amount: newEntry.discountAmount,
-        line_total: newEntry.lineTotal,
-        paid_amount: newEntry.paidAmount,
-        balance_amount: newEntry.balanceAmount,
-        payment_status: newEntry.paymentStatus,
-        time: newEntry.time,
-        items: newEntry.items || []
-      }, { merge: true });
-      fetchFirebaseData();
+      const writePromise = setDoc(
+        doc(db, 'machine_sales', String(saleId)),
+        {
+          id: saleId,
+          sale_no: saleNo,
+          customer_name: newEntry.customerName,
+          customer_phone: newEntry.customerPhone,
+          city_address: newEntry.cityAddress,
+          machine_name: newEntry.machineName,
+          serial_no: newEntry.serialNo,
+          qty: newEntry.qty,
+          unit_price: newEntry.unitPrice,
+          discount_amount: newEntry.discountAmount,
+          line_total: newEntry.lineTotal,
+          paid_amount: newEntry.paidAmount,
+          balance_amount: newEntry.balanceAmount,
+          payment_status: newEntry.paymentStatus,
+          time: newEntry.time,
+          items: newEntry.items || []
+        },
+        { merge: true }
+      ).catch((e) => {
+        console.error('Firebase addMachineSale Exception:', e);
+      });
+      await Promise.race([writePromise, new Promise((resolve) => setTimeout(resolve, 1200))]);
     } catch (e) {
       console.error('Firebase addMachineSale Exception:', e);
     }
@@ -1709,7 +1659,7 @@ export function StoreInventoryProvider({ children }) {
     let updatedList = [];
     setMachineSales((prev) => {
       updatedList = prev.map((m) => (String(m.id) === String(id) ? { ...m, ...updatedData } : m));
-      localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(updatedList));
+      safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(updatedList));
       return updatedList;
     });
 
@@ -1782,12 +1732,12 @@ export function StoreInventoryProvider({ children }) {
     const stringId = String(id);
     const existingDeleted = safeParseJSON('rehmat_deleted_sale_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, stringId]));
-    localStorage.setItem('rehmat_deleted_sale_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_sale_ids', JSON.stringify(updatedDeleted));
     setDeletedSaleIds(updatedDeleted);
 
     const existingSales = safeParseJSON('rehmat_store_machine_sales_v2', []);
     const filteredSales = existingSales.filter((m) => String(m.id) !== stringId);
-    localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(filteredSales));
+    safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(filteredSales));
     setMachineSales((prev) => prev.filter((m) => String(m.id) !== stringId));
 
     try {
@@ -1803,12 +1753,12 @@ export function StoreInventoryProvider({ children }) {
 
     const existingDeleted = safeParseJSON('rehmat_deleted_sale_ids', []);
     const updatedDeleted = Array.from(new Set([...existingDeleted, ...stringIds]));
-    localStorage.setItem('rehmat_deleted_sale_ids', JSON.stringify(updatedDeleted));
+    safeSetJSON('rehmat_deleted_sale_ids', JSON.stringify(updatedDeleted));
     setDeletedSaleIds(updatedDeleted);
 
     const existingSales = safeParseJSON('rehmat_store_machine_sales_v2', []);
     const filteredSales = existingSales.filter((m) => !idsSet.has(String(m.id)));
-    localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(filteredSales));
+    safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(filteredSales));
     setMachineSales((prev) => prev.filter((m) => !idsSet.has(String(m.id))));
 
     try {
@@ -1847,18 +1797,115 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // ----------------------------------------------------
-  // CUSTOMER LEDGER & PAYMENTS ACTIONS
+  // MACHINE CUSTOMERS & KHATA VOUCHERS ACTIONS
   // ----------------------------------------------------
+  const addMachineCustomer = async (customerData) => {
+    const custId = generateUUID();
+    const nowISO = new Date().toISOString();
+    const newCustomer = {
+      id: custId,
+      name: (customerData.name || '').trim(),
+      phone: (customerData.phone || '').trim(),
+      city: (customerData.city || '').trim(),
+      address: (customerData.address || customerData.city || '').trim(),
+      openingBalance: parseFloat(customerData.openingBalance) || 0,
+      notes: (customerData.notes || '').trim(),
+      createdAt: nowISO
+    };
+
+    setMachineCustomers((prev) => {
+      const updated = [newCustomer, ...prev].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      safeSetJSON('rehmat_store_machine_customers_v1', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await setDoc(doc(db, 'machine_customers', String(custId)), {
+        id: custId,
+        name: newCustomer.name,
+        phone: newCustomer.phone,
+        city: newCustomer.city,
+        address: newCustomer.address,
+        opening_balance: newCustomer.openingBalance,
+        notes: newCustomer.notes,
+        created_at: nowISO
+      }, { merge: true });
+    } catch (e) {
+      console.error('Firebase addMachineCustomer Exception:', e);
+    }
+    return newCustomer;
+  };
+
+  const updateMachineCustomer = async (id, updatedFields) => {
+    let saved = null;
+    setMachineCustomers((prev) => {
+      const updated = prev.map((c) => {
+        if (String(c.id) === String(id)) {
+          saved = {
+            ...c,
+            ...updatedFields,
+            openingBalance: updatedFields.openingBalance !== undefined ? parseFloat(updatedFields.openingBalance) || 0 : c.openingBalance
+          };
+          return saved;
+        }
+        return c;
+      });
+      safeSetJSON('rehmat_store_machine_customers_v1', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const payload = {};
+      if (updatedFields.name !== undefined) payload.name = updatedFields.name;
+      if (updatedFields.phone !== undefined) payload.phone = updatedFields.phone;
+      if (updatedFields.city !== undefined) payload.city = updatedFields.city;
+      if (updatedFields.address !== undefined) payload.address = updatedFields.address;
+      if (updatedFields.openingBalance !== undefined) payload.opening_balance = parseFloat(updatedFields.openingBalance) || 0;
+      if (updatedFields.notes !== undefined) payload.notes = updatedFields.notes;
+      await setDoc(doc(db, 'machine_customers', String(id)), payload, { merge: true });
+    } catch (e) {
+      console.error('Firebase updateMachineCustomer Exception:', e);
+    }
+    return saved;
+  };
+
+  const deleteMachineCustomer = async (id) => {
+    const strId = String(id);
+    const existingDeleted = safeParseJSON('rehmat_deleted_machine_customer_ids', []);
+    safeSetJSON('rehmat_deleted_machine_customer_ids', JSON.stringify(Array.from(new Set([...existingDeleted, strId]))));
+
+    setMachineCustomers((prev) => {
+      const updated = prev.filter((c) => String(c.id) !== strId);
+      safeSetJSON('rehmat_store_machine_customers_v1', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await deleteDoc(doc(db, 'machine_customers', strId));
+    } catch (e) {
+      console.error('Firebase deleteMachineCustomer Exception:', e);
+    }
+  };
+
   const addCustomerPayment = async (paymentData) => {
     const paymentId = generateUUID();
+    const voucherNo = paymentData.voucherNo || `PAY-${Math.floor(10000 + Math.random() * 90000)}`;
     const now = new Date();
-    const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    const formattedTime = `${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    const entryType = paymentData.entryType || 'Receipt';
+    const referenceType = paymentData.referenceType || (paymentData.repairId ? 'Repair' : paymentData.invoiceId ? 'Sale' : 'Account');
+    const amountNum = Math.max(0, parseFloat(paymentData.amountPaid) || 0);
 
     const newPayment = {
       id: paymentId,
+      voucherNo,
+      entryType,
+      referenceType,
       invoiceId: paymentData.invoiceId || '',
-      customerName: paymentData.customerName || 'Walk-in Customer',
-      amountPaid: parseFloat(paymentData.amountPaid) || 0,
+      repairId: paymentData.repairId || '',
+      referenceLabel: paymentData.referenceLabel || '',
+      customerName: (paymentData.customerName || 'Walk-in Customer').trim(),
+      amountPaid: amountNum,
       paymentMethod: paymentData.paymentMethod || 'Cash',
       referenceNo: paymentData.referenceNo || '',
       notes: paymentData.notes || '',
@@ -1866,56 +1913,79 @@ export function StoreInventoryProvider({ children }) {
       createdAt: now.toISOString()
     };
 
+    const existingPending = safeParseJSON('rehmat_pending_customer_payment_ids', []);
+    safeSetJSON('rehmat_pending_customer_payment_ids', JSON.stringify(Array.from(new Set([...existingPending, String(paymentId)]))));
+
     setCustomerPayments((prev) => {
       const updated = [newPayment, ...prev];
-      localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(updated));
-      localStorage.setItem('rehmat_customer_payments_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_store_customer_payments_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_customer_payments_v2', JSON.stringify(updated));
       return updated;
     });
 
-    // Auto-update machine sales invoice paid amount & status if matching invoiceId
+    const deltaPaid = entryType === 'Payout' ? -amountNum : amountNum;
+
+    const computeNextSale = (sale) => {
+      const currentPaid = parseFloat(sale.paidAmount) || 0;
+      const updatedPaid = Math.max(0, currentPaid + deltaPaid);
+      const netBill = parseFloat(sale.lineTotal || sale.subTotal) || 0;
+      const updatedStatus = netBill > 0 && updatedPaid >= netBill ? 'Paid' : updatedPaid > 0 ? 'Partial' : 'Unpaid';
+      const updatedBal = Math.max(0, netBill - updatedPaid);
+      return {
+        ...sale,
+        paidAmount: updatedPaid,
+        balanceAmount: updatedBal,
+        paymentStatus: updatedStatus
+      };
+    };
+
+    const syncTasks = [];
+
+    // Auto-update linked Machine Sale invoice paid amount & status
     if (paymentData.invoiceId) {
-      let saleToSync = null;
+      const targetSale = (machineSales || []).find((s) => String(s.id) === String(paymentData.invoiceId));
+      const saleToSync = targetSale ? computeNextSale(targetSale) : null;
+
       setMachineSales((prevSales) => {
-        const updated = prevSales.map((sale) => {
-          if (String(sale.id) === String(paymentData.invoiceId)) {
-            const currentPaid = parseFloat(sale.paidAmount) || 0;
-            const updatedPaid = currentPaid + newPayment.amountPaid;
-            const netBill = parseFloat(sale.lineTotal || sale.subTotal) || 0;
-            const updatedStatus = updatedPaid >= netBill ? 'Paid' : updatedPaid > 0 ? 'Partial' : 'Unpaid';
-            const updatedBal = Math.max(0, netBill - updatedPaid);
-            const updatedSale = {
-              ...sale,
-              paidAmount: updatedPaid,
-              balanceAmount: updatedBal,
-              paymentStatus: updatedStatus
-            };
-            saleToSync = updatedSale;
-            return updatedSale;
-          }
-          return sale;
-        });
-        localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(updated));
+        const updated = prevSales.map((sale) => (String(sale.id) === String(paymentData.invoiceId) ? computeNextSale(sale) : sale));
+        safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(updated));
         return updated;
       });
 
       if (saleToSync) {
-        try {
-          await setDoc(doc(db, 'machine_sales', String(paymentData.invoiceId)), {
-            paid_amount: saleToSync.paidAmount,
-            balance_amount: saleToSync.balanceAmount,
-            payment_status: saleToSync.paymentStatus
-          }, { merge: true });
-        } catch (e) {
-          console.error('Firebase updateMachineSale in addCustomerPayment error:', e);
-        }
+        syncTasks.push(
+          setDoc(
+            doc(db, 'machine_sales', String(paymentData.invoiceId)),
+            {
+              paid_amount: saleToSync.paidAmount,
+              balance_amount: saleToSync.balanceAmount,
+              payment_status: saleToSync.paymentStatus
+            },
+            { merge: true }
+          ).catch((e) => console.error('Firebase updateMachineSale in addCustomerPayment error:', e))
+        );
       }
     }
 
-    try {
-      await setDoc(doc(db, 'customer_payments', String(paymentId)), {
+    // Auto-update linked Machine Repair Job Card paid amount & balance
+    if (paymentData.repairId) {
+      const targetRepair = (machineRepairs || []).find((r) => String(r.id) === String(paymentData.repairId));
+      if (targetRepair) {
+        const updatedPaid = Math.max(0, (parseFloat(targetRepair.paidAmount) || 0) + deltaPaid);
+        syncTasks.push(updateMachineRepair(targetRepair.id, { paidAmount: updatedPaid }));
+      }
+    }
+
+    const voucherWritePromise = setDoc(
+      doc(db, 'customer_payments', String(paymentId)),
+      {
         id: paymentId,
+        voucher_no: voucherNo,
+        entry_type: entryType,
+        reference_type: referenceType,
         invoice_id: newPayment.invoiceId || '',
+        repair_id: newPayment.repairId || '',
+        reference_label: newPayment.referenceLabel || '',
         customer_name: newPayment.customerName,
         payment_date: newPayment.time,
         amount_paid: newPayment.amountPaid,
@@ -1923,69 +1993,102 @@ export function StoreInventoryProvider({ children }) {
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes,
         created_at: newPayment.createdAt
-      }, { merge: true });
-      fetchFirebaseData();
-    } catch (e) {
-      console.error('Firebase addCustomerPayment Exception:', e);
-    }
+      },
+      { merge: true }
+    )
+      .then(() => {
+        const currPending = safeParseJSON('rehmat_pending_customer_payment_ids', []);
+        safeSetJSON(
+          'rehmat_pending_customer_payment_ids',
+          JSON.stringify(currPending.filter((id) => String(id) !== String(paymentId)))
+        );
+      })
+      .catch((e) => {
+        console.error('Firebase addCustomerPayment Exception:', e);
+      });
+
+    syncTasks.push(voucherWritePromise);
+
+    // Never block UI indefinitely if Firebase network stream is slow or offline
+    await Promise.race([Promise.allSettled(syncTasks), new Promise((resolve) => setTimeout(resolve, 1200))]);
+
+    return newPayment;
   };
 
-  // ----------------------------------------------------
-  // VENDOR LEDGER & PAYABLE ACTIONS
-  // ----------------------------------------------------
-  const addVendorPayment = async (paymentData) => {
-    const paymentId = paymentData.id || generateUUID();
-    const now = new Date();
-    const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-    const cleanVendorName = (paymentData.vendorName || 'Supplier').trim();
+  const deleteCustomerPayment = async (paymentId) => {
+    const strId = String(paymentId);
+    const target = (customerPayments || []).find((p) => String(p.id) === strId);
 
-    const newPayment = {
-      id: paymentId,
-      vendorName: cleanVendorName,
-      amountPaid: parseFloat(paymentData.amountPaid) || 0,
-      paymentMethod: paymentData.paymentMethod || 'Cash',
-      referenceNo: paymentData.referenceNo || '',
-      notes: paymentData.notes || '',
-      time: formattedTime,
-      createdAt: now.toISOString()
-    };
+    const existingDeleted = safeParseJSON('rehmat_deleted_customer_payment_ids', []);
+    safeSetJSON('rehmat_deleted_customer_payment_ids', JSON.stringify(Array.from(new Set([...existingDeleted, strId]))));
 
-    setVendorPayments((prev) => {
-      const exists = prev.some((p) => String(p.id) === String(paymentId));
-      if (exists) {
-        return prev.map((p) => (String(p.id) === String(paymentId) ? newPayment : p));
-      }
-      return [newPayment, ...prev];
+    const currPending = safeParseJSON('rehmat_pending_customer_payment_ids', []);
+    if (currPending.length > 0) {
+      safeSetJSON(
+        'rehmat_pending_customer_payment_ids',
+        JSON.stringify(currPending.filter((id) => String(id) !== strId))
+      );
+    }
+
+    setCustomerPayments((prev) => {
+      const updated = prev.filter((p) => String(p.id) !== strId);
+      safeSetJSON('rehmat_store_customer_payments_v2', JSON.stringify(updated));
+      safeSetJSON('rehmat_customer_payments_v2', JSON.stringify(updated));
+      return updated;
     });
 
-    try {
-      await setDoc(doc(db, 'vendor_payments', String(paymentId)), {
-        id: paymentId,
-        vendor_name: newPayment.vendorName,
-        payment_date: newPayment.time,
-        amount_paid: newPayment.amountPaid,
-        payment_method: newPayment.paymentMethod,
-        reference_no: newPayment.referenceNo,
-        notes: newPayment.notes
-      }, { merge: true });
-      fetchFirebaseData();
-    } catch (e) {
-      console.error('Firebase addVendorPayment Exception:', e);
+    if (target) {
+      const amt = Math.max(0, parseFloat(target.amountPaid) || 0);
+      const reverseDelta = target.entryType === 'Payout' ? amt : -amt;
+
+      if (target.invoiceId) {
+        const computeReversedSale = (sale) => {
+          const updatedPaid = Math.max(0, (parseFloat(sale.paidAmount) || 0) + reverseDelta);
+          const netBill = parseFloat(sale.lineTotal || sale.subTotal) || 0;
+          const updatedBal = Math.max(0, netBill - updatedPaid);
+          const updatedStatus = netBill > 0 && updatedPaid >= netBill ? 'Paid' : updatedPaid > 0 ? 'Partial' : 'Unpaid';
+          return { ...sale, paidAmount: updatedPaid, balanceAmount: updatedBal, paymentStatus: updatedStatus };
+        };
+
+        const targetSale = (machineSales || []).find((s) => String(s.id) === String(target.invoiceId));
+        const saleToSync = targetSale ? computeReversedSale(targetSale) : null;
+
+        setMachineSales((prevSales) => {
+          const updated = prevSales.map((sale) => (String(sale.id) === String(target.invoiceId) ? computeReversedSale(sale) : sale));
+          safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(updated));
+          return updated;
+        });
+
+        if (saleToSync) {
+          try {
+            await setDoc(
+              doc(db, 'machine_sales', String(target.invoiceId)),
+              {
+                paid_amount: saleToSync.paidAmount,
+                balance_amount: saleToSync.balanceAmount,
+                payment_status: saleToSync.paymentStatus
+              },
+              { merge: true }
+            );
+          } catch (e) {
+            console.error('Firebase reverse sale payment error:', e);
+          }
+        }
+      }
+
+      if (target.repairId) {
+        const targetRepair = (machineRepairs || []).find((r) => String(r.id) === String(target.repairId));
+        if (targetRepair) {
+          const updatedPaid = Math.max(0, (parseFloat(targetRepair.paidAmount) || 0) + reverseDelta);
+          await updateMachineRepair(targetRepair.id, { paidAmount: updatedPaid });
+        }
+      }
     }
-  };
-
-  const deleteVendorPayment = async (paymentId) => {
-    const stringId = String(paymentId);
-    const existingDeleted = safeParseJSON('rehmat_deleted_vendor_payment_ids', []);
-    const updatedDeleted = Array.from(new Set([...existingDeleted, stringId]));
-    localStorage.setItem('rehmat_deleted_vendor_payment_ids', JSON.stringify(updatedDeleted));
-
-    setVendorPayments((prev) => prev.filter((p) => String(p.id) !== stringId));
 
     try {
-      await deleteDoc(doc(db, 'vendor_payments', stringId));
+      await deleteDoc(doc(db, 'customer_payments', strId));
     } catch (e) {
-      console.error('Firebase deleteVendorPayment error:', e);
+      console.error('Firebase deleteCustomerPayment Exception:', e);
     }
   };
 
@@ -2004,8 +2107,12 @@ export function StoreInventoryProvider({ children }) {
       machineSales,
       machineModels,
       machineRecipes,
+      machineRepairs,
+      machineCustomers,
       customerPayments,
       vendorPayments,
+      storeCustomers,
+      storePayments,
       expenses,
       expenseCategories
     };
@@ -2070,6 +2177,8 @@ export function StoreInventoryProvider({ children }) {
         await Promise.allSettled(salesToInsert.map((sale) => setDoc(doc(db, 'machine_sales', String(sale.id)), sale, { merge: true })));
       }
       if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
+      if (data.storeCustomers && Array.isArray(data.storeCustomers)) setStoreCustomers(data.storeCustomers);
+      if (data.storePayments && Array.isArray(data.storePayments)) setStorePayments(data.storePayments);
       if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
       if (data.expenses && Array.isArray(data.expenses)) setExpenses(data.expenses);
       if (data.expenseCategories && Array.isArray(data.expenseCategories)) setExpenseCategories(data.expenseCategories);
@@ -2082,172 +2191,6 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
-  // ----------------------------------------------------
-  // MACHINE REPAIR & SERVICE JOB CARDS ACTIONS
-  // ----------------------------------------------------
-  const addMachineRepair = async (repairData) => {
-    const repairId = generateUUID();
-    const repairNo = repairData.repairNo || `REP-${Math.floor(1000 + Math.random() * 9000)}`;
-    const partsCost = parseFloat(repairData.partsCost) || 0;
-    const laborCost = parseFloat(repairData.laborCost) || 0;
-    const totalCost = partsCost + laborCost;
-    const paidAmount = parseFloat(repairData.paidAmount) || 0;
-    const balanceAmount = Math.max(0, totalCost - paidAmount);
-    const paymentStatus = balanceAmount <= 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending';
-    const now = new Date();
-    const formattedDate = repairData.receivedDate || now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-    const newRepair = {
-      ...repairData,
-      id: repairId,
-      repairNo,
-      partsCost,
-      laborCost,
-      totalCost,
-      paidAmount,
-      balanceAmount,
-      paymentStatus,
-      repairStatus: repairData.repairStatus || 'Received',
-      receivedDate: formattedDate,
-      promisedDate: repairData.promisedDate || '1-2 Days',
-      technicianNotes: repairData.technicianNotes || ''
-    };
-
-    setMachineRepairs((prev) => [newRepair, ...prev]);
-
-    try {
-      await setDoc(doc(db, 'machine_repairs', String(repairId)), {
-        id: repairId,
-        repair_no: repairNo,
-        customer_name: repairData.customerName || 'Walk-in Customer',
-        customer_phone: repairData.customerPhone || 'N/A',
-        city_address: repairData.cityAddress || 'Lahore',
-        machine_name: repairData.machineName || 'Lawn Mower Machine',
-        serial_no: repairData.serialNo || 'N/A',
-        fault_description: repairData.faultDescription || 'General Service & Repair',
-        parts_cost: partsCost,
-        labor_cost: laborCost,
-        discount_amount: parseFloat(repairData.discountAmount) || 0,
-        total_cost: totalCost,
-        paid_amount: paidAmount,
-        balance_amount: balanceAmount,
-        repair_status: repairData.repairStatus || 'Received',
-        received_date: formattedDate,
-        promised_date: repairData.promisedDate || '1-2 Days',
-        repair_items: repairData.repairItems || []
-      }, { merge: true });
-    } catch (e) {
-      console.error('Firebase addMachineRepair Exception:', e);
-    }
-    return newRepair;
-  };
-
-  const updateMachineRepair = async (repairId, updatedFields) => {
-    setMachineRepairs((prev) =>
-      prev.map((r) => {
-        if (r.id === repairId) {
-          const partsCost = updatedFields.partsCost !== undefined ? parseFloat(updatedFields.partsCost) || 0 : r.partsCost;
-          const laborCost = updatedFields.laborCost !== undefined ? parseFloat(updatedFields.laborCost) || 0 : r.laborCost;
-          const totalCost = partsCost + laborCost;
-          const paidAmount = updatedFields.paidAmount !== undefined ? parseFloat(updatedFields.paidAmount) || 0 : r.paidAmount;
-          const balanceAmount = Math.max(0, totalCost - paidAmount);
-          const paymentStatus = balanceAmount <= 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending';
-
-          return {
-            ...r,
-            ...updatedFields,
-            partsCost,
-            laborCost,
-            totalCost,
-            paidAmount,
-            balanceAmount,
-            paymentStatus
-          };
-        }
-        return r;
-      })
-    );
-
-    try {
-      const updatePayload = {};
-      if (updatedFields.repairStatus) updatePayload.repair_status = updatedFields.repairStatus;
-      if (updatedFields.paidAmount !== undefined) updatePayload.paid_amount = parseFloat(updatedFields.paidAmount) || 0;
-      if (updatedFields.balanceAmount !== undefined) updatePayload.balance_amount = parseFloat(updatedFields.balanceAmount) || 0;
-      await setDoc(doc(db, 'machine_repairs', String(repairId)), updatePayload, { merge: true });
-    } catch (e) {
-      console.error('Firebase updateMachineRepair Exception:', e);
-    }
-  };
-
-  const deleteMachineRepair = async (repairId) => {
-    setMachineRepairs((prev) => prev.filter((r) => r.id !== repairId));
-    try {
-      await deleteDoc(doc(db, 'machine_repairs', String(repairId)));
-    } catch (e) {
-      console.error('Firebase deleteMachineRepair Exception:', e);
-    }
-  };
-
-  const addExpense = async (expenseData) => {
-    const newId = expenseData.id || `exp-${Date.now()}`;
-    const newExpense = {
-      id: newId,
-      title: expenseData.title,
-      category: expenseData.category || 'General',
-      amount: parseFloat(expenseData.amount) || 0,
-      paymentMethod: expenseData.paymentMethod || expenseData.payment_method || 'Cash',
-      paidTo: expenseData.paidTo || expenseData.paid_to || 'N/A',
-      expenseDate: expenseData.expenseDate || expenseData.expense_date || new Date().toISOString().split('T')[0],
-      notes: expenseData.notes || '',
-      createdAt: new Date().toISOString()
-    };
-
-    setExpenses((prev) => [newExpense, ...prev]);
-    logActivity('Expense Added', `Added expense: PKR ${newExpense.amount} for ${newExpense.title}`);
-
-    try {
-      await setDoc(doc(db, 'expenses', String(newExpense.id)), {
-        id: newExpense.id,
-        title: newExpense.title,
-        category: newExpense.category,
-        amount: newExpense.amount,
-        payment_method: newExpense.paymentMethod,
-        paid_to: newExpense.paidTo,
-        expense_date: newExpense.expenseDate,
-        notes: newExpense.notes
-      }, { merge: true });
-    } catch (e) {
-      console.error('Firebase addExpense error:', e);
-    }
-    return newExpense;
-  };
-
-  const deleteExpense = async (expenseId) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
-    logActivity('Expense Deleted', `Deleted expense ID ${expenseId}`);
-    try {
-      await deleteDoc(doc(db, 'expenses', String(expenseId)));
-    } catch (e) {
-      console.error('Firebase deleteExpense error:', e);
-    }
-  };
-
-  const addExpenseCategory = (categoryName) => {
-    if (!categoryName || !categoryName.trim()) return false;
-    const trimmed = categoryName.trim();
-    if (expenseCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-      return false;
-    }
-    setExpenseCategories((prev) => [...prev, trimmed]);
-    logActivity('Expense Category Added', `Added new expense category: ${trimmed}`);
-    return true;
-  };
-
-  const deleteExpenseCategory = (categoryName) => {
-    setExpenseCategories((prev) => prev.filter((c) => c !== categoryName));
-    logActivity('Expense Category Deleted', `Removed expense category: ${categoryName}`);
-  };
-
   const resetAllDataToZero = async () => {
     try {
       // 1. Wipe store_items, usage_logs, and all operational collections from Firebase Firestore (including Shop)
@@ -2256,8 +2199,11 @@ export function StoreInventoryProvider({ children }) {
         'usage_logs',
         'machine_sales',
         'machine_repairs',
+        'machine_customers',
         'customer_payments',
         'vendor_payments',
+        'store_customers',
+        'store_payments',
         'vendors',
         'shop_items',
         'shop_usage_logs',
@@ -2286,8 +2232,11 @@ export function StoreInventoryProvider({ children }) {
       setVendors([]);
       setMachineSales([]);
       setMachineRepairs([]);
+      setMachineCustomers([]);
       setCustomerPayments([]);
       setVendorPayments([]);
+      setStoreCustomers([]);
+      setStorePayments([]);
 
       // 4. Refetch live state from Supabase immediately so the UI reflects an empty state across all browsers
       fetchFirebaseData();
@@ -2353,13 +2302,25 @@ export function StoreInventoryProvider({ children }) {
       machineModels,
       machineRecipes,
       machineRepairs,
+      machineCustomers,
       customerPayments,
       vendorPayments,
+      storeCustomers,
+      storePayments,
+      addStoreCustomer,
+      updateStoreCustomer,
+      deleteStoreCustomer,
+      addStorePayment,
+      deleteStorePayment,
       addMachineModel,
       saveMachineRecipe,
       deleteMachineRecipe,
       assembleMachine,
+      addMachineCustomer,
+      updateMachineCustomer,
+      deleteMachineCustomer,
       addCustomerPayment,
+      deleteCustomerPayment,
       addVendorPayment,
       deleteVendorPayment,
       exportFullBackupData,
@@ -2393,6 +2354,10 @@ export function StoreInventoryProvider({ children }) {
       updateMasterItemName,
       deleteMasterItemName,
       deleteMultipleMasterItemNames,
+      defaultMasterItemNames,
+      defaultStoreItems,
+      restoreDefaultMasterItemNames,
+      restoreDefaultStoreItems,
       addMachineSale,
       updateMachineSale,
       deleteMachineSale,
@@ -2431,8 +2396,12 @@ export function StoreInventoryProvider({ children }) {
       machineSales,
       machineModels,
       machineRecipes,
+      machineRepairs,
+      machineCustomers,
       customerPayments,
       vendorPayments,
+      storeCustomers,
+      storePayments,
       expenses,
       expenseCategories,
       totalInventoryCount,

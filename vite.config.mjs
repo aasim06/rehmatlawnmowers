@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => {
       open: false,
       port: PORT,
       host: true,
+      headers: {
+        'Cache-Control': 'no-store'
+      },
       watch: {
         ignored: ['**/src-tauri/**', '**/*.exe', '**/*.zip', '**/*.msi', '**/*.pdb', '**/*.rar']
       }
@@ -39,7 +42,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), jsconfigPaths()],
     build: {
       chunkSizeWarningLimit: 1000,
-      sourcemap: true,
+      sourcemap: mode === 'development',
       cssCodeSplit: true,
       rollupOptions: {
         output: {

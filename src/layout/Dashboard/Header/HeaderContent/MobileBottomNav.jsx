@@ -1,6 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import usePermission from 'hooks/usePermission';
-import { useAuth } from 'context/AuthContext';
 
 // material-ui
 import { Paper, BottomNavigation, BottomNavigationAction, Box } from '@mui/material';
@@ -18,7 +17,6 @@ export default function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasAccessToItem, isSuperAdmin } = usePermission();
-  const { user } = useAuth();
 
   const currentPath = location.pathname;
 

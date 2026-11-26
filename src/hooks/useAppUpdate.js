@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isTauriApp } from 'utils/platform';
 
 // Built-in build time timestamp injected at build time
 const LOCAL_BUILD_TIME = typeof __APP_BUILD_TIME__ !== 'undefined' ? Number(__APP_BUILD_TIME__) : Date.now();
@@ -10,6 +11,10 @@ export function useAppUpdate() {
 
   const checkForUpdate = useCallback(async () => {
     if (typeof window === 'undefined') return;
+    // Skip remote update check only in active local Vite development server
+    if (import.meta.env.DEV) {
+      return;
+    }
     try {
       setChecking(true);
       const url = `https://rehmatlawnmowers.vercel.app/version.json?_t=${Date.now()}`;
@@ -25,7 +30,7 @@ export function useAppUpdate() {
           setHasUpdate(false);
         }
       }
-    } catch (err) {
+    } catch {
       // Offline or network error - silent
     } finally {
       setChecking(false);
@@ -46,8 +51,15 @@ export function useAppUpdate() {
       }
     } catch {}
 
-    // 3. Force reload current view without navigating away
-    window.location.reload();
+    // 3. If running inside Tauri .exe, load the fresh Vercel build with Tauri mode intact.
+    // If running in browser, perform a fresh reload.
+    const isTauri = isTauriApp();
+    if (isTauri) {
+      const ts = Date.now();
+      window.location.href = `https://rehmatlawnmowers.vercel.app/?platform=tauri&_v=${ts}`;
+    } else {
+      window.location.reload();
+    }
   }, []);
 
   useEffect(() => {

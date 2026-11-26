@@ -11,19 +11,11 @@ import { axisClasses, chartsGridClasses, lineClasses } from '@mui/x-charts';
 import { LineChart } from '@mui/x-charts/LineChart';
 
 // project imports
-import { withAlpha } from 'utils/colorUtils';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // Labels
 const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const weeklyLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// Base Store Flow Data
-const baseMonthlyStockIn = [76, 85, 101, 98, 87, 105, 91, 114, 94, 86, 115, 83];
-const baseWeeklyStockIn = [31, 40, 28, 51, 42, 60, 83];
-
-const baseMonthlyStockOut = [50, 45, 70, 35, 60, 36, 26, 45, 65, 52, 53, 28];
-const baseWeeklyStockOut = [11, 32, 45, 32, 34, 25, 18];
 
 function Legend({ items, onToggle }) {
   return (

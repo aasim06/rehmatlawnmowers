@@ -18,30 +18,29 @@ import { DownOutlined, UpOutlined } from '@ant-design/icons';
 // project imports
 import NavItem from './NavItem';
 import { handlerDrawerOpen, useGetMenuMaster } from 'api/menu';
+import { getSidebarItemSx } from 'utils/themeSurface';
 
 // ==============================|| NAVIGATION - LIST COLLAPSE ||============================== //
+
+const hasMatchingRoute = (childrenList, currentPath) =>
+  childrenList?.some((child) => {
+    if (child.url && currentPath.includes(child.url)) return true;
+    if (child.children) return hasMatchingRoute(child.children, currentPath);
+    return false;
+  });
 
 export default function NavCollapse({ item, level = 1 }) {
   const { menuMaster } = useGetMenuMaster();
   const drawerOpen = menuMaster.isDashboardDrawerOpened;
   const { pathname } = useLocation();
 
-  // Auto-expand if current route matches any child item URL
-  const checkOpen = (childrenList) => {
-    return childrenList?.some((child) => {
-      if (child.url && pathname.includes(child.url)) return true;
-      if (child.children) return checkOpen(child.children);
-      return false;
-    });
-  };
-
-  const [open, setOpen] = useState(() => checkOpen(item.children));
+  const [open, setOpen] = useState(() => hasMatchingRoute(item.children, pathname));
 
   useEffect(() => {
-    if (checkOpen(item.children)) {
+    if (hasMatchingRoute(item.children, pathname)) {
       setOpen(true);
     }
-  }, [pathname]);
+  }, [item.children, pathname]);
 
   const handleClick = () => {
     if (!drawerOpen) {
@@ -53,11 +52,9 @@ export default function NavCollapse({ item, level = 1 }) {
   };
 
   const Icon = item.icon;
-  const itemIcon = item.icon ? (
-    <Icon style={{ fontSize: drawerOpen ? '1rem' : '1.25rem' }} />
-  ) : false;
+  const itemIcon = item.icon ? <Icon style={{ fontSize: drawerOpen ? '1rem' : '1.25rem' }} /> : false;
 
-  const hasActiveChild = checkOpen(item.children);
+  const hasActiveChild = hasMatchingRoute(item.children, pathname);
 
   const navChildren = item.children?.map((menuItem) => {
     switch (menuItem.type) {
@@ -80,82 +77,16 @@ export default function NavCollapse({ item, level = 1 }) {
         <ListItemButton
           selected={hasActiveChild}
           onClick={handleClick}
-          sx={(theme) => {
-            const isDark = theme.palette.mode === 'dark';
-            return {
-              zIndex: 1201,
-              borderRadius: 1.5,
-              mb: 0.5,
-              ...(drawerOpen
-                ? {
-                    pl: `${level * 28}px`,
-                    py: 1,
-                    mx: 1,
-                    color: isDark ? '#94a3b8' : theme.palette.text.secondary,
-                    '&:hover': {
-                      bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : theme.vars.palette.primary.lighter,
-                      color: isDark ? '#f8fafc' : theme.vars.palette.primary.main,
-                      '& .MuiListItemIcon-root': {
-                        color: isDark ? '#f8fafc' : theme.vars.palette.primary.main
-                      }
-                    },
-                    '&.Mui-selected': {
-                      bgcolor: isDark ? 'rgba(99, 102, 241, 0.15)' : theme.vars.palette.primary.lighter,
-                      borderLeft: isDark ? '3px solid #6366f1' : 'none',
-                      color: isDark ? '#818cf8' : theme.vars.palette.primary.main,
-                      fontWeight: 600,
-                      '& .MuiListItemIcon-root': {
-                        color: isDark ? '#818cf8' : theme.vars.palette.primary.main
-                      },
-                      '&:hover': {
-                        bgcolor: isDark ? 'rgba(99, 102, 241, 0.22)' : theme.vars.palette.primary.lighter,
-                        color: isDark ? '#a5b4fc' : theme.vars.palette.primary.main
-                      }
-                    }
-                  }
-                : {
-                    width: 44,
-                    height: 44,
-                    minWidth: 44,
-                    p: 0,
-                    mx: 'auto',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    color: hasActiveChild
-                      ? isDark ? '#818cf8' : theme.vars.palette.primary.main
-                      : isDark ? '#94a3b8' : theme.palette.text.secondary,
-                    bgcolor: hasActiveChild
-                      ? isDark ? 'rgba(99, 102, 241, 0.15)' : theme.vars.palette.primary.lighter
-                      : 'transparent',
-                    '&:hover': {
-                      bgcolor: hasActiveChild
-                        ? isDark ? 'rgba(99, 102, 241, 0.22)' : theme.vars.palette.primary.lighter
-                        : isDark ? 'rgba(255, 255, 255, 0.05)' : theme.vars.palette.secondary.lighter,
-                      color: isDark ? '#f8fafc' : theme.vars.palette.primary.main,
-                      '& .MuiListItemIcon-root': {
-                        color: isDark ? '#f8fafc' : theme.vars.palette.primary.main
-                      }
-                    },
-                    '&.Mui-selected': {
-                      bgcolor: isDark ? 'rgba(99, 102, 241, 0.15)' : theme.vars.palette.primary.lighter,
-                      borderLeft: 'none',
-                      borderRight: 'none',
-                      '&:hover': {
-                        bgcolor: isDark ? 'rgba(99, 102, 241, 0.22)' : theme.vars.palette.primary.lighter
-                      }
-                    }
-                  })
-            };
-          }}
+          sx={(theme) => getSidebarItemSx(theme, hasActiveChild, drawerOpen, level)}
         >
           {itemIcon && (
             <ListItemIcon
               sx={(theme) => {
                 const isDark = theme.palette.mode === 'dark';
+                const activeColor = isDark ? '#8098f9' : theme.palette.primary.main;
+                const idleColor = isDark ? '#98a2b3' : '#667085';
                 return {
-                  color: isDark
-                    ? hasActiveChild ? '#818cf8' : '#94a3b8'
-                    : hasActiveChild ? theme.vars.palette.primary.main : theme.vars.palette.text.secondary,
+                  color: hasActiveChild ? activeColor : idleColor,
                   ...(drawerOpen
                     ? {
                         minWidth: 28
@@ -183,9 +114,7 @@ export default function NavCollapse({ item, level = 1 }) {
                   sx={(theme) => {
                     const isDark = theme.palette.mode === 'dark';
                     return {
-                      color: isDark
-                        ? hasActiveChild ? '#818cf8' : '#cbd5e1'
-                        : hasActiveChild ? theme.vars.palette.primary.main : theme.vars.palette.text.primary,
+                      color: hasActiveChild ? (isDark ? '#8098f9' : theme.palette.primary.main) : isDark ? '#d0d5dd' : '#344054',
                       fontWeight: hasActiveChild ? 600 : 500
                     };
                   }}

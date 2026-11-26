@@ -13,7 +13,7 @@ import { useGetMenuMaster } from 'api/menu';
 export default function Navigation() {
   const { menuMaster } = useGetMenuMaster();
   const drawerOpen = menuMaster.isDashboardDrawerOpened;
-  const { hasAccessToItem, isSuperAdmin } = usePermission();
+  const { hasAccessToItem } = usePermission();
 
   const navGroups = menuItem.items.map((item) => {
     let filteredItem = { ...item };

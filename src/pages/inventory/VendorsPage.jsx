@@ -33,7 +33,7 @@ import {
 } from '@mui/material';
 
 // icons
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlined, MailOutlined, PayCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlined, PayCircleOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';

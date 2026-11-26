@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
-import { useAuth } from 'context/AuthContext';
 
 // material-ui
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -18,7 +17,6 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
 
 // project imports
 import MainCard from 'components/MainCard';
@@ -31,7 +29,6 @@ import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
 import ExportOutlined from '@ant-design/icons/ExportOutlined';
 import ImportOutlined from '@ant-design/icons/ImportOutlined';
 import WarningOutlined from '@ant-design/icons/WarningOutlined';
-import MessageOutlined from '@ant-design/icons/MessageOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import SendOutlined from '@ant-design/icons/SendOutlined';
 

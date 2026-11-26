@@ -2,18 +2,18 @@
 
 export default function TableCell(theme) {
   const isDark = theme.palette.mode === 'dark';
-  const dividerColor = isDark ? '#1e293b' : theme.vars.palette.divider;
+  const dividerColor = isDark ? '#2e3a47' : '#f2f4f7';
 
   return {
     MuiTableCell: {
       styleOverrides: {
         root: ({ ownerState }) => {
           const baseStyle = {
-            fontSize: '0.875rem',
-            padding: '12px 16px',
+            fontSize: '0.8125rem',
+            padding: '13px 16px',
             borderColor: dividerColor,
             borderBottom: `1px solid ${dividerColor}`,
-            color: isDark ? '#f8fafc' : 'inherit'
+            color: isDark ? '#f2f4f7' : '#344054'
           };
 
           const align = ownerState.align;
@@ -47,17 +47,17 @@ export default function TableCell(theme) {
 
           return baseStyle;
         },
-        sizeSmall: { padding: '8px 12px' },
+        sizeSmall: { padding: '9px 12px' },
         head: {
-          fontWeight: 600,
+          fontWeight: 700,
           fontSize: '0.75rem',
-          letterSpacing: '0.04em',
+          letterSpacing: '0.05em',
           textTransform: 'uppercase',
-          color: isDark ? '#94a3b8' : theme.vars.palette.text.secondary
+          color: isDark ? '#98a2b3' : '#667085'
         },
         footer: {
           fontSize: '0.75rem',
-          color: isDark ? '#94a3b8' : theme.vars.palette.text.secondary
+          color: isDark ? '#98a2b3' : '#667085'
         }
       }
     }

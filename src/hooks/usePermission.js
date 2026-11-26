@@ -1,4 +1,10 @@
-import { useAuth, defaultSuperAdminPermissions, defaultAdminPermissions, defaultStoreKeeperPermissions, getRoleDefaultPermissions } from 'context/AuthContext';
+import {
+  useAuth,
+  defaultSuperAdminPermissions,
+  defaultAdminPermissions,
+  defaultStoreKeeperPermissions,
+  getRoleDefaultPermissions
+} from 'context/AuthContext';
 import { isTauriApp } from 'utils/platform';
 
 /**
@@ -22,9 +28,8 @@ export function usePermission() {
   const isStoreKeeper = role === 'Store Keeper';
 
   // Resolve user permissions: prioritize explicit custom permissions saved on user object
-  const userPerms = (user?.permissions && Object.keys(user.permissions).length > 0)
-    ? user.permissions
-    : (getRoleDefaultPermissions(role) || {});
+  const userPerms =
+    user?.permissions && Object.keys(user.permissions).length > 0 ? user.permissions : getRoleDefaultPermissions(role) || {};
 
   // Permission flags
   const canEditPrice = isSuperAdmin || Boolean(userPerms.canEditPrice);
@@ -44,11 +49,16 @@ export function usePermission() {
     '/inventory/categories': 'categories',
     '/inventory/add-item-name': 'categories',
     '/inventory/bom': 'items',
+    '/inventory/machine-dashboard': 'machine-sales',
     '/inventory/machine-sales': 'machine-sales',
+    '/inventory/machine-invoices': 'machine-sales',
     '/inventory/machine-repairs': 'machine-repairs',
+    '/inventory/machine-payments': 'customer-ledgers',
     '/inventory/customer-ledgers': 'customer-ledgers',
     '/inventory/vendor-ledgers': 'vendor-ledgers',
     '/inventory/vendors': 'vendors',
+    '/inventory/store-payments': 'store-ledger',
+    '/inventory/store-ledger': 'store-ledger',
     '/inventory/ledger': 'ledger',
     '/inventory/usage-log': 'ledger',
     '/inventory/reports': 'reports',
@@ -64,6 +74,7 @@ export function usePermission() {
     '/shop/stock-out': 'shop-mart',
     '/shop/mart': 'shop-mart',
     '/shop/ledger': 'shop-ledger',
+    '/shop/payments': 'shop-ledger',
     '/shop/invoices': 'shop-invoices'
   };
 

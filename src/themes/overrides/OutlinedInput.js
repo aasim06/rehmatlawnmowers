@@ -24,41 +24,62 @@ export default function OutlinedInput(theme) {
     MuiOutlinedInput: {
       styleOverrides: {
         input: {
-          padding: 'var(--mantis-input-padding, 10.5px 14px 10.5px 12px)',
-          color: isDark ? '#f8fafc' : 'inherit',
+          padding: 'var(--mantis-input-padding, 10px 14px)',
+          lineHeight: '1.4375em',
+          color: isDark ? '#f9fafb' : '#101828',
           '&::placeholder': {
-            color: isDark ? '#64748b' : theme.vars.palette.grey[400],
+            color: isDark ? '#667085' : '#98a2b3',
             opacity: 1
           }
         },
         notchedOutline: {
-          borderColor: isDark ? '#1e293b' : theme.vars.palette.grey[300]
+          borderColor: isDark ? '#344054' : '#d0d5dd',
+          transition: 'border-color 0.15s ease'
         },
         root: {
-          backgroundColor: isDark ? '#162033' : 'transparent',
+          display: 'inline-flex',
+          alignItems: 'center',
+          borderRadius: 8,
+          backgroundColor: isDark ? '#1d2939' : '#ffffff',
           ...getColor({ variant: 'primary', theme }),
           '&.Mui-error': { ...getColor({ variant: 'error', theme }) },
+          '& .MuiSelect-select': {
+            display: 'flex',
+            alignItems: 'center',
+            minHeight: '1.4375em'
+          },
           ...(isDark && {
             '&:hover .MuiOutlinedInput-notchedOutline': {
-              borderColor: '#334155'
+              borderColor: '#475467'
             },
             '&.Mui-focused': {
-              boxShadow: '0 0 0 1px #6366f1',
+              boxShadow: '0 0 0 3px rgba(70, 95, 255, 0.2)',
               '& .MuiOutlinedInput-notchedOutline': {
                 border: '1px solid',
-                borderColor: '#6366f1'
+                borderColor: '#465fff'
               }
             },
             '&.Mui-disabled': {
-              backgroundColor: '#131b2e',
+              backgroundColor: '#171f2f',
               '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#1e293b'
+                borderColor: '#2e3a47'
               }
             }
           })
         },
-        sizeSmall: { '& .MuiOutlinedInput-input': { padding: 'var(--mantis-input-padding-small, 7.5px 8px 7.5px 12px)' } },
-        multiline: { '& .MuiOutlinedInput-input': { padding: 0 } },
+        sizeSmall: {
+          '& .MuiOutlinedInput-input': {
+            padding: 'var(--mantis-input-padding-small, 7.5px 12px)'
+          },
+          '&.MuiInputBase-multiline': {
+            padding: '7.5px 12px'
+          }
+        },
+        multiline: {
+          padding: '10px 14px',
+          alignItems: 'flex-start',
+          '& .MuiOutlinedInput-input': { padding: 0 }
+        },
         colorSecondary: getColor({ variant: 'secondary', theme }),
         colorError: getColor({ variant: 'error', theme }),
         colorWarning: getColor({ variant: 'warning', theme }),

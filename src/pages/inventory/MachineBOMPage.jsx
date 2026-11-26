@@ -28,13 +28,13 @@ import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import EditOutlined from '@ant-design/icons/EditOutlined';
 import BuildOutlined from '@ant-design/icons/BuildOutlined';
-import ToolOutlined from '@ant-design/icons/ToolOutlined';
 import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import EyeOutlined from '@ant-design/icons/EyeOutlined';
 import WarningOutlined from '@ant-design/icons/WarningOutlined';
 
 import MainCard from 'components/MainCard';
+import { AppButton } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function MachineBOMPage() {
@@ -226,7 +226,7 @@ export default function MachineBOMPage() {
       {/* Header Bar */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h3" fontWeight={700} color="textPrimary">
+          <Typography variant="h4" fontWeight={700} color="textPrimary">
             Machine Recipes (BOM)
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 0.25 }}>
@@ -265,13 +265,13 @@ export default function MachineBOMPage() {
         {/* Master Clean Data Table */}
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc') }}>
+            <TableHead>
               <TableRow>
-                <TableCell style={{ width: '5%' }}><strong>#</strong></TableCell>
-                <TableCell style={{ width: '40%' }}><strong>MACHINE MODEL NAME</strong></TableCell>
-                <TableCell align="center" style={{ width: '20%' }}><strong>FORMULA COMPONENTS</strong></TableCell>
-                <TableCell align="center" style={{ width: '15%' }}><strong>STATUS</strong></TableCell>
-                <TableCell align="right" style={{ width: '20%' }}><strong>ACTIONS</strong></TableCell>
+                <TableCell sx={{ width: '5%' }}>#</TableCell>
+                <TableCell sx={{ width: '40%' }}>Machine Model Name</TableCell>
+                <TableCell align="center" sx={{ width: '20%' }}>Formula Components</TableCell>
+                <TableCell align="center" sx={{ width: '15%' }}>Status</TableCell>
+                <TableCell align="right" sx={{ width: '20%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -391,7 +391,7 @@ export default function MachineBOMPage() {
           }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, fontSize: '1.15rem', bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'), borderBottom: '1px solid', borderColor: 'divider' }}>
+        <DialogTitle sx={{ fontWeight: 700, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'), borderBottom: '1px solid', borderColor: 'divider' }}>
           {selectedRecipeForView?.modelName} - Formula Parts
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2.5 }}>
@@ -473,7 +473,7 @@ export default function MachineBOMPage() {
         }}
       >
         <form onSubmit={handleSaveRecipeSubmit}>
-          <DialogTitle sx={{ fontWeight: 700, fontSize: '1.15rem', bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'), borderBottom: '1px solid', borderColor: 'divider' }}>
+          <DialogTitle sx={{ fontWeight: 700, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'), borderBottom: '1px solid', borderColor: 'divider' }}>
             {editingRecipe ? 'Edit Machine Recipe' : 'Add New Machine Recipe'}
           </DialogTitle>
           <DialogContent dividers sx={{ p: 3 }}>
@@ -590,10 +590,12 @@ export default function MachineBOMPage() {
             </Box>
           </DialogContent>
           <DialogActions sx={{ p: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'), borderTop: '1px solid', borderColor: 'divider' }}>
-            <Button onClick={() => setRecipeModalOpen(false)} sx={{ fontWeight: 600 }}>Cancel</Button>
-            <Button type="submit" variant="contained" sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 700, px: 2.5 }}>
+            <AppButton intent="cancel" onClick={() => setRecipeModalOpen(false)}>
+              Cancel
+            </AppButton>
+            <AppButton intent="primary" type="submit">
               Save Recipe Formula
-            </Button>
+            </AppButton>
           </DialogActions>
         </form>
       </Dialog>

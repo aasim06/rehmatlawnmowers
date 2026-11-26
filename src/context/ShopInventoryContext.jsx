@@ -1,14 +1,36 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { StoreInventoryContext } from 'context/StoreInventoryContext';
+import { defaultMasterItemNames } from 'data/factoryStoreData';
 import { db } from 'api/firebase';
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  deleteDoc
-} from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
+import { getTodayISO, isRecordInDateRange } from 'utils/ledgerHelpers';
+
+const STORAGE_KEYS = {
+  items: 'rehmat_shop_items_v2',
+  usageLogs: 'rehmat_shop_usage_logs_v2',
+  vendors: 'rehmat_shop_vendors_v2',
+  categories: 'rehmat_shop_categories_v2',
+  masterItemNames: 'rehmat_shop_master_item_names_v2',
+  sales: 'rehmat_shop_sales_v2',
+  payments: 'rehmat_shop_customer_payments_v2',
+  customers: 'rehmat_shop_customers_v1'
+};
+
+const DELETED_KEYS = {
+  items: 'rehmat_deleted_shop_item_ids',
+  usageLogs: 'rehmat_deleted_shop_log_ids',
+  vendors: 'rehmat_deleted_shop_vendor_ids',
+  sales: 'rehmat_deleted_shop_sale_ids',
+  payments: 'rehmat_deleted_shop_payment_ids',
+  customers: 'rehmat_deleted_shop_customer_ids'
+};
+
+const PENDING_KEYS = {
+  sales: 'rehmat_pending_shop_sale_ids',
+  payments: 'rehmat_pending_shop_payment_ids',
+  customers: 'rehmat_pending_shop_customer_ids'
+};
 
 const safeParseJSON = (key, fallback = []) => {
   try {
@@ -19,6 +41,46 @@ const safeParseJSON = (key, fallback = []) => {
     return fallback;
   }
 };
+
+const persistJSON = (key, value) => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+          console.warn(`LocalStorage write warning (${key}):`, e);
+        }
+      });
+    } else {
+      setTimeout(() => {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+          console.warn(`LocalStorage write warning (${key}):`, e);
+        }
+      }, 0);
+    }
+  } catch (err) {
+    console.warn(`LocalStorage write warning (${key}):`, err);
+  }
+};
+
+const addTrackedId = (key, id) => {
+  const existing = safeParseJSON(key, []).map(String);
+  persistJSON(key, Array.from(new Set([...existing, String(id)])));
+};
+
+const removeTrackedId = (key, id) => {
+  const existing = safeParseJSON(key, []).map(String);
+  if (existing.length === 0) return;
+  persistJSON(
+    key,
+    existing.filter((item) => item !== String(id))
+  );
+};
+
+const syncWithTimeout = (promise, ms = 1200) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
 
 const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -165,131 +227,172 @@ export const defaultShopItems = [
 ];
 
 export function ShopInventoryProvider({ children }) {
-  // 1. Shop Inventory Items State (Clean Zero Start)
-  const [items, setItems] = useState(() => safeParseJSON('rehmat_shop_items_v2', []));
-
-  // 2. Shop Usage & Stock Movement Logs State
-  const [usageLogs, setUsageLogs] = useState(() => safeParseJSON('rehmat_shop_usage_logs_v2', []));
-
-  // 3. Shop Vendors / Parties / Suppliers State
-  const [vendors, setVendors] = useState(() => safeParseJSON('rehmat_shop_vendors_v2', []));
-
-  // 4. Shop Categories State
+  const [items, setItems] = useState(() => safeParseJSON(STORAGE_KEYS.items, []));
+  const [usageLogs, setUsageLogs] = useState(() => safeParseJSON(STORAGE_KEYS.usageLogs, []));
+  const [vendors, setVendors] = useState(() => safeParseJSON(STORAGE_KEYS.vendors, []));
   const [categories, setCategories] = useState(() => {
-    const raw = localStorage.getItem('rehmat_shop_categories_v2');
+    const raw = localStorage.getItem(STORAGE_KEYS.categories);
     if (raw !== null) {
       try {
         return JSON.parse(raw);
-      } catch (e) {
+      } catch {
         return defaultShopCategories;
       }
     }
     return defaultShopCategories;
   });
 
-  // 5. Shop Master Item Names
-  const [masterItemNames, setMasterItemNames] = useState(() => safeParseJSON('rehmat_shop_master_item_names_v2', []));
+  const [masterItemNames, setMasterItemNames] = useState(() => {
+    const saved = safeParseJSON(STORAGE_KEYS.masterItemNames, null);
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    const storeMaster = safeParseJSON('rehmat_store_master_item_names_v2', null);
+    if (Array.isArray(storeMaster) && storeMaster.length > 0) return storeMaster;
+    return defaultMasterItemNames;
+  });
 
-  // 6. Shop Sales & Invoices State (for Shop Ledger & Credit Tracking)
-  const [shopSales, setShopSales] = useState(() => safeParseJSON('rehmat_shop_sales_v2', []));
+  const [shopSales, setShopSales] = useState(() => safeParseJSON(STORAGE_KEYS.sales, []));
+  const [shopCustomerPayments, setShopCustomerPayments] = useState(() => safeParseJSON(STORAGE_KEYS.payments, []));
+  const [shopCustomers, setShopCustomers] = useState(() => safeParseJSON(STORAGE_KEYS.customers, []));
 
-  // 7. Shop Customer Payments State (for Customer Payment Collections)
-  const [shopCustomerPayments, setShopCustomerPayments] = useState(() => safeParseJSON('rehmat_shop_customer_payments_v2', []));
+  const fetchShopFirebaseData = useCallback(async () => {
+    try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-  // 6. Persistence to localStorage
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_items_v2', JSON.stringify(items));
-  }, [items]);
+      const deletedItems = new Set(safeParseJSON(DELETED_KEYS.items, []).map(String));
+      const deletedLogs = new Set(safeParseJSON(DELETED_KEYS.usageLogs, []).map(String));
+      const deletedVendors = new Set(safeParseJSON(DELETED_KEYS.vendors, []).map(String));
+      const deletedSales = new Set(safeParseJSON(DELETED_KEYS.sales, []).map(String));
+      const deletedPayments = new Set(safeParseJSON(DELETED_KEYS.payments, []).map(String));
+      const deletedCustomers = new Set(safeParseJSON(DELETED_KEYS.customers, []).map(String));
 
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_usage_logs_v2', JSON.stringify(usageLogs));
-  }, [usageLogs]);
+      const [itemsSnap, logsSnap, vendorsSnap, catsSnap, salesSnap, paySnap, custSnap] = await Promise.allSettled([
+        getDocs(collection(db, 'shop_items')),
+        getDocs(collection(db, 'shop_usage_logs')),
+        getDocs(collection(db, 'shop_vendors')),
+        getDocs(collection(db, 'shop_categories')),
+        getDocs(collection(db, 'shop_sales')),
+        getDocs(collection(db, 'shop_customer_payments')),
+        getDocs(collection(db, 'shop_customers'))
+      ]);
 
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_vendors_v2', JSON.stringify(vendors));
-  }, [vendors]);
+      const mergeWithPending = (remoteDocs, deletedSet, localStorageKey, pendingKey) => {
+        const cleanRemote = remoteDocs.filter((docItem) => !deletedSet.has(String(docItem.id)));
+        const remoteIdSet = new Set(cleanRemote.map((d) => String(d.id)));
+        const pendingIds = pendingKey ? safeParseJSON(pendingKey, []).map(String) : [];
+        const stillPending = pendingIds.filter((id) => !remoteIdSet.has(id) && !deletedSet.has(id));
+        if (pendingKey && stillPending.length !== pendingIds.length) {
+          persistJSON(pendingKey, stillPending);
+        }
+        const pendingSet = new Set(stillPending);
+        const localRecords = safeParseJSON(localStorageKey, []);
+        const unsyncedLocal = localRecords.filter((rec) => pendingSet.has(String(rec.id)) && !remoteIdSet.has(String(rec.id)));
+        return [...unsyncedLocal, ...cleanRemote];
+      };
 
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_categories_v2', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_master_item_names_v2', JSON.stringify(masterItemNames));
-  }, [masterItemNames]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_sales_v2', JSON.stringify(shopSales));
-  }, [shopSales]);
-
-  useEffect(() => {
-    localStorage.setItem('rehmat_shop_customer_payments_v2', JSON.stringify(shopCustomerPayments));
-  }, [shopCustomerPayments]);
-
-  // 7. Initial Fetch from Firebase Firestore for Shop
-  useEffect(() => {
-    let isMounted = true;
-    const fetchShopFirebaseData = async () => {
-      try {
-        const [itemsSnap, logsSnap, vendorsSnap, catsSnap, salesSnap, paySnap] = await Promise.allSettled([
-          getDocs(collection(db, 'shop_items')),
-          getDocs(collection(db, 'shop_usage_logs')),
-          getDocs(collection(db, 'shop_vendors')),
-          getDocs(collection(db, 'shop_categories')),
-          getDocs(collection(db, 'shop_sales')),
-          getDocs(collection(db, 'shop_customer_payments'))
-        ]);
-
-        if (!isMounted) return;
-
-        if (itemsSnap.status === 'fulfilled') {
-          const fbItems = itemsSnap.value.docs ? itemsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
+      if (itemsSnap.status === 'fulfilled' && itemsSnap.value?.docs) {
+        const fbItems = itemsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })).filter((i) => !deletedItems.has(String(i.id)));
+        if (fbItems.length > 0) {
           setItems(fbItems);
-          localStorage.setItem('rehmat_shop_items_v2', JSON.stringify(fbItems));
+          persistJSON(STORAGE_KEYS.items, fbItems);
         }
-        if (logsSnap.status === 'fulfilled') {
-          const fbLogs = logsSnap.value.docs ? logsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-          setUsageLogs(fbLogs);
-          localStorage.setItem('rehmat_shop_usage_logs_v2', JSON.stringify(fbLogs));
-        }
-        if (vendorsSnap.status === 'fulfilled') {
-          const fbVendors = vendorsSnap.value.docs ? vendorsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-          setVendors(fbVendors);
-          localStorage.setItem('rehmat_shop_vendors_v2', JSON.stringify(fbVendors));
-        }
-        if (catsSnap.status === 'fulfilled' && !catsSnap.value.empty) {
-          const fbCats = catsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
-          setCategories(fbCats);
-          localStorage.setItem('rehmat_shop_categories_v2', JSON.stringify(fbCats));
-        }
-        if (salesSnap && salesSnap.status === 'fulfilled') {
-          const fbSales = salesSnap.value.docs ? salesSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-          setShopSales(fbSales);
-          localStorage.setItem('rehmat_shop_sales_v2', JSON.stringify(fbSales));
-        }
-        if (paySnap && paySnap.status === 'fulfilled') {
-          const fbPay = paySnap.value.docs ? paySnap.value.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-          setShopCustomerPayments(fbPay);
-          localStorage.setItem('rehmat_shop_customer_payments_v2', JSON.stringify(fbPay));
-        }
-      } catch (err) {
-        console.warn('Firebase Shop Data Sync notice (falling back to local data):', err);
       }
-    };
 
-    fetchShopFirebaseData();
-    return () => {
-      isMounted = false;
-    };
+      if (logsSnap.status === 'fulfilled' && logsSnap.value?.docs) {
+        const fbLogs = logsSnap.value.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((l) => !deletedLogs.has(String(l.id)))
+          .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        if (fbLogs.length > 0) {
+          setUsageLogs(fbLogs);
+          persistJSON(STORAGE_KEYS.usageLogs, fbLogs);
+        }
+      }
+
+      if (vendorsSnap.status === 'fulfilled' && vendorsSnap.value?.docs) {
+        const fbVendors = vendorsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })).filter((v) => !deletedVendors.has(String(v.id)));
+        if (fbVendors.length > 0) {
+          setVendors(fbVendors);
+          persistJSON(STORAGE_KEYS.vendors, fbVendors);
+        }
+      }
+
+      if (catsSnap.status === 'fulfilled' && !catsSnap.value.empty) {
+        const fbCats = catsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setCategories(fbCats);
+        persistJSON(STORAGE_KEYS.categories, fbCats);
+      }
+
+      if (salesSnap.status === 'fulfilled' && salesSnap.value?.docs) {
+        const fbSales = salesSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const mergedSales = mergeWithPending(fbSales, deletedSales, STORAGE_KEYS.sales, PENDING_KEYS.sales).sort(
+          (a, b) => new Date(b.dateISO || b.createdAt || 0) - new Date(a.dateISO || a.createdAt || 0)
+        );
+        if (mergedSales.length > 0) {
+          setShopSales(mergedSales);
+          persistJSON(STORAGE_KEYS.sales, mergedSales);
+        }
+      }
+
+      if (paySnap.status === 'fulfilled' && paySnap.value?.docs) {
+        const fbPay = paySnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const mergedPayments = mergeWithPending(fbPay, deletedPayments, STORAGE_KEYS.payments, PENDING_KEYS.payments).sort(
+          (a, b) => new Date(b.createdAt || b.dateISO || 0) - new Date(a.createdAt || a.dateISO || 0)
+        );
+        if (mergedPayments.length > 0) {
+          setShopCustomerPayments(mergedPayments);
+          persistJSON(STORAGE_KEYS.payments, mergedPayments);
+        }
+      }
+
+      if (custSnap.status === 'fulfilled' && custSnap.value?.docs) {
+        const fbCustomers = custSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const mergedCustomers = mergeWithPending(fbCustomers, deletedCustomers, STORAGE_KEYS.customers, PENDING_KEYS.customers).sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '')
+        );
+        if (mergedCustomers.length > 0) {
+          setShopCustomers(mergedCustomers);
+          persistJSON(STORAGE_KEYS.customers, mergedCustomers);
+        }
+      }
+    } catch (err) {
+      console.warn('Firebase Shop Data Sync notice (falling back to local data):', err);
+    }
   }, []);
 
-  // 8. Shop Operations: Receive Stock (Stock In)
-  const receiveStock = async (itemIdOrObj, qtyReceivedParam, supplierNameParam = 'Vendor Shipment', refNoParam = '', unitPriceParam = 0, categoryParam = 'General', imageUrlParam = '') => {
+  useEffect(() => {
+    fetchShopFirebaseData();
+    let lastFocusFetch = Date.now();
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusFetch > 120000) {
+        lastFocusFetch = now;
+        fetchShopFirebaseData();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    const interval = setInterval(fetchShopFirebaseData, 90000);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [fetchShopFirebaseData]);
+
+  // ── Receive Stock (Stock In) ───────────────────────────────────────────
+  const receiveStock = async (
+    itemIdOrObj,
+    qtyReceivedParam,
+    supplierNameParam = 'Vendor Shipment',
+    refNoParam = '',
+    unitPriceParam = 0,
+    categoryParam = 'General',
+    imageUrlParam = ''
+  ) => {
     let targetItem = null;
     let itemId = itemIdOrObj;
-    let qtyReceived = parseInt(qtyReceivedParam, 10) || 1;
-    let supplierName = supplierNameParam || 'Vendor Shipment';
-    let refNo = refNoParam || 'PO-' + Math.floor(1000 + Math.random() * 9000);
-    let unitPrice = parseFloat(unitPriceParam) || 0;
+    const qtyReceived = parseInt(qtyReceivedParam, 10) || 1;
+    const supplierName = supplierNameParam || 'Vendor Shipment';
+    const refNo = refNoParam || `PO-${Math.floor(1000 + Math.random() * 9000)}`;
+    const unitPrice = parseFloat(unitPriceParam) || 0;
     let category = categoryParam || 'General';
     let imageUrl = imageUrlParam || '';
 
@@ -300,41 +403,43 @@ export function ShopInventoryProvider({ children }) {
       if (!imageUrl && targetItem.imageUrl) imageUrl = targetItem.imageUrl;
     } else {
       targetItem = items.find(
-        (i) =>
-          i.id === itemId ||
-          i.itemCode === itemId ||
-          (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
+        (i) => i.id === itemId || i.itemCode === itemId || (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
       );
     }
 
+    const syncTasks = [];
+
     if (!targetItem) {
-      // Auto-create item in shop
       targetItem = {
         id: generateUUID(),
         name: String(itemId),
         itemCode: `SHP-${Math.floor(100 + Math.random() * 900)}`,
-        category: category,
+        category,
         totalStock: 0,
-        unitPrice: unitPrice,
+        unitPrice,
         unit: 'PCS',
         minLevel: 5,
         rackLocation: 'Shop Counter',
-        imageUrl: imageUrl
+        imageUrl
       };
-      setItems((prev) => [targetItem, ...prev]);
-      try {
-        await setDoc(doc(db, 'shop_items', String(targetItem.id)), targetItem, { merge: true });
-      } catch (e) {
-        console.warn('Firebase shop_items setDoc error:', e);
-      }
+      setItems((prev) => {
+        const updated = [targetItem, ...prev];
+        persistJSON(STORAGE_KEYS.items, updated);
+        return updated;
+      });
+      syncTasks.push(
+        setDoc(doc(db, 'shop_items', String(targetItem.id)), targetItem, { merge: true }).catch((e) =>
+          console.warn('Firebase shop_items setDoc error:', e)
+        )
+      );
     }
 
-    const priceToRecord = unitPrice > 0 ? unitPrice : (targetItem.unitPrice || 0);
+    const priceToRecord = unitPrice > 0 ? unitPrice : targetItem.unitPrice || 0;
     const lineTotal = qtyReceived * priceToRecord;
     const now = new Date();
     const timeStr = `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
     const logId = generateUUID();
+
     const newLog = {
       id: logId,
       time: timeStr,
@@ -348,50 +453,66 @@ export function ShopInventoryProvider({ children }) {
       department: 'Shop Counter',
       issuedBy: 'Shop Keeper',
       unitPrice: priceToRecord,
-      lineTotal: lineTotal,
+      lineTotal,
       notes: `Ref: ${refNo}`
     };
 
-    // Update Shop Items State
-    setItems((prev) =>
-      prev.map((i) => {
+    const nextStock = (parseInt(targetItem.totalStock, 10) || 0) + qtyReceived;
+    const nextPrice = priceToRecord > 0 ? priceToRecord : targetItem.unitPrice || 0;
+
+    setItems((prev) => {
+      const updated = prev.map((i) => {
         if (i.id === targetItem.id || i.name.toLowerCase() === targetItem.name.toLowerCase()) {
-          const updatedStock = (parseInt(i.totalStock, 10) || 0) + qtyReceived;
-          const updatedPrice = priceToRecord > 0 ? priceToRecord : (i.unitPrice || 0);
           return {
             ...i,
-            totalStock: updatedStock,
-            unitPrice: updatedPrice,
+            totalStock: (parseInt(i.totalStock, 10) || 0) + qtyReceived,
+            unitPrice: priceToRecord > 0 ? priceToRecord : i.unitPrice || 0,
             ...(imageUrl ? { imageUrl } : {})
           };
         }
         return i;
-      })
+      });
+      persistJSON(STORAGE_KEYS.items, updated);
+      return updated;
+    });
+
+    setUsageLogs((prev) => {
+      const updated = [newLog, ...prev];
+      persistJSON(STORAGE_KEYS.usageLogs, updated);
+      return updated;
+    });
+
+    syncTasks.push(
+      setDoc(
+        doc(db, 'shop_items', String(targetItem.id)),
+        {
+          ...targetItem,
+          totalStock: nextStock,
+          unitPrice: nextPrice,
+          ...(imageUrl ? { imageUrl } : {})
+        },
+        { merge: true }
+      ).catch((e) => console.warn('Firebase shop receiveStock item sync error:', e)),
+      setDoc(doc(db, 'shop_usage_logs', String(logId)), newLog, { merge: true }).catch((e) =>
+        console.warn('Firebase shop receiveStock log sync error:', e)
+      )
     );
 
-    // Update Shop Usage Logs State
-    setUsageLogs((prev) => [newLog, ...prev]);
-
-    // Save to Firestore in background
-    try {
-      await Promise.allSettled([
-        setDoc(doc(db, 'shop_items', String(targetItem.id)), {
-          ...targetItem,
-          totalStock: (parseInt(targetItem.totalStock, 10) || 0) + qtyReceived,
-          unitPrice: priceToRecord > 0 ? priceToRecord : (targetItem.unitPrice || 0),
-          ...(imageUrl ? { imageUrl } : {})
-        }, { merge: true }),
-        setDoc(doc(db, 'shop_usage_logs', String(logId)), newLog, { merge: true })
-      ]);
-    } catch (e) {
-      console.warn('Firebase Shop receiveStock sync error:', e);
-    }
-
+    await syncWithTimeout(Promise.allSettled(syncTasks));
     return true;
   };
 
-  // 9. Shop Operations: Issue Stock (Stock Out / Sale)
-  const issueStock = async (itemIdOrObj, qtyUsedParam, usedByParam, departmentParam = 'Sales / Counter', issuedByParam = 'Shop Keeper', notesParam = '', unitPriceParam = 0, categoryParam = 'General') => {
+  // ── Issue Stock (Stock Out / Sale Deduction) ───────────────────────────
+  const issueStock = async (
+    itemIdOrObj,
+    qtyUsedParam,
+    usedByParam,
+    departmentParam = 'Sales / Counter',
+    issuedByParam = 'Shop Keeper',
+    notesParam = '',
+    unitPriceParam = 0,
+    categoryParam = 'General'
+  ) => {
     let itemId = itemIdOrObj;
     let qtyUsed = parseInt(qtyUsedParam, 10) || 1;
     let usedBy = usedByParam || 'Walk-in Customer';
@@ -413,29 +534,20 @@ export function ShopInventoryProvider({ children }) {
     }
 
     const targetItem = items.find(
-      (i) =>
-        i.id === itemId ||
-        i.itemCode === itemId ||
-        (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
+      (i) => i.id === itemId || i.itemCode === itemId || (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
     );
-
-    if (!targetItem) {
-      alert('Shop item not found in stock!');
-      return false;
-    }
+    if (!targetItem) return false;
 
     const currentStock = parseInt(targetItem.totalStock, 10) || 0;
-    if (currentStock < qtyUsed) {
-      return false; // Insufficient quantity
-    }
+    if (currentStock < qtyUsed) return false;
 
     const newStock = Math.max(0, currentStock - qtyUsed);
-    const finalPrice = unitPrice > 0 ? unitPrice : (targetItem.unitPrice || 0);
+    const finalPrice = unitPrice > 0 ? unitPrice : targetItem.unitPrice || 0;
     const lineTotal = qtyUsed * finalPrice;
     const now = new Date();
     const timeStr = `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
     const logId = generateUUID();
+
     const newLog = {
       id: logId,
       time: timeStr,
@@ -444,46 +556,45 @@ export function ShopInventoryProvider({ children }) {
       itemName: targetItem.name,
       itemCode: targetItem.itemCode || `SHP-${Math.floor(100 + Math.random() * 900)}`,
       category: targetItem.category || category,
-      qtyUsed: qtyUsed,
-      usedBy: usedBy,
-      department: department,
-      issuedBy: issuedBy,
+      qtyUsed,
+      usedBy,
+      department,
+      issuedBy,
       unitPrice: finalPrice,
-      lineTotal: lineTotal,
-      notes: notes
+      lineTotal,
+      notes
     };
 
-    // Update Shop Items State
-    setItems((prev) =>
-      prev.map((i) => (i.id === targetItem.id ? { ...i, totalStock: newStock } : i))
-    );
+    setItems((prev) => {
+      const updated = prev.map((i) => (i.id === targetItem.id ? { ...i, totalStock: newStock } : i));
+      persistJSON(STORAGE_KEYS.items, updated);
+      return updated;
+    });
 
-    // Update Shop Usage Logs State
-    setUsageLogs((prev) => [newLog, ...prev]);
+    setUsageLogs((prev) => {
+      const updated = [newLog, ...prev];
+      persistJSON(STORAGE_KEYS.usageLogs, updated);
+      return updated;
+    });
 
-    // Save to Firestore
-    try {
-      await Promise.allSettled([
-        setDoc(doc(db, 'shop_items', String(targetItem.id)), {
-          ...targetItem,
-          totalStock: newStock
-        }, { merge: true }),
+    await syncWithTimeout(
+      Promise.allSettled([
+        setDoc(doc(db, 'shop_items', String(targetItem.id)), { ...targetItem, totalStock: newStock }, { merge: true }),
         setDoc(doc(db, 'shop_usage_logs', String(logId)), newLog, { merge: true })
-      ]);
-    } catch (e) {
-      console.warn('Firebase Shop issueStock sync error:', e);
-    }
+      ])
+    ).catch((e) => console.warn('Firebase Shop issueStock sync error:', e));
 
     return true;
   };
 
-  // 10. Add New Item in Shop
+  // ── Item Management ────────────────────────────────────────────────────
   const addNewItem = async (newItemData) => {
     const id = generateUUID();
     const itemCode = newItemData.itemCode || `SHP-${Math.floor(100 + Math.random() * 900)}`;
     const fullItem = {
       id,
       name: (newItemData.name || '').trim(),
+      specification: (newItemData.specification || '').trim(),
       itemCode,
       category: newItemData.category || 'General',
       unit: newItemData.unit || 'PCS',
@@ -494,30 +605,47 @@ export function ShopInventoryProvider({ children }) {
       imageUrl: newItemData.imageUrl || ''
     };
 
-    setItems((prev) => [fullItem, ...prev]);
+    removeTrackedId(DELETED_KEYS.items, id);
+    setItems((prev) => {
+      const updated = [fullItem, ...prev];
+      persistJSON(STORAGE_KEYS.items, updated);
+      return updated;
+    });
 
-    try {
-      await setDoc(doc(db, 'shop_items', String(id)), fullItem, { merge: true });
-    } catch (e) {
-      console.warn('Firebase Shop addNewItem error:', e);
-    }
+    await syncWithTimeout(
+      setDoc(doc(db, 'shop_items', String(id)), fullItem, { merge: true }).catch((e) =>
+        console.warn('Firebase Shop addNewItem error:', e)
+      )
+    );
 
     return fullItem;
   };
 
   const updateItem = async (itemId, updatedData) => {
-    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, ...updatedData } : i)));
-    try {
-      await setDoc(doc(db, 'shop_items', String(itemId)), updatedData, { merge: true });
-    } catch (e) {
-      console.warn('Firebase Shop updateItem error:', e);
-    }
+    setItems((prev) => {
+      const updated = prev.map((i) => (i.id === itemId ? { ...i, ...updatedData } : i));
+      persistJSON(STORAGE_KEYS.items, updated);
+      return updated;
+    });
+
+    await syncWithTimeout(
+      setDoc(doc(db, 'shop_items', String(itemId)), updatedData, { merge: true }).catch((e) =>
+        console.warn('Firebase Shop updateItem error:', e)
+      )
+    );
   };
 
   const deleteItem = async (itemId) => {
-    setItems((prev) => prev.filter((i) => i.id !== itemId));
+    const strId = String(itemId);
+    addTrackedId(DELETED_KEYS.items, strId);
+    setItems((prev) => {
+      const updated = prev.filter((i) => String(i.id) !== strId);
+      persistJSON(STORAGE_KEYS.items, updated);
+      return updated;
+    });
+
     try {
-      await deleteDoc(doc(db, 'shop_items', String(itemId)));
+      await syncWithTimeout(deleteDoc(doc(db, 'shop_items', strId)));
     } catch (e) {
       console.warn('Firebase Shop deleteItem error:', e);
     }
@@ -526,29 +654,38 @@ export function ShopInventoryProvider({ children }) {
   const cleanDuplicateItems = () => {};
 
   const seedShopDemoData = async () => {
+    persistJSON(DELETED_KEYS.items, []);
     setItems(defaultShopItems);
-    localStorage.setItem('rehmat_shop_items_v2', JSON.stringify(defaultShopItems));
+    persistJSON(STORAGE_KEYS.items, defaultShopItems);
     try {
-      for (const it of defaultShopItems) {
-        await setDoc(doc(db, 'shop_items', String(it.id)), it, { merge: true });
-      }
+      await syncWithTimeout(Promise.allSettled(defaultShopItems.map((it) => setDoc(doc(db, 'shop_items', String(it.id)), it, { merge: true }))));
     } catch (e) {
       console.warn('Firebase seed error:', e);
     }
   };
 
-  // 11. Log Management
+  // ── Log Management ─────────────────────────────────────────────────────
   const deleteLog = async (logId) => {
-    setUsageLogs((prev) => prev.filter((l) => l.id !== logId));
+    const strId = String(logId);
+    addTrackedId(DELETED_KEYS.usageLogs, strId);
+    setUsageLogs((prev) => {
+      const updated = prev.filter((l) => String(l.id) !== strId);
+      persistJSON(STORAGE_KEYS.usageLogs, updated);
+      return updated;
+    });
     try {
-      await deleteDoc(doc(db, 'shop_usage_logs', String(logId)));
+      await deleteDoc(doc(db, 'shop_usage_logs', strId));
     } catch (e) {
       console.warn('Firebase Shop deleteLog error:', e);
     }
   };
 
   const updateLog = async (logId, updatedData) => {
-    setUsageLogs((prev) => prev.map((l) => (l.id === logId ? { ...l, ...updatedData } : l)));
+    setUsageLogs((prev) => {
+      const updated = prev.map((l) => (l.id === logId ? { ...l, ...updatedData } : l));
+      persistJSON(STORAGE_KEYS.usageLogs, updated);
+      return updated;
+    });
     try {
       await setDoc(doc(db, 'shop_usage_logs', String(logId)), updatedData, { merge: true });
     } catch (e) {
@@ -557,8 +694,13 @@ export function ShopInventoryProvider({ children }) {
   };
 
   const deleteMultipleLogs = async (logIds = []) => {
-    const idSet = new Set(logIds);
-    setUsageLogs((prev) => prev.filter((l) => !idSet.has(l.id)));
+    const idSet = new Set(logIds.map(String));
+    logIds.forEach((id) => addTrackedId(DELETED_KEYS.usageLogs, id));
+    setUsageLogs((prev) => {
+      const updated = prev.filter((l) => !idSet.has(String(l.id)));
+      persistJSON(STORAGE_KEYS.usageLogs, updated);
+      return updated;
+    });
     try {
       await Promise.allSettled(logIds.map((id) => deleteDoc(doc(db, 'shop_usage_logs', String(id)))));
     } catch (e) {
@@ -566,39 +708,58 @@ export function ShopInventoryProvider({ children }) {
     }
   };
 
-  // 12. Vendor / Party Management
+  // ── Vendor / Supplier Management ───────────────────────────────────────
   const addVendor = async (vendorData) => {
     const id = generateUUID();
     const newV = { id, ...vendorData };
-    setVendors((prev) => [newV, ...prev]);
+    setVendors((prev) => {
+      const updated = [newV, ...prev];
+      persistJSON(STORAGE_KEYS.vendors, updated);
+      return updated;
+    });
     try {
-      await setDoc(doc(db, 'shop_vendors', String(id)), newV, { merge: true });
+      await syncWithTimeout(setDoc(doc(db, 'shop_vendors', String(id)), newV, { merge: true }));
     } catch (e) {
       console.warn('Firebase Shop addVendor error:', e);
     }
   };
 
   const updateVendor = async (id, updatedData) => {
-    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, ...updatedData } : v)));
+    setVendors((prev) => {
+      const updated = prev.map((v) => (v.id === id ? { ...v, ...updatedData } : v));
+      persistJSON(STORAGE_KEYS.vendors, updated);
+      return updated;
+    });
     try {
-      await setDoc(doc(db, 'shop_vendors', String(id)), updatedData, { merge: true });
+      await syncWithTimeout(setDoc(doc(db, 'shop_vendors', String(id)), updatedData, { merge: true }));
     } catch (e) {
       console.warn('Firebase Shop updateVendor error:', e);
     }
   };
 
   const deleteVendor = async (id) => {
-    setVendors((prev) => prev.filter((v) => v.id !== id));
+    const strId = String(id);
+    addTrackedId(DELETED_KEYS.vendors, strId);
+    setVendors((prev) => {
+      const updated = prev.filter((v) => String(v.id) !== strId);
+      persistJSON(STORAGE_KEYS.vendors, updated);
+      return updated;
+    });
     try {
-      await deleteDoc(doc(db, 'shop_vendors', String(id)));
+      await deleteDoc(doc(db, 'shop_vendors', strId));
     } catch (e) {
       console.warn('Firebase Shop deleteVendor error:', e);
     }
   };
 
   const deleteMultipleVendors = async (ids = []) => {
-    const idSet = new Set(ids);
-    setVendors((prev) => prev.filter((v) => !idSet.has(v.id)));
+    const idSet = new Set(ids.map(String));
+    ids.forEach((id) => addTrackedId(DELETED_KEYS.vendors, id));
+    setVendors((prev) => {
+      const updated = prev.filter((v) => !idSet.has(String(v.id)));
+      persistJSON(STORAGE_KEYS.vendors, updated);
+      return updated;
+    });
     try {
       await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'shop_vendors', String(id)))));
     } catch (e) {
@@ -606,11 +767,15 @@ export function ShopInventoryProvider({ children }) {
     }
   };
 
-  // 13. Category Management
+  // ── Category Management ────────────────────────────────────────────────
   const addCategory = async (catData) => {
     const id = generateUUID();
     const newCat = { id, ...catData };
-    setCategories((prev) => [...prev, newCat]);
+    setCategories((prev) => {
+      const updated = [...prev, newCat];
+      persistJSON(STORAGE_KEYS.categories, updated);
+      return updated;
+    });
     try {
       await setDoc(doc(db, 'shop_categories', String(id)), newCat, { merge: true });
     } catch (e) {
@@ -619,7 +784,11 @@ export function ShopInventoryProvider({ children }) {
   };
 
   const updateCategory = async (id, updatedData) => {
-    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updatedData } : c)));
+    setCategories((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, ...updatedData } : c));
+      persistJSON(STORAGE_KEYS.categories, updated);
+      return updated;
+    });
     try {
       await setDoc(doc(db, 'shop_categories', String(id)), updatedData, { merge: true });
     } catch (e) {
@@ -628,7 +797,11 @@ export function ShopInventoryProvider({ children }) {
   };
 
   const deleteCategory = async (id) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setCategories((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      persistJSON(STORAGE_KEYS.categories, updated);
+      return updated;
+    });
     try {
       await deleteDoc(doc(db, 'shop_categories', String(id)));
     } catch (e) {
@@ -638,7 +811,11 @@ export function ShopInventoryProvider({ children }) {
 
   const deleteMultipleCategories = async (ids = []) => {
     const idSet = new Set(ids);
-    setCategories((prev) => prev.filter((c) => !idSet.has(c.id)));
+    setCategories((prev) => {
+      const updated = prev.filter((c) => !idSet.has(c.id));
+      persistJSON(STORAGE_KEYS.categories, updated);
+      return updated;
+    });
     try {
       await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'shop_categories', String(id)))));
     } catch (e) {
@@ -646,108 +823,338 @@ export function ShopInventoryProvider({ children }) {
     }
   };
 
-  // Master Items Dummy handlers
-  const addMasterItemName = (name) => setMasterItemNames((p) => [...p, { id: generateUUID(), name }]);
-  const updateMasterItemName = () => {};
-  const deleteMasterItemName = () => {};
-  const deleteMultipleMasterItemNames = () => {};
-  const addNotification = () => {};
+  // ── Shop Customer Directory CRUD ───────────────────────────────────────
+  const addShopCustomer = async (customerData) => {
+    const custId = generateUUID();
+    const nowISO = new Date().toISOString();
+    const newCustomer = {
+      id: custId,
+      name: (customerData.name || '').trim(),
+      phone: (customerData.phone || '').trim(),
+      city: (customerData.city || '').trim(),
+      address: (customerData.address || customerData.city || '').trim(),
+      openingBalance: parseFloat(customerData.openingBalance) || 0,
+      notes: (customerData.notes || '').trim(),
+      createdAt: nowISO
+    };
 
-  // ── Shop Sales & Ledger Actions ──────────────────────────────────
+    removeTrackedId(DELETED_KEYS.customers, custId);
+    addTrackedId(PENDING_KEYS.customers, custId);
+
+    setShopCustomers((prev) => {
+      const updated = [newCustomer, ...prev].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      persistJSON(STORAGE_KEYS.customers, updated);
+      return updated;
+    });
+
+    await syncWithTimeout(
+      setDoc(doc(db, 'shop_customers', String(custId)), newCustomer, { merge: true })
+        .then(() => removeTrackedId(PENDING_KEYS.customers, custId))
+        .catch((e) => console.warn('Firebase shop_customers sync warning:', e))
+    );
+
+    return newCustomer;
+  };
+
+  const updateShopCustomer = async (id, updatedFields) => {
+    let saved = null;
+    setShopCustomers((prev) => {
+      const updated = prev.map((c) => {
+        if (String(c.id) === String(id)) {
+          saved = {
+            ...c,
+            ...updatedFields,
+            openingBalance: updatedFields.openingBalance !== undefined ? parseFloat(updatedFields.openingBalance) || 0 : c.openingBalance
+          };
+          return saved;
+        }
+        return c;
+      });
+      persistJSON(STORAGE_KEYS.customers, updated);
+      return updated;
+    });
+
+    await syncWithTimeout(
+      setDoc(doc(db, 'shop_customers', String(id)), updatedFields, { merge: true }).catch((e) =>
+        console.warn('Firebase updateShopCustomer warning:', e)
+      )
+    );
+    return saved;
+  };
+
+  const deleteShopCustomer = async (id) => {
+    const strId = String(id);
+    addTrackedId(DELETED_KEYS.customers, strId);
+    removeTrackedId(PENDING_KEYS.customers, strId);
+    setShopCustomers((prev) => {
+      const updated = prev.filter((c) => String(c.id) !== strId);
+      persistJSON(STORAGE_KEYS.customers, updated);
+      return updated;
+    });
+
+    try {
+      await syncWithTimeout(deleteDoc(doc(db, 'shop_customers', strId)));
+    } catch (e) {
+      console.warn('Firebase deleteShopCustomer warning:', e);
+    }
+  };
+
+  // ── Shop Sales & Invoices Actions ──────────────────────────────────────
   const addShopSale = async (saleData) => {
     const saleId = saleData.id || generateUUID();
     const now = new Date();
+    const totalAmt = Math.max(0, parseFloat(saleData.totalAmount ?? saleData.grandTotal ?? saleData.subTotal) || 0);
+    const pMethod = saleData.paymentMethod || 'Cash';
+    const isCredit = String(pMethod).toLowerCase().includes('credit');
+    const hasExplicitPaid = saleData.paidAmount !== undefined && saleData.paidAmount !== null && saleData.paidAmount !== '';
+    const paidAmt = hasExplicitPaid ? Math.max(0, parseFloat(saleData.paidAmount) || 0) : isCredit ? 0 : totalAmt;
+    const balanceAmt = Math.max(0, totalAmt - paidAmt);
+    const paymentStatus = totalAmt > 0 && balanceAmt <= 0 ? 'Paid' : paidAmt > 0 ? 'Partial' : 'Unpaid';
+
     const newSale = {
       ...saleData,
       id: saleId,
+      totalAmount: totalAmt,
+      paidAmount: paidAmt,
+      balanceAmount: balanceAmt,
+      paymentStatus,
       createdAt: now.toISOString(),
       dateISO: saleData.dateISO || now.toISOString()
     };
 
-    setShopSales((prev) => [newSale, ...prev]);
+    removeTrackedId(DELETED_KEYS.sales, saleId);
+    addTrackedId(PENDING_KEYS.sales, saleId);
 
-    try {
+    setShopSales((prev) => {
+      const updated = [newSale, ...prev];
+      persistJSON(STORAGE_KEYS.sales, updated);
+      return updated;
+    });
+
+    await syncWithTimeout(
       setDoc(doc(db, 'shop_sales', String(saleId)), newSale, { merge: true })
-        .catch((err) => console.warn('Firebase shop_sales sync warning:', err));
-    } catch (e) {
-      console.warn('Firebase addShopSale exception:', e);
-    }
+        .then(() => removeTrackedId(PENDING_KEYS.sales, saleId))
+        .catch((err) => console.warn('Firebase shop_sales sync warning:', err))
+    );
+
     return newSale;
   };
 
   const updateShopSale = async (saleId, updatedData) => {
     const stringId = String(saleId);
-    let updatedRecord = null;
+    const existing = shopSales.find((s) => String(s.id) === stringId);
     const now = new Date();
 
-    setShopSales((prev) =>
-      prev.map((s) => {
-        if (String(s.id) === stringId) {
-          updatedRecord = {
-            ...s,
-            ...updatedData,
-            id: s.id,
-            updatedAt: now.toISOString()
-          };
-          return updatedRecord;
-        }
-        return s;
-      })
-    );
+    const computeNext = (s) => {
+      const merged = { ...s, ...updatedData, id: s.id, updatedAt: now.toISOString() };
+      const totalAmt = Math.max(0, parseFloat(merged.totalAmount ?? merged.grandTotal ?? merged.subTotal) || 0);
+      const paidAmt = Math.max(0, parseFloat(merged.paidAmount) || 0);
+      const balanceAmt = Math.max(0, totalAmt - paidAmt);
+      const paymentStatus = totalAmt > 0 && balanceAmt <= 0 ? 'Paid' : paidAmt > 0 ? 'Partial' : 'Unpaid';
+      return { ...merged, totalAmount: totalAmt, paidAmount: paidAmt, balanceAmount: balanceAmt, paymentStatus };
+    };
+
+    const updatedRecord = existing ? computeNext(existing) : null;
+
+    setShopSales((prev) => {
+      const updated = prev.map((s) => (String(s.id) === stringId ? computeNext(s) : s));
+      persistJSON(STORAGE_KEYS.sales, updated);
+      return updated;
+    });
 
     if (updatedRecord) {
-      try {
-        setDoc(doc(db, 'shop_sales', stringId), updatedRecord, { merge: true })
-          .catch((err) => console.warn('Firebase updateShopSale sync warning:', err));
-      } catch (e) {
-        console.warn('Firebase updateShopSale exception:', e);
-      }
+      await syncWithTimeout(
+        setDoc(doc(db, 'shop_sales', stringId), updatedRecord, { merge: true }).catch((err) =>
+          console.warn('Firebase updateShopSale sync warning:', err)
+        )
+      );
     }
     return updatedRecord;
   };
 
   const deleteShopSale = async (saleId) => {
     const stringId = String(saleId);
-    setShopSales((prev) => prev.filter((s) => String(s.id) !== stringId));
+    addTrackedId(DELETED_KEYS.sales, stringId);
+    removeTrackedId(PENDING_KEYS.sales, stringId);
+    setShopSales((prev) => {
+      const updated = prev.filter((s) => String(s.id) !== stringId);
+      persistJSON(STORAGE_KEYS.sales, updated);
+      return updated;
+    });
     try {
-      deleteDoc(doc(db, 'shop_sales', stringId)).catch(() => {});
+      await syncWithTimeout(deleteDoc(doc(db, 'shop_sales', stringId)));
     } catch (e) {
       console.warn('deleteShopSale error:', e);
     }
   };
 
+  const deleteMultipleShopSales = async (saleIds = []) => {
+    const idSet = new Set(saleIds.map(String));
+    saleIds.forEach((id) => {
+      addTrackedId(DELETED_KEYS.sales, id);
+      removeTrackedId(PENDING_KEYS.sales, id);
+    });
+    setShopSales((prev) => {
+      const updated = prev.filter((s) => !idSet.has(String(s.id)));
+      persistJSON(STORAGE_KEYS.sales, updated);
+      return updated;
+    });
+    try {
+      await syncWithTimeout(Promise.allSettled(saleIds.map((id) => deleteDoc(doc(db, 'shop_sales', String(id))))));
+    } catch (e) {
+      console.warn('deleteMultipleShopSales error:', e);
+    }
+  };
+
+  // ── Shop Customer Payment / Payout / Adjustment Vouchers ───────────────
   const addShopCustomerPayment = async (paymentData) => {
     const payId = paymentData.id || generateUUID();
+    const voucherNo = paymentData.voucherNo || `SHP-PAY-${Math.floor(10000 + Math.random() * 90000)}`;
     const now = new Date();
+    const formattedTime = `${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    const entryType = paymentData.entryType || 'Receipt';
+    const referenceType = paymentData.referenceType || (paymentData.invoiceId ? 'Sale' : 'Account');
+    const amountNum = Math.max(0, parseFloat(paymentData.amountPaid) || 0);
+
     const newPay = {
-      ...paymentData,
       id: payId,
-      date: paymentData.date || now.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }),
+      voucherNo,
+      entryType,
+      referenceType,
+      invoiceId: paymentData.invoiceId || '',
+      repairId: '',
+      referenceLabel: paymentData.referenceLabel || '',
+      customerName: (paymentData.customerName || 'Walk-in Customer').trim(),
+      amountPaid: amountNum,
+      paymentMethod: paymentData.paymentMethod || 'Cash',
+      referenceNo: paymentData.referenceNo || '',
+      notes: paymentData.notes || '',
+      time: formattedTime,
+      date: paymentData.date || formattedTime,
       dateISO: now.toISOString(),
       createdAt: now.toISOString()
     };
 
-    setShopCustomerPayments((prev) => [newPay, ...prev]);
+    removeTrackedId(DELETED_KEYS.payments, payId);
+    addTrackedId(PENDING_KEYS.payments, payId);
 
-    try {
-      setDoc(doc(db, 'shop_customer_payments', String(payId)), newPay, { merge: true })
-        .catch((err) => console.warn('Firebase shop_customer_payments sync warning:', err));
-    } catch (e) {
-      console.warn('Firebase addShopCustomerPayment exception:', e);
+    setShopCustomerPayments((prev) => {
+      const updated = [newPay, ...prev];
+      persistJSON(STORAGE_KEYS.payments, updated);
+      return updated;
+    });
+
+    const syncTasks = [];
+    const deltaPaid = entryType === 'Payout' ? -amountNum : amountNum;
+
+    if (paymentData.invoiceId) {
+      const computeNextSale = (sale) => {
+        const totalAmt = Math.max(0, parseFloat(sale.totalAmount ?? sale.grandTotal ?? sale.subTotal) || 0);
+        const currentPaid =
+          sale.paidAmount !== undefined && sale.paidAmount !== null
+            ? parseFloat(sale.paidAmount) || 0
+            : String(sale.paymentMethod || '').toLowerCase().includes('credit')
+              ? 0
+              : totalAmt;
+        const nextPaid = Math.max(0, currentPaid + deltaPaid);
+        const nextBal = Math.max(0, totalAmt - nextPaid);
+        const nextStatus = totalAmt > 0 && nextBal <= 0 ? 'Paid' : nextPaid > 0 ? 'Partial' : 'Unpaid';
+        return { ...sale, paidAmount: nextPaid, balanceAmount: nextBal, paymentStatus: nextStatus };
+      };
+
+      const targetSale = shopSales.find((s) => String(s.id) === String(paymentData.invoiceId));
+      const syncedSale = targetSale ? computeNextSale(targetSale) : null;
+
+      setShopSales((prevSales) => {
+        const updated = prevSales.map((s) => (String(s.id) === String(paymentData.invoiceId) ? computeNextSale(s) : s));
+        persistJSON(STORAGE_KEYS.sales, updated);
+        return updated;
+      });
+
+      if (syncedSale) {
+        syncTasks.push(
+          setDoc(
+            doc(db, 'shop_sales', String(syncedSale.id)),
+            {
+              paidAmount: syncedSale.paidAmount,
+              balanceAmount: syncedSale.balanceAmount,
+              paymentStatus: syncedSale.paymentStatus
+            },
+            { merge: true }
+          ).catch((e) => console.warn('Firebase shop_sales payment sync warning:', e))
+        );
+      }
     }
+
+    syncTasks.push(
+      setDoc(doc(db, 'shop_customer_payments', String(payId)), newPay, { merge: true })
+        .then(() => removeTrackedId(PENDING_KEYS.payments, payId))
+        .catch((err) => console.warn('Firebase shop_customer_payments sync warning:', err))
+    );
+
+    await syncWithTimeout(Promise.allSettled(syncTasks));
     return newPay;
   };
 
   const deleteShopCustomerPayment = async (payId) => {
-    setShopCustomerPayments((prev) => prev.filter((p) => p.id !== payId));
+    const strId = String(payId);
+    const target = shopCustomerPayments.find((p) => String(p.id) === strId);
+
+    addTrackedId(DELETED_KEYS.payments, strId);
+    removeTrackedId(PENDING_KEYS.payments, strId);
+
+    setShopCustomerPayments((prev) => {
+      const updated = prev.filter((p) => String(p.id) !== strId);
+      persistJSON(STORAGE_KEYS.payments, updated);
+      return updated;
+    });
+
+    if (target?.invoiceId) {
+      const amt = Math.max(0, parseFloat(target.amountPaid) || 0);
+      const reverseDelta = target.entryType === 'Payout' ? amt : -amt;
+
+      const computeReversedSale = (sale) => {
+        const totalAmt = Math.max(0, parseFloat(sale.totalAmount ?? sale.grandTotal ?? sale.subTotal) || 0);
+        const nextPaid = Math.max(0, (parseFloat(sale.paidAmount) || 0) + reverseDelta);
+        const nextBal = Math.max(0, totalAmt - nextPaid);
+        const nextStatus = totalAmt > 0 && nextBal <= 0 ? 'Paid' : nextPaid > 0 ? 'Partial' : 'Unpaid';
+        return { ...sale, paidAmount: nextPaid, balanceAmount: nextBal, paymentStatus: nextStatus };
+      };
+
+      const targetSale = shopSales.find((s) => String(s.id) === String(target.invoiceId));
+      const syncedSale = targetSale ? computeReversedSale(targetSale) : null;
+
+      setShopSales((prevSales) => {
+        const updated = prevSales.map((s) => (String(s.id) === String(target.invoiceId) ? computeReversedSale(s) : s));
+        persistJSON(STORAGE_KEYS.sales, updated);
+        return updated;
+      });
+
+      if (syncedSale) {
+        await syncWithTimeout(
+          setDoc(
+            doc(db, 'shop_sales', String(syncedSale.id)),
+            {
+              paidAmount: syncedSale.paidAmount,
+              balanceAmount: syncedSale.balanceAmount,
+              paymentStatus: syncedSale.paymentStatus
+            },
+            { merge: true }
+          ).catch((e) => console.warn('Firebase reverse shop_sales payment warning:', e))
+        );
+      }
+    }
+
     try {
-      deleteDoc(doc(db, 'shop_customer_payments', String(payId))).catch(() => {});
+      await syncWithTimeout(deleteDoc(doc(db, 'shop_customer_payments', strId)));
     } catch (e) {
       console.warn('deleteShopCustomerPayment error:', e);
     }
   };
 
-  // 14. Computed Shop Metrics
+  // ── Computed Shop Metrics ──────────────────────────────────────────────
+  const todayISO = getTodayISO();
+
   const totalInventoryCount = useMemo(() => {
     return items.reduce((acc, item) => acc + (parseInt(item.totalStock, 10) || 0), 0);
   }, [items]);
@@ -762,42 +1169,49 @@ export function ShopInventoryProvider({ children }) {
 
   const todayStockInQty = useMemo(() => {
     return usageLogs
-      .filter((l) => (l.time || '').includes('Today') && (l.type || '').toUpperCase().includes('IN'))
+      .filter((l) => isRecordInDateRange({ createdAt: l.timestamp, time: l.time }, todayISO, todayISO) && (l.type || '').toUpperCase().includes('IN'))
       .reduce((acc, l) => acc + (parseInt(l.qtyUsed, 10) || 0), 0);
-  }, [usageLogs]);
+  }, [usageLogs, todayISO]);
 
   const todayStockOutQty = useMemo(() => {
     return usageLogs
-      .filter((l) => (l.time || '').includes('Today') && (l.type || '').toUpperCase().includes('OUT'))
+      .filter((l) => isRecordInDateRange({ createdAt: l.timestamp, time: l.time }, todayISO, todayISO) && (l.type || '').toUpperCase().includes('OUT'))
       .reduce((acc, l) => acc + (parseInt(l.qtyUsed, 10) || 0), 0);
-  }, [usageLogs]);
+  }, [usageLogs, todayISO]);
 
   const todaySalesAmount = useMemo(() => {
+    if (shopSales.length > 0) {
+      return shopSales
+        .filter((s) => isRecordInDateRange({ dateISO: s.dateISO, createdAt: s.createdAt, time: s.date || s.time }, todayISO, todayISO))
+        .reduce((acc, s) => acc + (parseFloat(s.totalAmount ?? s.grandTotal ?? s.subTotal) || 0), 0);
+    }
     return usageLogs
-      .filter((l) => (l.time || '').includes('Today') && (l.type || '').toUpperCase().includes('OUT'))
+      .filter((l) => isRecordInDateRange({ createdAt: l.timestamp, time: l.time }, todayISO, todayISO) && (l.type || '').toUpperCase().includes('OUT'))
       .reduce((acc, l) => {
         const lineVal = parseFloat(l.lineTotal) || (parseInt(l.qtyUsed, 10) || 0) * (parseFloat(l.unitPrice) || 0);
         return acc + lineVal;
       }, 0);
-  }, [usageLogs]);
+  }, [shopSales, usageLogs, todayISO]);
 
   const totalSalesAmount = useMemo(() => {
+    if (shopSales.length > 0) {
+      return shopSales.reduce((acc, s) => acc + (parseFloat(s.totalAmount ?? s.grandTotal ?? s.subTotal) || 0), 0);
+    }
     return usageLogs
       .filter((l) => (l.type || '').toUpperCase().includes('OUT'))
       .reduce((acc, l) => {
         const lineVal = parseFloat(l.lineTotal) || (parseInt(l.qtyUsed, 10) || 0) * (parseFloat(l.unitPrice) || 0);
         return acc + lineVal;
       }, 0);
-  }, [usageLogs]);
+  }, [shopSales, usageLogs]);
 
   const lowStockAlerts = useMemo(() => {
     return items.filter((item) => (parseInt(item.totalStock, 10) || 0) <= (parseInt(item.minLevel, 10) || 5));
   }, [items]);
 
-  // 15. Factory Reset Shop Data to Zero
+  // ── Factory Reset Shop Data to Zero ────────────────────────────────────
   const resetShopDataToZero = async () => {
     try {
-      // 1. Wipe all shop collections from Firebase Firestore
       const collectionsToWipe = [
         'shop_items',
         'shop_usage_logs',
@@ -805,6 +1219,7 @@ export function ShopInventoryProvider({ children }) {
         'shop_categories',
         'shop_sales',
         'shop_customer_payments',
+        'shop_customers',
         'shop_master_item_names'
       ];
 
@@ -817,19 +1232,10 @@ export function ShopInventoryProvider({ children }) {
         }
       }
 
-      // 2. Clear and set all shop-specific localStorage keys to empty array
-      const shopKeys = [
-        'rehmat_shop_items_v2',
-        'rehmat_shop_usage_logs_v2',
-        'rehmat_shop_vendors_v2',
-        'rehmat_shop_categories_v2',
-        'rehmat_shop_master_item_names_v2',
-        'rehmat_shop_sales_v2',
-        'rehmat_shop_customer_payments_v2'
-      ];
-      shopKeys.forEach((key) => localStorage.setItem(key, JSON.stringify([])));
+      Object.values(STORAGE_KEYS).forEach((key) => persistJSON(key, []));
+      Object.values(DELETED_KEYS).forEach((key) => persistJSON(key, []));
+      Object.values(PENDING_KEYS).forEach((key) => persistJSON(key, []));
 
-      // 3. Clear UI State immediately to 0 / empty
       setItems([]);
       setUsageLogs([]);
       setVendors([]);
@@ -837,12 +1243,29 @@ export function ShopInventoryProvider({ children }) {
       setMasterItemNames([]);
       setShopSales([]);
       setShopCustomerPayments([]);
+      setShopCustomers([]);
 
       return { success: true, message: 'All Shop Data & Metrics wiped successfully to 0!' };
     } catch (err) {
       console.error('Reset Shop Data Error:', err);
       return { success: false, message: 'Wipe error: ' + err.message };
     }
+  };
+
+  // Keep masterItemNames & addMasterItemName usable cleanly
+  const addMasterItemName = async (nameData) => {
+    const itemObj = typeof nameData === 'string' ? { name: nameData } : nameData;
+    const newMaster = {
+      id: `SHP-MST-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: itemObj.name,
+      category: itemObj.category || 'General',
+      defaultUnit: itemObj.defaultUnit || 'PCS'
+    };
+    setMasterItemNames((prev) => {
+      const updated = [newMaster, ...prev];
+      persistJSON(STORAGE_KEYS.masterItemNames, updated);
+      return updated;
+    });
   };
 
   const contextValue = useMemo(
@@ -855,17 +1278,28 @@ export function ShopInventoryProvider({ children }) {
       masterItemNames,
       shopSales,
       shopCustomerPayments,
+      shopCustomers,
+      machineCustomers: shopCustomers,
       machineSales: shopSales,
       customerPayments: shopCustomerPayments,
       resetShopDataToZero,
       resetAllDataToZero: resetShopDataToZero,
+      addShopCustomer,
+      updateShopCustomer,
+      deleteShopCustomer,
+      addMachineCustomer: addShopCustomer,
+      updateMachineCustomer: updateShopCustomer,
+      deleteMachineCustomer: deleteShopCustomer,
       addShopSale,
       updateShopSale,
       editShopSale: updateShopSale,
       deleteShopSale,
+      deleteMultipleShopSales,
+      deleteMultipleMachineSales: deleteMultipleShopSales,
       addShopCustomerPayment,
       deleteShopCustomerPayment,
       addCustomerPayment: addShopCustomerPayment,
+      deleteCustomerPayment: deleteShopCustomerPayment,
       receiveStock,
       issueStock,
       addUsageLog: issueStock,
@@ -886,10 +1320,14 @@ export function ShopInventoryProvider({ children }) {
       deleteCategory,
       deleteMultipleCategories,
       addMasterItemName,
-      updateMasterItemName,
-      deleteMasterItemName,
-      deleteMultipleMasterItemNames,
-      addNotification,
+      updateMasterItemName: () => {},
+      deleteMasterItemName: () => {},
+      deleteMultipleMasterItemNames: () => {},
+      defaultMasterItemNames,
+      defaultShopItems,
+      restoreDefaultMasterItemNames: () => {},
+      restoreDefaultShopItems: seedShopDemoData,
+      addNotification: () => {},
       totalInventoryCount,
       totalValuation,
       todayStockInQty,
@@ -907,6 +1345,7 @@ export function ShopInventoryProvider({ children }) {
       masterItemNames,
       shopSales,
       shopCustomerPayments,
+      shopCustomers,
       totalInventoryCount,
       totalValuation,
       todayStockInQty,
@@ -917,16 +1356,9 @@ export function ShopInventoryProvider({ children }) {
     ]
   );
 
-  return (
-    <StoreInventoryContext.Provider value={contextValue}>
-      {children}
-    </StoreInventoryContext.Provider>
-  );
+  return <StoreInventoryContext.Provider value={contextValue}>{children}</StoreInventoryContext.Provider>;
 }
 
 ShopInventoryProvider.propTypes = {
   children: PropTypes.node
 };
-
-export const useShopInventory = () => useContext(StoreInventoryContext);
-

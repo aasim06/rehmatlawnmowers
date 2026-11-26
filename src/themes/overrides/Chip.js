@@ -1,4 +1,4 @@
-// project imports
+import { withAlpha } from 'utils/colorUtils';
 import getColors from 'utils/getColors';
 
 const CHIP_COLORS = ['primary', 'secondary', 'error', 'info', 'success', 'warning'];
@@ -18,18 +18,19 @@ function getColor({ color, theme }) {
 }
 
 function getColorStyle({ color, theme }) {
+  const isDark = theme.palette.mode === 'dark';
   const colors = getColors(theme, color);
-  const { light, lighter, main, darker } = colors;
+  const { light, lighter, main, dark } = colors;
+  const textColor = isDark ? light || main : dark || main;
 
   return {
-    color: main,
-    backgroundColor: lighter,
-    borderColor: light,
-    ...theme.applyStyles('dark', { color: darker }),
+    color: textColor,
+    backgroundColor: isDark ? withAlpha(main, 0.16) : lighter,
+    borderColor: isDark ? withAlpha(main, 0.3) : light,
     '& .MuiChip-deleteIcon': {
-      color: main,
+      color: textColor,
       '&:hover': {
-        color: light
+        color: main
       }
     }
   };
@@ -63,15 +64,20 @@ export default function Chip(theme) {
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 4,
+          borderRadius: 999,
+          fontWeight: 600,
           '&:active': {
             boxShadow: 'none'
           },
           ...generateColorVariants(theme, 'root')
         },
+        sizeSmall: {
+          height: 24,
+          fontSize: '0.75rem'
+        },
         sizeLarge: {
-          fontSize: '1rem',
-          height: 40
+          fontSize: '0.95rem',
+          height: 38
         },
         light: {
           ...defaultLightChip,

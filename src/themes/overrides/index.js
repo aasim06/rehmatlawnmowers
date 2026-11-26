@@ -43,11 +43,23 @@ function DialogAndMenu(theme) {
     MuiDialog: {
       styleOverrides: {
         paper: {
+          borderRadius: 16,
           backgroundImage: 'none',
-          backgroundColor: isDark ? '#131b2e' : theme.vars.palette.background.paper,
-          border: isDark ? '1px solid #1e293b' : 'none',
-          boxShadow: isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)' : undefined,
+          backgroundColor: isDark ? '#171f2f' : '#ffffff',
+          border: `1px solid ${isDark ? '#2e3a47' : '#e4e7ec'}`,
+          boxShadow: isDark
+            ? '0 20px 25px -5px rgba(0, 0, 0, 0.55), 0 8px 10px -6px rgba(0, 0, 0, 0.5)'
+            : '0 20px 25px -5px rgba(16, 24, 40, 0.12), 0 8px 10px -6px rgba(16, 24, 40, 0.06)',
           ...hiddenScrollbar
+        }
+      }
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontSize: '1.0625rem',
+          fontWeight: 700,
+          lineHeight: 1.45
         }
       }
     },
@@ -59,26 +71,88 @@ function DialogAndMenu(theme) {
       }
     },
     MuiMenu: {
+      defaultProps: {
+        anchorOrigin: {
+          vertical: 'bottom',
+          horizontal: 'left'
+        },
+        transformOrigin: {
+          vertical: 'top',
+          horizontal: 'left'
+        }
+      },
       styleOverrides: {
         paper: {
+          maxHeight: 280,
           backgroundImage: 'none',
-          backgroundColor: isDark ? '#131b2e' : theme.vars.palette.background.paper,
-          border: isDark ? '1px solid #1e293b' : 'none',
-          boxShadow: isDark ? '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)' : undefined,
+          backgroundColor: isDark ? '#171f2f' : '#ffffff',
+          border: `1px solid ${isDark ? '#2e3a47' : '#e4e7ec'}`,
+          boxShadow: isDark
+            ? '0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -4px rgba(0, 0, 0, 0.4)'
+            : '0 10px 20px -5px rgba(16, 24, 40, 0.12), 0 4px 6px -2px rgba(16, 24, 40, 0.05)',
+          borderRadius: 12,
           ...hiddenScrollbar
         },
         list: {
+          maxHeight: 280,
           ...hiddenScrollbar
         }
       }
     },
     MuiAutocomplete: {
       styleOverrides: {
+        popper: {
+          zIndex: 1300
+        },
+        inputRoot: {
+          alignItems: 'center',
+          '&.MuiOutlinedInput-root': {
+            paddingTop: 4,
+            paddingBottom: 4,
+            paddingLeft: 10,
+            '& .MuiAutocomplete-input': {
+              padding: '6px 4px !important',
+              lineHeight: '1.4375em'
+            },
+            '&.MuiInputBase-sizeSmall': {
+              paddingTop: 4,
+              paddingBottom: 4,
+              paddingLeft: 8,
+              '& .MuiAutocomplete-input': {
+                padding: '3.5px 4px !important',
+                lineHeight: '1.4375em'
+              }
+            }
+          }
+        },
         paper: {
+          backgroundImage: 'none',
+          backgroundColor: isDark ? '#171f2f' : '#ffffff',
+          border: `1px solid ${isDark ? '#2e3a47' : '#e4e7ec'}`,
+          boxShadow: isDark
+            ? '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4)'
+            : '0 10px 20px -5px rgba(16, 24, 40, 0.12), 0 4px 6px -2px rgba(16, 24, 40, 0.05)',
+          borderRadius: 12,
           ...hiddenScrollbar
         },
         listbox: {
+          maxHeight: '280px !important',
+          padding: '6px !important',
           ...hiddenScrollbar
+        },
+        option: {
+          fontSize: '0.875rem',
+          borderRadius: 8,
+          margin: '2px 4px',
+          padding: '7px 12px !important',
+          '&.Mui-focused': {
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f9fafb'
+          },
+          '&[aria-selected="true"]': {
+            backgroundColor: isDark ? 'rgba(70, 95, 255, 0.16) !important' : '#ecf3ff !important',
+            color: isDark ? '#8098f9' : '#465fff',
+            fontWeight: 600
+          }
         }
       }
     },
@@ -93,15 +167,16 @@ function DialogAndMenu(theme) {
       styleOverrides: {
         root: {
           fontSize: '0.875rem',
-          color: isDark ? '#f8fafc' : 'inherit',
+          borderRadius: 6,
+          color: isDark ? '#f9fafb' : '#344054',
           '&:hover': {
-            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : undefined
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f9fafb'
           },
           '&.Mui-selected': {
-            backgroundColor: isDark ? 'rgba(99, 102, 241, 0.12)' : undefined,
-            color: isDark ? '#818cf8' : undefined,
+            backgroundColor: isDark ? 'rgba(70, 95, 255, 0.16)' : '#ecf3ff',
+            color: isDark ? '#8098f9' : '#465fff',
             '&:hover': {
-              backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : undefined
+              backgroundColor: isDark ? 'rgba(70, 95, 255, 0.22)' : '#dde9ff'
             }
           }
         }
@@ -114,8 +189,8 @@ function DialogAndMenu(theme) {
         },
         body: {
           ...hiddenScrollbar,
-          backgroundColor: isDark ? '#090d16' : 'rgb(247, 246, 242)',
-          color: isDark ? '#f8fafc' : undefined
+          backgroundColor: isDark ? '#101828' : '#f9fafb',
+          color: isDark ? '#f9fafb' : '#101828'
         },
         '*': {
           scrollbarWidth: 'none !important',

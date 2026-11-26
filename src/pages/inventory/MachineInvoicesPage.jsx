@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import {
+  Alert,
+  Autocomplete,
   Box,
-  Button,
   Chip,
   Dialog,
   DialogActions,
@@ -11,14 +12,11 @@ import {
   DialogTitle,
   Divider,
   Drawer,
-  FormControl,
-  Grid,
   IconButton,
   InputAdornment,
-  InputLabel,
   MenuItem,
-  Select,
-  Stack,
+  OutlinedInput,
+  Snackbar,
   Table,
   TableBody,
   TableCell,
@@ -28,129 +26,230 @@ import {
   TableRow,
   TextField,
   Tooltip,
-  Typography,
-  Alert,
-  Snackbar,
-  Autocomplete
+  Typography
 } from '@mui/material';
 
-// Ant Design Icons
+// icons
 import {
+  CheckCircleOutlined,
+  CloseOutlined,
+  DeleteOutlined,
+  DollarOutlined,
+  EditOutlined,
   FileTextOutlined,
   PlusOutlined,
-  SearchOutlined,
   PrinterOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  CloseOutlined,
   ReloadOutlined,
-  DollarOutlined
+  SearchOutlined,
+  ToolOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 
-// Project imports
+// project imports
 import MainCard from 'components/MainCard';
-import CeoSignature from 'components/CeoSignature';
+import { AppButton, MasterKpiGrid, PageHeader, UniversalPrintModal } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
+import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx, getToneColors } from 'utils/themeSurface';
+import { formatPKR } from 'utils/dashboardHelpers';
+import {
+  formatFullDate,
+  formatInvoiceNo,
+  formatItemsSummaryLabel,
+  normalizeMachineItems,
+  resolveAllocatedInvoiceMap,
+  resolveRecordTimestamp,
+  resolveRepairFinancials,
+  resolveSaleFinancials
+} from 'utils/machineLedgerHelpers';
 
-// Helper for currency formatting
-const formatRs = (num) => {
-  const val = parseFloat(num) || 0;
-  return `Rs. ${val.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
-};
+const tableHeadCellSx = getTableHeadCellSx();
 
-const formatInvoiceNo = (sale) => {
-  if (!sale) return 'MS-10001';
-  const num = typeof sale === 'string' ? sale : sale.saleNo || sale.sale_no || sale.id;
-  if (!num) return 'MS-10001';
-  const str = String(num).trim();
-  if ((str.startsWith('MS-') || str.startsWith('PO-') || str.startsWith('REP-') || str.startsWith('INV-')) && str.length <= 15) {
-    return str;
-  }
-  const cleanHex = str
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 5)
-    .toUpperCase();
-  return `MS-${cleanHex || '10001'}`;
-};
-
-const formatFullDate = (timeStr, dateISO) => {
-  if (dateISO) {
-    const d = new Date(dateISO);
-    if (!isNaN(d.getTime())) {
-      const dateFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      return `${dateFormatted}, ${timeFormatted}`;
-    }
-  }
-  if (timeStr && timeStr.includes('Today,')) {
-    const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    return timeStr.replace('Today,', `${todayStr},`);
-  }
-  return timeStr || 'N/A';
+const getPaymentStatusColor = (status) => {
+  if (status === 'Paid') return 'success';
+  if (status === 'Partial') return 'warning';
+  return 'error';
 };
 
 export default function MachineInvoicesPage() {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
   const navigate = useNavigate();
   const { canDelete, canEditPrice } = usePermission();
 
   const {
     machineSales = [],
+    machineRepairs = [],
     machineModels = [],
+    machineCustomers = [],
     customerPayments = [],
     addCustomerPayment,
     updateMachineSale,
-    deleteMachineSale
+    deleteMachineSale,
+    deleteMachineRepair
   } = useStoreInventory();
 
-  // Search & Filter State
+  // Search & filter state
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterPeriod, setFilterPeriod] = useState('all'); // all, today, week, month
-  const [filterPayment, setFilterPayment] = useState('all'); // all, Paid, Partial, Unpaid
-
-  // Pagination State
+  const [sourceFilter, setSourceFilter] = useState('all'); // all | Sale | Repair
+  const [filterPeriod, setFilterPeriod] = useState('all'); // all | today | week | month
+  const [filterPayment, setFilterPayment] = useState('all'); // all | Paid | Partial | Unpaid
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Notification State
+  // Notification
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const showToast = (message, severity = 'success') => {
-    setSnackbar({ open: true, message, severity });
-  };
+  const showToast = (message, severity = 'success') => setSnackbar({ open: true, message, severity });
 
-  // Modal States
+  // Modals & Drawers
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedBill, setSelectedBill] = useState(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printVoucherData, setPrintVoucherData] = useState(null);
 
-  // Payment Modal State
+  // Payment Voucher Modal State
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState(null);
+  const [selectedBillForPay, setSelectedBillForPay] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
+    entryType: 'Receipt',
     amountPaid: '',
     paymentMethod: 'Cash',
     referenceNo: '',
     notes: ''
   });
+  const [savingPayment, setSavingPayment] = useState(false);
 
-  // Selected invoice for actions
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [editingSale, setEditingSale] = useState(null);
+  // Unified Sales + Repair Job Bills (reconciled with customer on-account vouchers)
+  const unifiedBills = useMemo(() => {
+    const allocationMap = resolveAllocatedInvoiceMap({
+      machineCustomers,
+      machineSales,
+      machineRepairs,
+      customerPayments
+    });
 
-  // ── Open Payment Modal ───────────────────────────────────────────────────
-  const handleOpenPaymentModal = (inv) => {
-    setSelectedInvoiceForPay(inv);
-    const totalBill = parseFloat(inv.lineTotal || inv.subTotal) || 0;
-    const directPaid = parseFloat(inv.paidAmount) || 0;
-    const extraPayments = (customerPayments || [])
-      .filter((p) => String(p.invoiceId) === String(inv.id))
-      .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
-    const currentPaid = Math.max(directPaid, extraPayments);
-    const currentBal = Math.max(0, totalBill - currentPaid);
+    const salesList = (machineSales || []).map((sale) => {
+      const fin = resolveSaleFinancials(sale, customerPayments);
+      const alloc = allocationMap.get(`Sale:${sale.id}`);
+      const rawItems = normalizeMachineItems(sale);
+      const paidAmount = alloc ? alloc.paidAmount : fin.paidAmount;
+      const balanceAmount = alloc ? alloc.balanceAmount : fin.balanceAmount;
+      const statusNorm = alloc ? alloc.paymentStatus : fin.paymentStatus;
+      return {
+        uid: `Sale-${sale.id}`,
+        id: sale.id,
+        sourceType: 'Sale',
+        docNo: formatInvoiceNo(sale),
+        customerName: sale.customerName || 'Walk-in Customer',
+        customerPhone: sale.customerPhone || '',
+        cityAddress: sale.cityAddress || '',
+        itemsSummary: rawItems.map((i) => `${i.name} (x${i.qty})`).join(', ') || 'Machine Sale',
+        itemsCount: rawItems.length,
+        billTotal: fin.billTotal,
+        paidAmount,
+        allocatedFromAccount: alloc ? alloc.allocatedFromAccount : 0,
+        balanceAmount,
+        paymentStatus: statusNorm,
+        filterStatus: statusNorm,
+        dateLabel: formatFullDate(sale.time, sale.dateISO),
+        sortTime: resolveRecordTimestamp(sale),
+        raw: sale
+      };
+    });
+
+    const repairList = (machineRepairs || []).map((rep) => {
+      const fin = resolveRepairFinancials(rep, customerPayments);
+      const alloc = allocationMap.get(`Repair:${rep.id}`);
+      const rawItems = normalizeMachineItems({ ...rep, recordType: 'Repair' });
+      const paidAmount = alloc ? alloc.paidAmount : fin.paidAmount;
+      const balanceAmount = alloc ? alloc.balanceAmount : fin.balanceAmount;
+      const normalizedStatus = alloc
+        ? alloc.paymentStatus
+        : fin.balanceAmount <= 0 && fin.netTotal > 0
+          ? 'Paid'
+          : fin.paidAmount > 0
+            ? 'Partial'
+            : 'Unpaid';
+      return {
+        uid: `Repair-${rep.id}`,
+        id: rep.id,
+        sourceType: 'Repair',
+        docNo: formatInvoiceNo(rep),
+        customerName: rep.customerName || 'Walk-in Customer',
+        customerPhone: rep.customerPhone || '',
+        cityAddress: rep.cityAddress || '',
+        itemsSummary: `${rep.machineName || 'Machine Repair'} • ${rep.repairStatus || 'Received'}`,
+        itemsCount: rawItems.length,
+        billTotal: fin.netTotal,
+        paidAmount,
+        allocatedFromAccount: alloc ? alloc.allocatedFromAccount : 0,
+        balanceAmount,
+        paymentStatus: normalizedStatus,
+        filterStatus: normalizedStatus,
+        dateLabel: formatFullDate(rep.receivedDate, rep.dateISO),
+        sortTime: resolveRecordTimestamp(rep),
+        raw: rep
+      };
+    });
+
+    return [...salesList, ...repairList].sort((a, b) => b.sortTime - a.sortTime);
+  }, [machineCustomers, machineSales, machineRepairs, customerPayments]);
+
+  const kpiSummary = useMemo(() => {
+    const totalBilled = unifiedBills.reduce((s, b) => s + b.billTotal, 0);
+    const totalPaid = unifiedBills.reduce((s, b) => s + b.paidAmount, 0);
+    const totalDue = unifiedBills.reduce((s, b) => s + b.balanceAmount, 0);
+    const dueCount = unifiedBills.filter((b) => b.balanceAmount > 0).length;
+    return {
+      totalCount: unifiedBills.length,
+      salesCount: unifiedBills.filter((b) => b.sourceType === 'Sale').length,
+      repairCount: unifiedBills.filter((b) => b.sourceType === 'Repair').length,
+      totalBilled,
+      totalPaid,
+      totalDue,
+      dueCount
+    };
+  }, [unifiedBills]);
+
+  const filteredBills = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const sevenDaysAgo = startOfToday - 6 * 86400000;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    return unifiedBills.filter((bill) => {
+      if (sourceFilter !== 'all' && bill.sourceType !== sourceFilter) return false;
+      if (filterPayment !== 'all' && bill.filterStatus.toLowerCase() !== filterPayment.toLowerCase()) return false;
+
+      if (filterPeriod !== 'all' && bill.sortTime > 0) {
+        if (filterPeriod === 'today' && bill.sortTime < startOfToday) return false;
+        if (filterPeriod === 'week' && bill.sortTime < sevenDaysAgo) return false;
+        if (filterPeriod === 'month' && bill.sortTime < startOfMonth) return false;
+      }
+
+      if (term) {
+        const hay = [bill.docNo, bill.customerName, bill.customerPhone, bill.cityAddress, bill.itemsSummary]
+          .join(' ')
+          .toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+
+      return true;
+    });
+  }, [unifiedBills, sourceFilter, filterPayment, filterPeriod, searchTerm]);
+
+  const paginatedBills = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredBills.slice(start, start + rowsPerPage);
+  }, [filteredBills, page, rowsPerPage]);
+
+  const handleOpenPaymentModal = (bill) => {
+    setSelectedBillForPay(bill);
     setPaymentForm({
-      amountPaid: currentBal > 0 ? String(currentBal) : '',
+      entryType: 'Receipt',
+      amountPaid: bill.balanceAmount > 0 ? String(bill.balanceAmount) : '',
       paymentMethod: 'Cash',
       referenceNo: '',
       notes: ''
@@ -158,73 +257,76 @@ export default function MachineInvoicesPage() {
     setPaymentModalOpen(true);
   };
 
-  // ── Submit Payment Handler ───────────────────────────────────────────────
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedInvoiceForPay) return;
+  const submitPaymentVoucher = async (shouldPrintReceipt = false) => {
+    if (!selectedBillForPay || savingPayment) return;
     const paidNum = parseFloat(paymentForm.amountPaid) || 0;
     if (paidNum <= 0) {
-      showToast('Please enter a valid payment amount', 'error');
+      showToast('Please enter a valid positive payment amount', 'error');
       return;
     }
 
-    const totalBill = parseFloat(selectedInvoiceForPay.lineTotal || selectedInvoiceForPay.subTotal) || 0;
-    const directPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
-    const extraPayments = (customerPayments || [])
-      .filter((p) => String(p.invoiceId) === String(selectedInvoiceForPay.id))
-      .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
-    const currentPaid = Math.max(directPaid, extraPayments);
-    const newPaid = currentPaid + paidNum;
-    const newBalance = Math.max(0, totalBill - newPaid);
-    const newStatus = newPaid >= totalBill ? 'Paid' : newPaid > 0 ? 'Partial' : 'Unpaid';
-
+    setSavingPayment(true);
     try {
-      if (updateMachineSale) {
-        await updateMachineSale(selectedInvoiceForPay.id, {
-          paidAmount: newPaid,
-          balanceAmount: newBalance,
-          paymentStatus: newStatus
-        });
-      }
+      const isRepair = selectedBillForPay.sourceType === 'Repair';
+      const createdVoucher = await addCustomerPayment({
+        customerName: selectedBillForPay.customerName,
+        entryType: paymentForm.entryType,
+        referenceType: isRepair ? 'Repair' : 'Sale',
+        invoiceId: isRepair ? '' : selectedBillForPay.id,
+        repairId: isRepair ? selectedBillForPay.id : '',
+        referenceLabel: selectedBillForPay.docNo,
+        amountPaid: paidNum,
+        paymentMethod: paymentForm.entryType === 'Adjustment' ? 'Discount / Waiver' : paymentForm.paymentMethod,
+        referenceNo: paymentForm.referenceNo,
+        notes: paymentForm.notes
+      });
 
-      if (addCustomerPayment) {
-        await addCustomerPayment({
-          customerName: selectedInvoiceForPay.customerName || 'Walk-in Customer',
-          invoiceId: selectedInvoiceForPay.id,
-          amountPaid: paidNum,
-          paymentMethod: paymentForm.paymentMethod,
-          referenceNo: paymentForm.referenceNo,
-          notes: paymentForm.notes
-        });
-      }
-
-      showToast(`Payment of Rs. ${paidNum.toLocaleString()} received successfully for invoice #${formatInvoiceNo(selectedInvoiceForPay)}!`);
+      showToast(
+        `${paymentForm.entryType === 'Adjustment' ? 'Settlement discount' : 'Payment'} of ${formatPKR(paidNum)} recorded for ${selectedBillForPay.docNo}!`
+      );
       setPaymentModalOpen(false);
+
+      if (shouldPrintReceipt && createdVoucher) {
+        setPrintVoucherData({
+          ...createdVoucher,
+          billTotal: selectedBillForPay.billTotal,
+          previousPaid: selectedBillForPay.paidAmount,
+          newBalance: Math.max(0, selectedBillForPay.balanceAmount - paidNum),
+          customerPhone: selectedBillForPay.customerPhone,
+          cityAddress: selectedBillForPay.cityAddress
+        });
+      }
     } catch (err) {
       console.error('Payment collection error:', err);
       showToast('Failed to record payment', 'error');
+    } finally {
+      setSavingPayment(false);
     }
   };
 
-  // ── Open Edit Drawer ─────────────────────────────────────────────────────
-  const handleOpenEdit = (sale) => {
+  const handleOpenEdit = (bill) => {
+    if (bill.sourceType !== 'Sale') {
+      navigate('/inventory/machine-repairs');
+      return;
+    }
+    const sale = bill.raw;
     const itemsArray =
       sale.items && sale.items.length > 0
         ? sale.items.map((i) => ({ ...i }))
         : [
-            {
-              machineName: sale.machineName || '',
-              serialNo: sale.serialNo || '',
-              qty: sale.qty || 1,
-              unitPrice: sale.unitPrice || 0,
-              discount: sale.discount || 0
-            }
-          ];
+          {
+            machineName: sale.machineName || '',
+            serialNo: sale.serialNo || '',
+            qty: sale.qty || 1,
+            unitPrice: sale.unitPrice || 0,
+            discount: sale.discount || 0
+          }
+        ];
 
     setEditingSale({
       ...sale,
       items: itemsArray,
-      paidAmount: sale.paidAmount || 0,
+      paidAmount: bill.paidAmount,
       customerName: sale.customerName || '',
       customerPhone: sale.customerPhone || '',
       cityAddress: sale.cityAddress || '',
@@ -233,15 +335,14 @@ export default function MachineInvoicesPage() {
     setEditDrawerOpen(true);
   };
 
-  // ── Submit Edit Sale ─────────────────────────────────────────────────────
   const handleEditSubmit = async (e) => {
-    if (e) e.preventDefault();
+    e.preventDefault();
     if (!editingSale) return;
 
     const itemsList = editingSale.items.map((i) => {
-      const q = parseInt(i.qty, 10) || 1;
-      const p = parseFloat(i.unitPrice) || 0;
-      const discPercent = parseFloat(i.discount) || 0;
+      const q = Math.max(1, parseInt(i.qty, 10) || 1);
+      const p = Math.max(0, parseFloat(i.unitPrice) || 0);
+      const discPercent = Math.min(100, Math.max(0, parseFloat(i.discount) || 0));
       const gross = q * p;
       const discAmount = (gross * discPercent) / 100;
       const lineTotal = Math.max(0, gross - discAmount);
@@ -260,9 +361,9 @@ export default function MachineInvoicesPage() {
     const discSum = itemsList.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
     const total = subTotal;
     const totalQtySum = itemsList.reduce((sum, i) => sum + i.qty, 0);
-    const paid = parseFloat(editingSale.paidAmount) || 0;
+    const paid = Math.max(0, parseFloat(editingSale.paidAmount) || 0);
     const bal = Math.max(0, total - paid);
-    const status = paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
+    const status = total > 0 && paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
     const firstMachine = itemsList[0] || {};
 
     try {
@@ -271,7 +372,7 @@ export default function MachineInvoicesPage() {
         customerPhone: editingSale.customerPhone,
         cityAddress: editingSale.cityAddress,
         items: itemsList,
-        machineName: itemsList.length > 1 ? `${firstMachine.machineName} (+${itemsList.length - 1} more)` : firstMachine.machineName,
+        machineName: formatItemsSummaryLabel(itemsList, 'Machine'),
         serialNo: firstMachine.serialNo,
         qty: totalQtySum,
         unitPrice: firstMachine.unitPrice,
@@ -293,423 +394,395 @@ export default function MachineInvoicesPage() {
     }
   };
 
-  // ── Delete Invoice ───────────────────────────────────────────────────────
   const handleConfirmDelete = async () => {
-    if (!selectedInvoice) return;
+    if (!selectedBill) return;
     try {
-      if (typeof deleteMachineSale === 'function') {
-        await deleteMachineSale(selectedInvoice.id);
+      if (selectedBill.sourceType === 'Repair' && typeof deleteMachineRepair === 'function') {
+        await deleteMachineRepair(selectedBill.id);
+      } else if (typeof deleteMachineSale === 'function') {
+        await deleteMachineSale(selectedBill.id);
       }
-      showToast(`Invoice ${formatInvoiceNo(selectedInvoice)} deleted successfully!`);
+      showToast(`${selectedBill.docNo} deleted successfully!`);
       setDeleteDialogOpen(false);
-      setSelectedInvoice(null);
+      setSelectedBill(null);
     } catch (err) {
-      console.error('Delete invoice error:', err);
-      showToast('Failed to delete invoice.', 'error');
+      console.error('Delete bill error:', err);
+      showToast('Failed to delete record.', 'error');
     }
   };
 
-  // ── Filter Invoices ──────────────────────────────────────────────────────
-  const filteredInvoices = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const sevenDaysAgo = startOfToday - 7 * 86400000;
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-    return (machineSales || []).filter((inv) => {
-      // 1. Search term match
-      if (term) {
-        const invNo = (inv.saleNo || inv.id || '').toLowerCase();
-        const cust = (inv.customerName || '').toLowerCase();
-        const phone = (inv.customerPhone || '').toLowerCase();
-        const city = (inv.cityAddress || '').toLowerCase();
-        const machinesStr = (inv.items || [])
-          .map((i) => i.machineName || '')
-          .concat([inv.machineName || ''])
-          .join(' ')
-          .toLowerCase();
-
-        const matches = invNo.includes(term) || cust.includes(term) || phone.includes(term) || city.includes(term) || machinesStr.includes(term);
-
-        if (!matches) return false;
-      }
-
-      // 2. Filter by Period
-      if (filterPeriod !== 'all') {
-        let invTime = 0;
-        if (inv.dateISO) {
-          invTime = new Date(inv.dateISO).getTime();
-        } else if (inv.time) {
-          const parsed = Date.parse(inv.time);
-          if (!isNaN(parsed)) invTime = parsed;
-        }
-
-        if (invTime > 0) {
-          if (filterPeriod === 'today' && invTime < startOfToday) return false;
-          if (filterPeriod === 'week' && invTime < sevenDaysAgo) return false;
-          if (filterPeriod === 'month' && invTime < startOfMonth) return false;
-        }
-      }
-
-      // 3. Filter by Payment Method / Status
-      if (filterPayment !== 'all') {
-        const totalAmt = parseFloat(inv.lineTotal || inv.subTotal) || 0;
-        const directPaid = parseFloat(inv.paidAmount) || 0;
-        const extraPayments = (customerPayments || [])
-          .filter((p) => String(p.invoiceId) === String(inv.id))
-          .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
-        const currentPaid = Math.max(directPaid, extraPayments);
-        const status = (currentPaid >= totalAmt && totalAmt > 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Unpaid').toLowerCase();
-        if (status !== filterPayment.toLowerCase()) return false;
-      }
-
-      return true;
-    });
-  }, [machineSales, customerPayments, searchTerm, filterPeriod, filterPayment]);
-
-  // Paginated Slices
-  const paginatedInvoices = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredInvoices.slice(start, start + rowsPerPage);
-  }, [filteredInvoices, page, rowsPerPage]);
+  const primaryTone = getToneColors(theme, 'primary');
+  const errorTone = getToneColors(theme, 'error');
+  const successTone = getToneColors(theme, 'success');
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
-      {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: -0.5, color: 'text.primary' }}>
-            Machine Invoices &amp; Billing
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            View machine sales invoices, manage billing history, edit orders, and print customer receipts.
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          color="success"
-          startIcon={<PlusOutlined />}
-          onClick={() => navigate('/inventory/machine-sales')}
-          sx={{ fontWeight: 800, borderRadius: 1.5, px: 2.5 }}
-        >
-          + New Machine Sale
-        </Button>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box>
+        <PageHeader
+          title="Machine Invoices & Billing"
+          count={kpiSummary.totalCount}
+          countLabel="Bills & Jobs"
+          subtitle="Track machine sales invoices and repair bills, collect payments with printed receipts, and settle customer dues."
+          actions={
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <AppButton intent="secondary" startIcon={<ToolOutlined />} onClick={() => navigate('/inventory/machine-repairs')}>
+                Workshop Repairs
+              </AppButton>
+              <AppButton intent="primary" startIcon={<PlusOutlined />} onClick={() => navigate('/inventory/machine-sales')}>
+                New Machine Sale
+              </AppButton>
+            </Box>
+          }
+          sx={{ mb: 2 }}
+        />
+
+        <MasterKpiGrid
+          kpis={[
+            {
+              label: 'Total Bills & Jobs',
+              value: kpiSummary.totalCount.toLocaleString(),
+              helper: `${kpiSummary.salesCount} Sales • ${kpiSummary.repairCount} Repairs`,
+              icon: <FileTextOutlined />,
+              tone: 'primary',
+              onClick: () => setFilterPayment('all')
+            },
+            {
+              label: 'Total Billed Amount',
+              value: formatPKR(kpiSummary.totalBilled),
+              helper: 'Combined sales & service value',
+              icon: <DollarOutlined />,
+              tone: 'primary'
+            },
+            {
+              label: 'Payments Collected',
+              value: formatPKR(kpiSummary.totalPaid),
+              helper: 'Advances & settled receipts',
+              icon: <CheckCircleOutlined />,
+              tone: 'success',
+              highlightValue: true
+            },
+            {
+              label: 'Pending Receivables',
+              value: formatPKR(kpiSummary.totalDue),
+              helper: kpiSummary.dueCount > 0 ? `${kpiSummary.dueCount} open balance bill(s)` : 'All invoices settled',
+              icon: kpiSummary.totalDue > 0 ? <WarningOutlined /> : <CheckCircleOutlined />,
+              tone: kpiSummary.totalDue > 0 ? 'error' : 'success',
+              highlightValue: kpiSummary.totalDue > 0,
+              onClick: () => setFilterPayment('Unpaid')
+            }
+          ]}
+        />
       </Box>
 
-      {/* ── Main Invoices Card with Search & Filters ─────────────────────── */}
-      <MainCard content={false} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        {/* Search & Filter Toolbar */}
-        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Grid container spacing={2} alignItems="center">
-            {/* Search Input */}
-            <Grid size={{ xs: 12, md: 5 }}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search by invoice #, customer name, phone, or machine model..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(0);
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchOutlined style={{ color: '#8c8c8c' }} />
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Grid>
+      {/* UNIFIED BILLING & PAYMENTS LEDGER CARD */}
+      <MainCard content={false} sx={getCardSurfaceSx(theme, { overflow: 'hidden' })}>
+        <Box sx={{ p: { xs: 2, sm: 2.5 }, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 2,
+              mb: 2
+            }}
+          >
+            {/* Segmented Source Tabs */}
+            <Box sx={getSubSurfaceSx(theme, { display: 'inline-flex', p: 0.5, borderRadius: 2, gap: 0.5 })}>
+              {[
+                { key: 'all', label: `All Bills (${kpiSummary.totalCount})` },
+                { key: 'Sale', label: `Machine Sales (${kpiSummary.salesCount})` },
+                { key: 'Repair', label: `Repair Jobs (${kpiSummary.repairCount})` }
+              ].map((tab) => {
+                const isActive = sourceFilter === tab.key;
+                return (
+                  <Box
+                    key={tab.key}
+                    component="button"
+                    type="button"
+                    onClick={() => {
+                      setSourceFilter(tab.key);
+                      setPage(0);
+                    }}
+                    sx={{
+                      border: 0,
+                      px: 1.5,
+                      py: 0.65,
+                      borderRadius: 1.5,
+                      fontSize: '0.8125rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      bgcolor: isActive ? 'background.paper' : 'transparent',
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                      boxShadow: isActive ? theme.shadows[1] : 'none'
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
 
-            {/* Filter by Period */}
-            <Grid size={{ xs: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Time Period</InputLabel>
-                <Select
-                  value={filterPeriod}
-                  label="Time Period"
-                  onChange={(e) => {
-                    setFilterPeriod(e.target.value);
-                    setPage(0);
-                  }}
-                >
-                  <MenuItem value="all">All Invoices</MenuItem>
-                  <MenuItem value="today">Today's Invoices</MenuItem>
-                  <MenuItem value="week">Past 7 Days</MenuItem>
-                  <MenuItem value="month">This Month</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+            <Typography variant="body2" color="text.secondary">
+              Showing <strong>{filteredBills.length}</strong> billing {filteredBills.length === 1 ? 'record' : 'records'}
+            </Typography>
+          </Box>
 
-            {/* Filter by Payment Status */}
-            <Grid size={{ xs: 6, md: 2.5 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Payment Status</InputLabel>
-                <Select
-                  value={filterPayment}
-                  label="Payment Status"
-                  onChange={(e) => {
-                    setFilterPayment(e.target.value);
-                    setPage(0);
-                  }}
-                >
-                  <MenuItem value="all">All Statuses</MenuItem>
-                  <MenuItem value="Paid">Paid</MenuItem>
-                  <MenuItem value="Partial">Partial</MenuItem>
-                  <MenuItem value="Unpaid">Unpaid / Credit</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+            <OutlinedInput
+              size="small"
+              placeholder="Search by invoice #, job #, customer, phone, model..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(0);
+              }}
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchOutlined style={{ color: theme.palette.text.secondary }} />
+                </InputAdornment>
+              }
+              sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 } }}
+            />
 
-            {/* Reset Filter Button */}
-            <Grid size={{ xs: 12, md: 1.5 }}>
-              <Button
-                fullWidth
-                size="medium"
-                variant="outlined"
-                color="secondary"
-                startIcon={<ReloadOutlined />}
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterPeriod('all');
-                  setFilterPayment('all');
-                  setPage(0);
-                }}
-                sx={{ borderRadius: 1.5, fontWeight: 600 }}
-              >
-                Reset
-              </Button>
-            </Grid>
-          </Grid>
+            <TextField
+              select
+              size="small"
+              label="Time Period"
+              value={filterPeriod}
+              onChange={(e) => {
+                setFilterPeriod(e.target.value);
+                setPage(0);
+              }}
+              sx={{ width: { xs: '48%', sm: 170 } }}
+            >
+              <MenuItem value="all">All Time</MenuItem>
+              <MenuItem value="today">Today</MenuItem>
+              <MenuItem value="week">Past 7 Days</MenuItem>
+              <MenuItem value="month">This Month</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              size="small"
+              label="Payment Status"
+              value={filterPayment}
+              onChange={(e) => {
+                setFilterPayment(e.target.value);
+                setPage(0);
+              }}
+              sx={{ width: { xs: '48%', sm: 170 } }}
+            >
+              <MenuItem value="all">All Statuses</MenuItem>
+              <MenuItem value="Paid">Paid</MenuItem>
+              <MenuItem value="Partial">Partial</MenuItem>
+              <MenuItem value="Unpaid">Unpaid / Credit</MenuItem>
+            </TextField>
+
+            <AppButton
+              intent="cancel"
+              size="small"
+              startIcon={<ReloadOutlined />}
+              onClick={() => {
+                setSearchTerm('');
+                setSourceFilter('all');
+                setFilterPeriod('all');
+                setFilterPayment('all');
+                setPage(0);
+              }}
+            >
+              Reset
+            </AppButton>
+          </Box>
         </Box>
 
-        {/* Invoices Table */}
-        <TableContainer sx={{ minHeight: 380 }}>
-          <Table sx={{ minWidth: 850 }}>
-            <TableHead sx={{ bgcolor: isDark ? 'background.default' : '#f8fafc' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }}>INVOICE #</TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }}>DATE &amp; TIME</TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }}>CUSTOMER</TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }}>ITEMS SUMMARY</TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }}>PAYMENT</TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }} align="right">
-                  SUBTOTAL
-                </TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }} align="right">
-                  TOTAL AMOUNT
-                </TableCell>
-                <TableCell sx={{ fontWeight: 800, py: 1.5 }} align="center">
-                  ACTIONS
-                </TableCell>
+        <TableContainer>
+          <Table sx={{ minWidth: 920 }}>
+            <TableHead>
+              <TableRow
+                sx={{
+                  bgcolor: getSubSurfaceSx(theme).bgcolor,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider'
+                }}
+              >
+                <TableCell sx={{ ...tableHeadCellSx, pl: 2.5 }}>Bill / Job #</TableCell>
+                <TableCell sx={tableHeadCellSx}>Date & Time</TableCell>
+                <TableCell sx={tableHeadCellSx}>Customer</TableCell>
+                <TableCell sx={tableHeadCellSx}>Items Summary</TableCell>
+                <TableCell align="center" sx={tableHeadCellSx}>Status</TableCell>
+                <TableCell align="right" sx={tableHeadCellSx}>Total Bill</TableCell>
+                <TableCell align="right" sx={tableHeadCellSx}>Paid / Due</TableCell>
+                <TableCell align="center" sx={{ ...tableHeadCellSx, pr: 2.5 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
-              {paginatedInvoices.length === 0 ? (
+              {paginatedBills.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <FileTextOutlined style={{ fontSize: 44, color: '#bfbfbf', marginBottom: 8 }} />
-                      <Typography variant="h6" fontWeight={700} color="text.secondary">
-                        No machine invoices found
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                        Create a machine sale from the Machine Sales page to generate invoices here.
-                      </Typography>
-                    </Box>
+                    <FileTextOutlined style={{ fontSize: 38, color: theme.palette.text.disabled, display: 'block', margin: '0 auto 8px' }} />
+                    <Typography variant="h6" fontWeight={700} color="text.secondary">
+                      No machine bills or repair invoices found
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                      Create a Machine Sale or Repair Job Card to generate bills and collect payments here.
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedInvoices.map((inv) => {
-                  const invNumber = formatInvoiceNo(inv);
-                  const custName = inv.customerName || 'Walk-in Customer';
-                  const custPhone = inv.customerPhone || '';
-                  const custCity = inv.cityAddress || '';
-                  const rawItems = inv.items && inv.items.length > 0 ? inv.items : [{ machineName: inv.machineName, qty: inv.qty || 1 }];
-                  const totalAmt = parseFloat(inv.lineTotal || inv.subTotal) || 0;
-                  const subTotal = parseFloat(inv.subTotal) || totalAmt;
-                  const directPaid = parseFloat(inv.paidAmount) || 0;
-                  const extraPayments = (customerPayments || [])
-                    .filter((p) => String(p.invoiceId) === String(inv.id))
-                    .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
-                  const currentPaid = Math.max(directPaid, extraPayments);
-                  const bal = Math.max(0, totalAmt - currentPaid);
-                  const pStatus = currentPaid >= totalAmt && totalAmt > 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : (inv.paymentStatus || 'Unpaid');
-
-                  return (
-                    <TableRow key={inv.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                      {/* Invoice # */}
-                      <TableCell>
+                paginatedBills.map((bill) => (
+                  <TableRow key={bill.uid} hover sx={{ '& td': { py: 1.75 } }}>
+                    <TableCell sx={{ pl: 2.5 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {bill.docNo}
+                        </Typography>
                         <Chip
-                          label={invNumber}
+                          label={bill.sourceType === 'Repair' ? 'Workshop Repair' : 'Machine Sale'}
                           size="small"
-                          sx={{
-                            fontWeight: 800,
-                            fontFamily: 'monospace',
-                            bgcolor: isDark ? 'rgba(0, 95, 86, 0.25)' : '#e6f7f4',
-                            color: '#005F56',
-                            border: '1px solid #86efac'
-                          }}
+                          color={bill.sourceType === 'Repair' ? 'warning' : 'primary'}
+                          variant="light"
+                          sx={{ height: 22, fontSize: '0.75rem', fontWeight: 700 }}
                         />
-                      </TableCell>
+                      </Box>
+                    </TableCell>
 
-                      {/* Date & Time */}
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                          {formatFullDate(inv.time, inv.dateISO)}
-                        </Typography>
-                      </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                        {bill.dateLabel}
+                      </Typography>
+                    </TableCell>
 
-                      {/* Customer */}
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={700} color="text.primary">
-                          {custName}
+                    <TableCell>
+                      <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                        {bill.customerName}
+                      </Typography>
+                      {(bill.customerPhone || bill.cityAddress) && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {bill.customerPhone}
+                          {bill.customerPhone && bill.cityAddress ? ' • ' : ''}
+                          {bill.cityAddress}
                         </Typography>
-                        {(custPhone || custCity) && (
-                          <Typography variant="caption" color="text.secondary">
-                            {custPhone ? `${custPhone}` : ''}
-                            {custPhone && custCity ? ' • ' : ''}
-                            {custCity ? `${custCity}` : ''}
-                          </Typography>
-                        )}
-                      </TableCell>
+                      )}
+                    </TableCell>
 
-                      {/* Items Summary */}
-                      <TableCell sx={{ maxWidth: 260 }}>
-                        <Typography variant="caption" fontWeight={700} color="primary.main" display="block">
-                          {rawItems.length} {rawItems.length === 1 ? 'Machine' : 'Machines'}
+                    <TableCell sx={{ maxWidth: 280 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.primary"
+                        sx={{ whiteSpace: 'normal', lineHeight: 1.4 }}
+                      >
+                        {bill.itemsSummary}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {bill.itemsCount} {bill.itemsCount === 1 ? 'line item' : 'line items'}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Chip
+                        label={bill.paymentStatus}
+                        size="small"
+                        color={getPaymentStatusColor(bill.paymentStatus)}
+                        variant="light"
+                        sx={{ fontWeight: 700, fontSize: '0.75rem' }}
+                      />
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatPKR(bill.billTotal)}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight={600} sx={{ color: successTone.main, fontVariantNumeric: 'tabular-nums' }}>
+                        Paid: {formatPKR(bill.paidAmount)}
+                      </Typography>
+                      {bill.allocatedFromAccount > 0 && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Incl. {formatPKR(bill.allocatedFromAccount)} on-account
                         </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: '0.8rem',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            color: 'text.primary'
-                          }}
+                      )}
+                      {bill.balanceAmount > 0 && (
+                        <Typography variant="caption" display="block" fontWeight={700} sx={{ color: errorTone.main, fontVariantNumeric: 'tabular-nums' }}>
+                          Due: {formatPKR(bill.balanceAmount)}
+                        </Typography>
+                      )}
+                    </TableCell>
+
+                    <TableCell align="center" sx={{ pr: 2.5 }}>
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                        <AppButton
+                          intent="primary"
+                          size="small"
+                          startIcon={<DollarOutlined />}
+                          onClick={() => handleOpenPaymentModal(bill)}
+                          disabled={bill.balanceAmount <= 0}
                         >
-                          {rawItems.map((i) => `${i.machineName || 'Machine'} (x${i.qty || 1})`).join(', ') || 'No item details'}
-                        </Typography>
-                      </TableCell>
+                          {bill.balanceAmount > 0 ? 'Receive' : 'Settled'}
+                        </AppButton>
 
-                      {/* Payment Status */}
-                      <TableCell>
-                        <Chip
-                          label={pStatus}
-                          size="small"
-                          color={pStatus === 'Paid' ? 'success' : pStatus === 'Partial' ? 'warning' : 'error'}
-                          variant="outlined"
-                          sx={{ fontWeight: 700, fontSize: '0.72rem' }}
-                        />
-                      </TableCell>
+                        <Tooltip title="View & Print Invoice">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedBill(bill);
+                              setPrintModalOpen(true);
+                            }}
+                            sx={{
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1.5,
+                              color: 'text.secondary',
+                              '&:hover': { bgcolor: primaryTone.bg, color: primaryTone.main, borderColor: primaryTone.border }
+                            }}
+                          >
+                            <PrinterOutlined style={{ fontSize: 13 }} />
+                          </IconButton>
+                        </Tooltip>
 
-                      {/* Subtotal */}
-                      <TableCell align="right">
-                        <Typography variant="body2" color="text.secondary">
-                          {formatRs(subTotal)}
-                        </Typography>
-                      </TableCell>
+                        <Tooltip title={bill.sourceType === 'Repair' ? 'Open in Machine Repairing' : 'Edit Invoice'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenEdit(bill)}
+                            sx={{
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1.5,
+                              color: 'text.secondary',
+                              '&:hover': { bgcolor: primaryTone.bg, color: primaryTone.main, borderColor: primaryTone.border }
+                            }}
+                          >
+                            <EditOutlined style={{ fontSize: 13 }} />
+                          </IconButton>
+                        </Tooltip>
 
-                      {/* Net Total */}
-                      <TableCell align="right">
-                        <Typography variant="subtitle2" fontWeight={800} color="#005F56">
-                          {formatRs(totalAmt)}
-                        </Typography>
-                        {bal > 0 && (
-                          <Typography variant="caption" color="error.main" display="block" fontWeight={700}>
-                            Due: {formatRs(bal)}
-                          </Typography>
-                        )}
-                      </TableCell>
-
-                      {/* Action Buttons */}
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                          {/* Receive Payment Button */}
-                          <Tooltip title="Receive Payment & Update Bill">
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<DollarOutlined />}
-                              onClick={() => handleOpenPaymentModal(inv)}
-                              sx={{
-                                bgcolor: '#10b981',
-                                '&:hover': { bgcolor: '#059669' },
-                                fontWeight: 700,
-                                borderRadius: 1.5,
-                                textTransform: 'none',
-                                fontSize: '0.72rem',
-                                py: 0.35,
-                                px: 1,
-                                height: 28,
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Receive Payment
-                            </Button>
-                          </Tooltip>
-
-                          {/* Print Receipt */}
-                          <Tooltip title="View & Print Invoice">
+                        {canDelete && (
+                          <Tooltip title="Delete Record">
                             <IconButton
                               size="small"
-                              color="primary"
                               onClick={() => {
-                                setSelectedInvoice(inv);
-                                setPrintModalOpen(true);
+                                setSelectedBill(bill);
+                                setDeleteDialogOpen(true);
                               }}
                               sx={{
-                                bgcolor: isDark ? 'rgba(0, 95, 86, 0.2)' : '#e6f7f4',
-                                '&:hover': { bgcolor: '#005F56', color: '#fff' }
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: errorTone.bg, color: errorTone.main, borderColor: errorTone.border }
                               }}
                             >
-                              <PrinterOutlined style={{ fontSize: 14 }} />
+                              <DeleteOutlined style={{ fontSize: 13 }} />
                             </IconButton>
                           </Tooltip>
-
-                          {/* Edit Invoice */}
-                          <Tooltip title="Edit Invoice">
-                            <IconButton
-                              size="small"
-                              color="info"
-                              onClick={() => handleOpenEdit(inv)}
-                              sx={{
-                                bgcolor: isDark ? 'rgba(22, 119, 255, 0.15)' : '#e6f4ff',
-                                '&:hover': { bgcolor: '#1677ff', color: '#fff' }
-                              }}
-                            >
-                              <EditOutlined style={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
-
-                          {/* Delete Invoice */}
-                          {canDelete && (
-                            <Tooltip title="Delete Invoice">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => {
-                                  setSelectedInvoice(inv);
-                                  setDeleteDialogOpen(true);
-                                }}
-                                sx={{
-                                  bgcolor: isDark ? 'rgba(255, 77, 79, 0.15)' : '#fff1f0',
-                                  '&:hover': { bgcolor: '#ff4d4f', color: '#fff' }
-                                }}
-                              >
-                                <DeleteOutlined style={{ fontSize: 14 }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
@@ -718,7 +791,7 @@ export default function MachineInvoicesPage() {
         <TablePagination
           rowsPerPageOptions={[10, 25, 50, 100]}
           component="div"
-          count={filteredInvoices.length}
+          count={filteredBills.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
@@ -729,260 +802,84 @@ export default function MachineInvoicesPage() {
         />
       </MainCard>
 
-      {/* ── PRINT OFFICIAL MACHINE SALE INVOICE DIALOG ──────────────────── */}
-      <Dialog open={printModalOpen} onClose={() => setPrintModalOpen(false)} maxWidth="md" fullWidth>
-        <style>
-          {`
-            @media print {
-              @page {
-                size: A4 portrait;
-                margin: 6mm;
-              }
-              #root { display: none !important; }
-              body * { visibility: hidden !important; }
-              #printable-machine-invoice, #printable-machine-invoice * { visibility: visible !important; }
-              #printable-machine-invoice {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                padding: 10px !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-              }
-              .MuiDialog-root, .MuiDialog-container, .MuiDialog-paper, .MuiDialogContent-root {
-                padding: 0 !important;
-                margin: 0 !important;
-                border: none !important;
-                overflow: visible !important;
-                box-shadow: none !important;
-              }
-              .MuiBackdrop-root, .MuiDialogActions-root, .MuiDialogTitle-root, .no-print, button {
-                display: none !important;
-              }
+      {/* PRINT BILL / JOB CARD MODAL */}
+      {selectedBill && (
+        <UniversalPrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          title={selectedBill.sourceType === 'Repair' ? 'Machine Repairing Job Card Receipt' : 'Official Customer Machine Sale Invoice'}
+          typeTag={selectedBill.sourceType === 'Repair' ? 'Repair Receipt' : 'Sales Invoice'}
+          badgeColor={selectedBill.sourceType === 'Repair' ? 'warning' : 'success'}
+          partyLabel="Customer Details"
+          party={{
+            name: selectedBill.customerName,
+            phone: selectedBill.customerPhone || 'N/A',
+            city: selectedBill.cityAddress || 'Lahore'
+          }}
+          invoiceLabel={selectedBill.sourceType === 'Repair' ? 'Job Card No:' : 'Invoice No:'}
+          invoiceNo={selectedBill.docNo}
+          date={selectedBill.dateLabel}
+          status={selectedBill.paymentStatus}
+          items={normalizeMachineItems(selectedBill.raw).map((it) => ({
+            name: it.name,
+            subtitle: it.subtitle,
+            qty: it.qty,
+            rate: it.rate,
+            total: it.amount
+          }))}
+          summary={{
+            totalAmount: selectedBill.billTotal,
+            paidAmount: selectedBill.paidAmount,
+            balanceAmount: selectedBill.balanceAmount,
+            notes: selectedBill.raw?.warrantyTerms ? `Warranty: ${selectedBill.raw.warrantyTerms}` : undefined
+          }}
+          receiverSignatureLabel="Customer Signature"
+        />
+      )}
+
+      {/* PRINT PAYMENT VOUCHER RECEIPT MODAL */}
+      {printVoucherData && (
+        <UniversalPrintModal
+          open={Boolean(printVoucherData)}
+          onClose={() => setPrintVoucherData(null)}
+          title="Official Customer Payment Receipt"
+          typeTag={printVoucherData.entryType === 'Adjustment' ? 'Discount Voucher' : 'Payment Receipt'}
+          badgeColor="success"
+          partyLabel="Received From"
+          party={{
+            name: printVoucherData.customerName,
+            phone: printVoucherData.customerPhone || undefined,
+            city: printVoucherData.cityAddress || undefined
+          }}
+          invoiceLabel="Voucher No:"
+          invoiceNo={formatInvoiceNo(printVoucherData)}
+          date={printVoucherData.time}
+          status={printVoucherData.paymentMethod || 'Cash'}
+          items={[
+            {
+              name: `Payment received against ${printVoucherData.referenceLabel || 'Customer Account'}`,
+              subtitle: printVoucherData.referenceNo ? `Ref: ${printVoucherData.referenceNo}` : printVoucherData.notes || '',
+              qty: 1,
+              rate: printVoucherData.amountPaid,
+              total: printVoucherData.amountPaid
             }
-          `}
-        </style>
+          ]}
+          summary={{
+            totalAmount: printVoucherData.billTotal,
+            paidAmount: (printVoucherData.previousPaid || 0) + (printVoucherData.amountPaid || 0),
+            balanceAmount: printVoucherData.newBalance,
+            notes: printVoucherData.notes || `Method: ${printVoucherData.paymentMethod}`
+          }}
+          receiverSignatureLabel="Customer / Payer Signature"
+        />
+      )}
 
-        <DialogTitle
-          className="no-print"
-          sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}
-        >
-          <Typography variant="h5" fontWeight={700}>
-            Official Customer Machine Sale Invoice
-          </Typography>
-          <Chip label="Sales Invoice" color="success" size="small" />
-        </DialogTitle>
-
-        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2 } }}>
-          {selectedInvoice && (
-            <Box
-              id="printable-machine-invoice"
-              sx={{
-                p: 2,
-                bgcolor: '#fff',
-                color: '#111827',
-                borderRadius: 1
-              }}
-            >
-              {/* Header Box */}
-              <Box sx={{ border: '1px solid #000', mb: 2 }}>
-                <Grid container>
-                  <Grid size={{ xs: 7 }} sx={{ p: 1.5, borderRight: '1px solid #000' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#666', display: 'block' }}>
-                      CUSTOMER DETAILS
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                      {selectedInvoice.customerName || 'Walk-in Customer'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                      Phone: {selectedInvoice.customerPhone || 'N/A'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                      City / Address: {selectedInvoice.cityAddress || 'N/A'}
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 5 }} sx={{ p: 1.5 }}>
-                    <Stack spacing={0.5}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800 }}>Invoice No:</Typography>
-                        <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', fontFamily: 'monospace' }}>
-                          {formatInvoiceNo(selectedInvoice)}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800 }}>Date &amp; Time:</Typography>
-                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                          {formatFullDate(selectedInvoice.time, selectedInvoice.dateISO)}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800 }}>Payment Status:</Typography>
-                        <Chip
-                          label={selectedInvoice.paymentStatus || 'Paid'}
-                          size="small"
-                          color={selectedInvoice.paymentStatus === 'Paid' ? 'success' : selectedInvoice.paymentStatus === 'Partial' ? 'warning' : 'error'}
-                          sx={{ height: 20, fontSize: '0.7rem', fontWeight: 800 }}
-                        />
-                      </Box>
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '16px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#fff', borderBottom: '1px solid #000' }}>
-                    <th style={{ width: '8%', padding: '6px', borderRight: '1px solid #000', textAlign: 'center', fontSize: '0.8rem' }}>Sr</th>
-                    <th style={{ width: '52%', padding: '6px', borderRight: '1px solid #000', textAlign: 'left', fontSize: '0.8rem' }}>
-                      Specification / Model
-                    </th>
-                    <th style={{ width: '10%', padding: '6px', borderRight: '1px solid #000', textAlign: 'center', fontSize: '0.8rem' }}>QTY</th>
-                    <th style={{ width: '15%', padding: '6px', borderRight: '1px solid #000', textAlign: 'right', fontSize: '0.8rem' }}>Rate</th>
-                    <th style={{ width: '15%', padding: '6px', textAlign: 'right', fontSize: '0.8rem' }}>Total Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedInvoice.items && selectedInvoice.items.length > 0
-                    ? selectedInvoice.items
-                    : [
-                        {
-                          machineName: selectedInvoice.machineName,
-                          serialNo: selectedInvoice.serialNo,
-                          qty: selectedInvoice.qty || 1,
-                          unitPrice: selectedInvoice.unitPrice || selectedInvoice.lineTotal,
-                          lineTotal: selectedInvoice.lineTotal
-                        }
-                      ]
-                  ).map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #000' }}>
-                      <td style={{ padding: '6px', borderRight: '1px solid #000', textAlign: 'center', fontSize: '0.8rem', fontWeight: 700 }}>
-                        {String(idx + 1).padStart(2, '0')}
-                      </td>
-                      <td style={{ padding: '6px', borderRight: '1px solid #000', fontSize: '0.8rem', fontWeight: 600 }}>
-                        {item.machineName || 'Machine'}
-                        {item.serialNo && (
-                          <span style={{ display: 'block', fontSize: '0.72rem', color: '#666' }}>
-                            S/N: {item.serialNo}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '6px', borderRight: '1px solid #000', textAlign: 'center', fontSize: '0.8rem', fontWeight: 700 }}>
-                        {String(item.qty || 1).padStart(2, '0')}
-                      </td>
-                      <td style={{ padding: '6px', borderRight: '1px solid #000', textAlign: 'right', fontSize: '0.8rem' }}>
-                        {(parseFloat(item.unitPrice) || 0).toLocaleString()}
-                      </td>
-                      <td style={{ padding: '6px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700 }}>
-                        {(parseFloat(item.lineTotal) || 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr style={{ backgroundColor: '#fff', borderTop: '1px solid #000' }}>
-                    <td colSpan={4} style={{ padding: '6px 12px', borderRight: '1px solid #000', textAlign: 'right', fontWeight: 800, fontSize: '0.85rem' }}>
-                      Total amount
-                    </td>
-                    <td style={{ padding: '6px', textAlign: 'right', fontWeight: 900, fontSize: '0.85rem' }}>
-                      {(parseFloat(selectedInvoice.lineTotal || selectedInvoice.subTotal) || 0).toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* Financial Box with Flex Space-Between */}
-              {(() => {
-                const totalAmt = parseFloat(selectedInvoice.lineTotal || selectedInvoice.subTotal) || 0;
-                const directPaid = parseFloat(selectedInvoice.paidAmount) || 0;
-                const extraPaid = (customerPayments || [])
-                  .filter((p) => String(p.invoiceId) === String(selectedInvoice.id))
-                  .reduce((sum, p) => sum + (parseFloat(p.amountPaid) || 0), 0);
-                const printPaid = Math.max(directPaid, extraPaid);
-                const printBal = Math.max(0, totalAmt - printPaid);
-
-                return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      p: 1.5,
-                      bgcolor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 1,
-                      mb: 3
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                      PAID AMOUNT: Rs. {printPaid.toLocaleString()}
-                    </Typography>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                        NET TOTAL: Rs. {totalAmt.toLocaleString()}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: 800,
-                          color: printBal > 0 ? 'error.main' : 'success.main',
-                          display: 'block'
-                        }}
-                      >
-                        {printBal > 0 ? `REMAINING DUE: Rs. ${printBal.toLocaleString()}` : 'STATUS: FULLY PAID'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })()}
-
-              {/* Warranty Terms */}
-              {selectedInvoice.warrantyTerms && (
-                <Box sx={{ mb: 2, p: 1, bgcolor: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#166534' }}>
-                    Warranty Terms: {selectedInvoice.warrantyTerms}
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Signatures */}
-              <Box sx={{ mt: 4, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Box sx={{ borderTop: '1px solid #94a3b8', pt: 1, width: 200, textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block' }}>
-                      Customer Signature
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
-                    <CeoSignature />
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-
-        <DialogActions className="no-print" sx={{ p: 2 }}>
-          <Button onClick={() => setPrintModalOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>
-            Close
-          </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<PrinterOutlined />}
-            onClick={() => window.print()}
-            sx={{ fontWeight: 800, px: 3 }}
-          >
-            Print Customer Machine Bill
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── EDIT MACHINE SALE INVOICE DRAWER ────────────────────────────── */}
+      {/* EDIT MACHINE SALE DRAWER */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: { xs: 320, sm: 460 }, p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" fontWeight={800}>
-              Edit Machine Invoice
+            <Typography variant="h5" fontWeight={700}>
+              Edit Machine Invoice {editingSale ? formatInvoiceNo(editingSale) : ''}
             </Typography>
             <IconButton onClick={() => setEditDrawerOpen(false)}>
               <CloseOutlined />
@@ -991,147 +888,131 @@ export default function MachineInvoicesPage() {
           <Divider sx={{ mb: 2.5 }} />
 
           {editingSale && (
-            <form onSubmit={handleEditSubmit}>
-              <Stack spacing={2.5}>
-                <TextField
-                  label="Customer Name"
-                  fullWidth
-                  value={editingSale.customerName}
-                  onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
-                  required
-                />
-                <TextField
-                  label="Customer Phone"
-                  fullWidth
-                  value={editingSale.customerPhone}
-                  onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
-                />
-                <TextField
-                  label="City / Address"
-                  fullWidth
-                  value={editingSale.cityAddress}
-                  onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
-                />
+            <Box component="form" onSubmit={handleEditSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Customer Name"
+                size="small"
+                fullWidth
+                required
+                value={editingSale.customerName}
+                onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
+              />
+              <TextField
+                label="Customer Phone"
+                size="small"
+                fullWidth
+                value={editingSale.customerPhone}
+                onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
+              />
+              <TextField
+                label="City / Address"
+                size="small"
+                fullWidth
+                value={editingSale.cityAddress}
+                onChange={(e) => setEditingSale({ ...editingSale, cityAddress: e.target.value })}
+              />
 
-                {/* Machines List */}
-                <Typography variant="subtitle2" fontWeight={800} color="primary">
-                  Machines Purchased ({editingSale.items.length})
-                </Typography>
+              <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                Machines Purchased ({editingSale.items.length})
+              </Typography>
 
-                {editingSale.items.map((item, idx) => (
-                  <Box key={idx} sx={{ p: 1.5, border: '1px solid #e2e8f0', borderRadius: 1.5, bgcolor: '#f8fafc' }}>
-                    <Stack spacing={1.5}>
-                      <Autocomplete
-                        freeSolo
-                        options={machineModels}
-                        value={item.machineName}
-                        onChange={(e, val) => {
-                          const updated = [...editingSale.items];
-                          updated[idx].machineName = val || '';
-                          setEditingSale({ ...editingSale, items: updated });
-                        }}
-                        onInputChange={(e, val) => {
-                          const updated = [...editingSale.items];
-                          updated[idx].machineName = val || '';
-                          setEditingSale({ ...editingSale, items: updated });
-                        }}
-                        renderInput={(params) => <TextField {...params} label="Machine Model" size="small" required />}
-                      />
-                      <Grid container spacing={1}>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Qty"
-                            type="number"
-                            size="small"
-                            fullWidth
-                            value={item.qty}
-                            onChange={(e) => {
-                              const updated = [...editingSale.items];
-                              updated[idx].qty = parseInt(e.target.value, 10) || 1;
-                              setEditingSale({ ...editingSale, items: updated });
-                            }}
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <TextField
-                            label="Unit Price"
-                            type="number"
-                            size="small"
-                            fullWidth
-                            disabled={!canEditPrice}
-                            value={item.unitPrice}
-                            onChange={(e) => {
-                              const updated = [...editingSale.items];
-                              updated[idx].unitPrice = parseFloat(e.target.value) || 0;
-                              setEditingSale({ ...editingSale, items: updated });
-                            }}
-                          />
-                        </Grid>
-                      </Grid>
-                    </Stack>
+              {editingSale.items.map((item, idx) => (
+                <Box key={idx} sx={getSubSurfaceSx(theme, { p: 1.5, borderRadius: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 })}>
+                  <Autocomplete
+                    freeSolo
+                    size="small"
+                    options={machineModels}
+                    value={item.machineName}
+                    onChange={(e, val) => {
+                      const updated = [...editingSale.items];
+                      updated[idx] = { ...updated[idx], machineName: val || '' };
+                      setEditingSale({ ...editingSale, items: updated });
+                    }}
+                    onInputChange={(e, val) => {
+                      const updated = [...editingSale.items];
+                      updated[idx] = { ...updated[idx], machineName: val || '' };
+                      setEditingSale({ ...editingSale, items: updated });
+                    }}
+                    renderInput={(params) => <TextField {...params} label="Machine Model" required />}
+                  />
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                    <TextField
+                      label="Qty"
+                      type="number"
+                      size="small"
+                      value={item.qty}
+                      onChange={(e) => {
+                        const updated = [...editingSale.items];
+                        updated[idx] = { ...updated[idx], qty: parseInt(e.target.value, 10) || 1 };
+                        setEditingSale({ ...editingSale, items: updated });
+                      }}
+                    />
+                    <TextField
+                      label="Unit Price"
+                      type="number"
+                      size="small"
+                      disabled={!canEditPrice}
+                      value={item.unitPrice}
+                      onChange={(e) => {
+                        const updated = [...editingSale.items];
+                        updated[idx] = { ...updated[idx], unitPrice: parseFloat(e.target.value) || 0 };
+                        setEditingSale({ ...editingSale, items: updated });
+                      }}
+                    />
                   </Box>
-                ))}
+                </Box>
+              ))}
 
-                <TextField
-                  label="Paid Amount (Rs.)"
-                  type="number"
-                  fullWidth
-                  value={editingSale.paidAmount}
-                  onChange={(e) => setEditingSale({ ...editingSale, paidAmount: e.target.value })}
-                />
+              <TextField
+                label="Paid Amount (Rs.)"
+                type="number"
+                size="small"
+                fullWidth
+                value={editingSale.paidAmount}
+                onChange={(e) => setEditingSale({ ...editingSale, paidAmount: e.target.value })}
+              />
 
-                <TextField
-                  label="Warranty Terms"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={editingSale.warrantyTerms}
-                  onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
-                />
+              <TextField
+                label="Warranty Terms"
+                size="small"
+                fullWidth
+                multiline
+                rows={2}
+                value={editingSale.warrantyTerms}
+                onChange={(e) => setEditingSale({ ...editingSale, warrantyTerms: e.target.value })}
+              />
 
-                <Button type="submit" variant="contained" color="success" fullWidth sx={{ fontWeight: 800, py: 1.2 }}>
-                  Save Changes
-                </Button>
-              </Stack>
-            </form>
+              <AppButton type="submit" intent="primary" fullWidth>
+                Save Changes
+              </AppButton>
+            </Box>
           )}
         </Box>
       </Drawer>
 
-      {/* ── RECEIVE PAYMENT MODAL ────────────────────────────────────────── */}
-      <Dialog
-        open={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            boxShadow: '0 24px 48px rgba(0,0,0,0.2)'
-          }
-        }}
-      >
-        <form onSubmit={handlePaymentSubmit}>
+      {/* RECEIVE PAYMENT VOUCHER MODAL */}
+      <Dialog open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} maxWidth="sm" fullWidth>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitPaymentVoucher(false);
+          }}
+        >
           <DialogTitle
             sx={{
-              fontWeight: 800,
-              color: '#10b981',
+              fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid',
-              borderColor: 'divider',
-              pb: 1.5
+              borderColor: 'divider'
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <DollarOutlined /> Receive Payment
-              {selectedInvoiceForPay && (
-                <Chip
-                  label={formatInvoiceNo(selectedInvoiceForPay)}
-                  size="small"
-                  sx={{ fontWeight: 800, ml: 1, bgcolor: '#e6f7f4', color: '#005F56' }}
-                />
+              <DollarOutlined style={{ color: primaryTone.main }} /> Receive Payment Voucher
+              {selectedBillForPay && (
+                <Chip label={selectedBillForPay.docNo} size="small" color="primary" variant="light" sx={{ fontWeight: 700 }} />
               )}
             </Box>
             <IconButton size="small" onClick={() => setPaymentModalOpen(false)}>
@@ -1140,114 +1021,117 @@ export default function MachineInvoicesPage() {
           </DialogTitle>
 
           <DialogContent dividers sx={{ p: 3 }}>
-            {selectedInvoiceForPay && (() => {
-              const totalBill = parseFloat(selectedInvoiceForPay.lineTotal || selectedInvoiceForPay.subTotal) || 0;
-              const directPaid = parseFloat(selectedInvoiceForPay.paidAmount) || 0;
-              const extraPayments = (customerPayments || [])
-                .filter((p) => String(p.invoiceId) === String(selectedInvoiceForPay.id))
-                .reduce((acc, p) => acc + (parseFloat(p.amountPaid) || 0), 0);
-              const alreadyPaid = Math.max(directPaid, extraPayments);
-              const dueBal = Math.max(0, totalBill - alreadyPaid);
+            {selectedBillForPay && (() => {
               const paidNow = parseFloat(paymentForm.amountPaid) || 0;
-              const remAfter = Math.max(0, dueBal - paidNow);
+              const remAfter = Math.max(0, selectedBillForPay.balanceAmount - paidNow);
 
               return (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {/* Customer & Invoice Summary Card */}
-                  <Box
-                    sx={{
-                      p: 2,
-                      bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f0fdf4',
-                      borderRadius: 1.5,
-                      border: '1px solid #bbf7d0'
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={getSubSurfaceSx(theme, { p: 2, borderRadius: 2 })}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                       <Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
-                          Customer Name
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+                          Customer Account
                         </Typography>
-                        <Typography variant="h5" fontWeight={800} color="primary.main">
-                          {selectedInvoiceForPay.customerName || 'Walk-in Customer'}
+                        <Typography variant="h5" fontWeight={700} color="text.primary">
+                          {selectedBillForPay.customerName}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {selectedInvoiceForPay.customerPhone || 'N/A'}{selectedInvoiceForPay.cityAddress ? ` • ${selectedInvoiceForPay.cityAddress}` : ''}
+                          {selectedBillForPay.customerPhone || 'N/A'}
+                          {selectedBillForPay.cityAddress ? ` • ${selectedBillForPay.cityAddress}` : ''}
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
-                          Current Due Balance
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+                          Current Due
                         </Typography>
-                        <Typography variant="h4" fontWeight={900} sx={{ color: dueBal > 0 ? '#ef4444' : '#10b981', mt: 0.25 }}>
-                          Rs. {dueBal.toLocaleString()}
+                        <Typography variant="h4" fontWeight={700} sx={{ color: errorTone.main, fontVariantNumeric: 'tabular-nums' }}>
+                          {formatPKR(selectedBillForPay.balanceAmount)}
                         </Typography>
                       </Box>
                     </Box>
 
-                    <Divider sx={{ my: 1.5, borderColor: '#bbf7d0' }} />
-
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="text.secondary">Total Invoice Amount:</Typography>
-                        <Typography variant="body2" fontWeight={800} color="#005F56">
-                          Rs. {totalBill.toLocaleString()}
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
-                        <Typography variant="caption" color="text.secondary">Previously Paid:</Typography>
-                        <Typography variant="body2" fontWeight={800} color="text.primary">
-                          Rs. {alreadyPaid.toLocaleString()}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-
-                  {/* Payment Inputs */}
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
                       <TextField
-                        label="Amount Received (Rs) *"
+                        select
+                        size="small"
+                        label="Voucher Type *"
+                        fullWidth
+                        value={paymentForm.entryType}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, entryType: e.target.value })}
+                      >
+                        <MenuItem value="Receipt">Payment Received (Cash In)</MenuItem>
+                        <MenuItem value="Adjustment">Discount / Final Settlement</MenuItem>
+                      </TextField>
+
+                      <TextField
+                        label="Amount (Rs.) *"
                         type="number"
+                        size="small"
                         fullWidth
                         required
                         autoFocus
-                        placeholder="Enter amount..."
                         inputProps={{ min: 0 }}
                         value={paymentForm.amountPaid}
                         onChange={(e) => setPaymentForm({ ...paymentForm, amountPaid: e.target.value })}
                       />
-                    </Grid>
+                    </Box>
+                  </Box>
 
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        label="New Remaining Due (Rs)"
-                        type="text"
-                        fullWidth
-                        disabled
-                        value={`Rs. ${remAfter.toLocaleString()}`}
-                        sx={{
-                          bgcolor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5',
-                          borderRadius: 1
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                    <TextField
+                      select
+                      size="small"
+                      label="Voucher Type *"
+                      fullWidth
+                      value={paymentForm.entryType}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, entryType: e.target.value })}
+                    >
+                      <MenuItem value="Receipt">Cash / Payment Received</MenuItem>
+                      <MenuItem value="Adjustment">Discount / Final Settlement</MenuItem>
+                    </TextField>
+
+                    <TextField
+                      label="Amount (Rs.) *"
+                      type="number"
+                      size="small"
+                      fullWidth
+                      required
+                      autoFocus
+                      inputProps={{ min: 0 }}
+                      value={paymentForm.amountPaid}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amountPaid: e.target.value })}
+                    />
+                  </Box>
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                    <TextField
+                      select
+                      size="small"
+                      label="Payment Method"
+                      fullWidth
+                      disabled={paymentForm.entryType === 'Adjustment'}
+                      value={paymentForm.paymentMethod}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                    >
+                      <MenuItem value="Cash">Cash</MenuItem>
+                      <MenuItem value="Bank Transfer">Bank Transfer / Online</MenuItem>
+                      <MenuItem value="Easypaisa / JazzCash">Easypaisa / JazzCash</MenuItem>
+                      <MenuItem value="Cheque">Cheque</MenuItem>
+                    </TextField>
+
+                    <TextField
+                      size="small"
+                      label="New Remaining Due"
+                      fullWidth
+                      disabled
+                      value={formatPKR(remAfter)}
+                    />
+                  </Box>
 
                   <TextField
-                    select
-                    label="Payment Method *"
-                    fullWidth
-                    value={paymentForm.paymentMethod}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                  >
-                    <MenuItem value="Cash">Cash</MenuItem>
-                    <MenuItem value="Bank Transfer">Bank Transfer / Online</MenuItem>
-                    <MenuItem value="Cheque">Cheque</MenuItem>
-                    <MenuItem value="Easypaisa / JazzCash">Easypaisa / JazzCash</MenuItem>
-                  </TextField>
-
-                  <TextField
-                    label="Reference / Cheque No"
+                    size="small"
+                    label="Reference / Cheque / Transaction #"
                     placeholder="e.g. TXN-908123"
                     fullWidth
                     value={paymentForm.referenceNo}
@@ -1255,6 +1139,7 @@ export default function MachineInvoicesPage() {
                   />
 
                   <TextField
+                    size="small"
                     label="Notes / Remarks"
                     placeholder="Optional payment notes..."
                     fullWidth
@@ -1266,46 +1151,44 @@ export default function MachineInvoicesPage() {
             })()}
           </DialogContent>
 
-          <DialogActions sx={{ p: 2, bgcolor: isDark ? 'background.paper' : '#f8fafc', borderTop: '1px solid', borderColor: 'divider' }}>
-            <Button onClick={() => setPaymentModalOpen(false)} color="inherit">
+          <DialogActions sx={{ px: 3, py: 2, bgcolor: getSubSurfaceSx(theme).bgcolor }}>
+            <AppButton intent="cancel" onClick={() => setPaymentModalOpen(false)} disabled={savingPayment}>
               Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={<DollarOutlined />}
-              sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, fontWeight: 800, px: 3 }}
+            </AppButton>
+            <AppButton
+              intent="secondary"
+              startIcon={<PrinterOutlined />}
+              onClick={() => submitPaymentVoucher(true)}
+              disabled={savingPayment}
             >
-              Confirm &amp; Save Payment
-            </Button>
+              Save &amp; Print Receipt
+            </AppButton>
+            <AppButton type="submit" intent="primary" startIcon={<DollarOutlined />} disabled={savingPayment}>
+              {savingPayment ? 'Saving...' : 'Confirm Payment'}
+            </AppButton>
           </DialogActions>
-        </form>
+        </Box>
       </Dialog>
 
-      {/* ── DELETE CONFIRMATION DIALOG ──────────────────────────────────── */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete Machine Invoice
-        </DialogTitle>
+      {/* DELETE DIALOG */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete {selectedBill?.docNo}?</DialogTitle>
         <DialogContent>
-          <Typography variant="body1">
-            Are you sure you want to delete machine invoice <strong>{selectedInvoice ? formatInvoiceNo(selectedInvoice) : ''}</strong>?
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            This action cannot be undone and will remove this sale from records and ledger.
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete <strong>{selectedBill?.docNo}</strong> for <strong>{selectedBill?.customerName}</strong>? This
+            action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="inherit">
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained" sx={{ fontWeight: 700 }}>
-            Yes, Delete Invoice
-          </Button>
+          </AppButton>
+          <AppButton intent="danger" onClick={handleConfirmDelete}>
+            Yes, Delete
+          </AppButton>
         </DialogActions>
       </Dialog>
 
-      {/* ── SNACKBAR FEEDBACK ────────────────────────────────────────────── */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

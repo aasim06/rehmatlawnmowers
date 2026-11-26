@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
@@ -24,6 +23,7 @@ import CloudDownloadOutlined from '@ant-design/icons/CloudDownloadOutlined';
 import CloudUploadOutlined from '@ant-design/icons/CloudUploadOutlined';
 
 import MainCard from 'components/MainCard';
+import { AppButton } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function BackupRestorePage() {
@@ -31,7 +31,6 @@ export default function BackupRestorePage() {
     items,
     usageLogs,
     machineSales,
-    machineRecipes,
     customerPayments,
     vendorPayments,
     exportFullBackupData,
@@ -151,22 +150,16 @@ export default function BackupRestorePage() {
                     </Typography>
                   </Box>
                 </Stack>
-                <Button
-                  variant="contained"
+                <AppButton
+                  intent="primary"
+                  size="large"
                   fullWidth
                   startIcon={<DownloadOutlined />}
                   onClick={handleDownloadBackup}
-                  sx={{
-                    bgcolor: '#10b981',
-                    '&:hover': { bgcolor: '#059669' },
-                    fontWeight: 700,
-                    height: 42,
-                    borderRadius: 2,
-                    mt: 1
-                  }}
+                  sx={{ mt: 1 }}
                 >
                   Download JSON Backup
-                </Button>
+                </AppButton>
               </CardContent>
             </Card>
           </Grid>
@@ -188,23 +181,17 @@ export default function BackupRestorePage() {
                     </Typography>
                   </Box>
                 </Stack>
-                <Button
-                  variant="contained"
+                <AppButton
+                  intent="secondary"
+                  size="large"
                   component="label"
                   fullWidth
                   startIcon={<UploadOutlined />}
-                  sx={{
-                    bgcolor: '#3b82f6',
-                    '&:hover': { bgcolor: '#2563eb' },
-                    fontWeight: 700,
-                    height: 42,
-                    borderRadius: 2,
-                    mt: 1
-                  }}
+                  sx={{ mt: 1 }}
                 >
                   Upload & Restore File
                   <input type="file" accept=".json" hidden onChange={handleFileRestoreUpload} />
-                </Button>
+                </AppButton>
               </CardContent>
             </Card>
           </Grid>
@@ -224,15 +211,9 @@ export default function BackupRestorePage() {
               </Typography>
             </Box>
             <Box sx={{ ml: { sm: 'auto' } }}>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteOutlined />}
-                onClick={() => setResetConfirmOpen(true)}
-                sx={{ fontWeight: 700, height: 38, borderRadius: 2, whiteSpace: 'nowrap' }}
-              >
+              <AppButton intent="danger-outlined" startIcon={<DeleteOutlined />} onClick={() => setResetConfirmOpen(true)}>
                 Reset Data to 0
-              </Button>
+              </AppButton>
             </Box>
           </Box>
         </Box>
@@ -240,7 +221,7 @@ export default function BackupRestorePage() {
 
       {/* Confirm Reset Dialog */}
       <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} paperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: 'error.main' }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
           Confirm Reset All Data to Zero?
         </DialogTitle>
         <DialogContent>
@@ -249,10 +230,12 @@ export default function BackupRestorePage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setResetConfirmOpen(false)} color="secondary" sx={{ fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={handleResetData} color="error" variant="contained" sx={{ fontWeight: 700, borderRadius: 1.5 }}>
+          <AppButton intent="cancel" onClick={() => setResetConfirmOpen(false)}>
+            Cancel
+          </AppButton>
+          <AppButton intent="danger" onClick={handleResetData}>
             Yes, Reset All Data to 0
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
     </Box>

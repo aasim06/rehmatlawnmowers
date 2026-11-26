@@ -9,8 +9,17 @@ import { extendPaletteWithChannels } from 'utils/colorUtils';
 
 function buildGrey() {
   const greyPrimary = [
-    '#ffffff', '#fafafa', '#f5f5f5', '#f0f0f0', '#d9d9d9',
-    '#bfbfbf', '#8c8c8c', '#595959', '#262626', '#141414', '#000000'
+    '#ffffff',
+    '#fafafa',
+    '#f5f5f5',
+    '#f0f0f0',
+    '#d9d9d9',
+    '#bfbfbf',
+    '#8c8c8c',
+    '#595959',
+    '#262626',
+    '#141414',
+    '#000000'
   ];
   const greyAscent = ['#fafafa', '#bfbfbf', '#434343', '#1f1f1f'];
   const greyConstant = ['#fafafb', '#e6ebf1'];
@@ -32,15 +41,21 @@ export function buildPalette(presetColor) {
     ...extendedCommon,
     ...extendedLight,
     text: {
-      primary: extendedLight.grey[700],
-      secondary: extendedLight.grey[500],
-      disabled: extendedLight.grey[400]
+      primary: '#101828',
+      secondary: '#667085',
+      disabled: '#98a2b3'
     },
-    action: { disabled: extendedLight.grey[300] },
-    divider: extendedLight.grey[200],
+    action: {
+      active: '#667085',
+      hover: '#f9fafb',
+      selected: 'rgba(70, 95, 255, 0.08)',
+      disabled: '#98a2b3',
+      disabledBackground: '#f2f4f7'
+    },
+    divider: '#e4e7ec',
     background: {
-      paper: extendedLight.grey[0],
-      default: 'rgb(247, 246, 242)'
+      paper: '#ffffff',
+      default: '#f9fafb'
     }
   });
 
@@ -50,66 +65,66 @@ export function buildPalette(presetColor) {
     ...extendedLight,
     primary: {
       ...extendedLight.primary,
-      lighter: '#1e1b4b',
-      100: '#312e81',
-      200: '#3730a3',
-      light: '#818cf8',
-      400: '#818cf8',
-      main: '#6366f1',
-      dark: '#4f46e5',
-      700: '#4338ca',
-      darker: '#312e81',
-      900: '#1e1b4b',
+      lighter: '#1b2342',
+      100: '#252dae',
+      200: '#2a31d8',
+      light: '#8098f9',
+      400: '#7592ff',
+      main: '#465fff',
+      dark: '#3641f5',
+      700: '#2a31d8',
+      darker: '#c2d6ff',
+      900: '#dde9ff',
       contrastText: '#ffffff'
     },
     secondary: {
-      lighter: '#162033',
-      100: '#1e293b',
-      200: '#334155',
-      light: '#cbd5e1',
-      400: '#94a3b8',
-      main: '#94a3b8',
-      dark: '#cbd5e1',
-      700: '#e2e8f0',
-      darker: '#f8fafc',
+      lighter: '#1d2939',
+      100: '#1d2939',
+      200: '#2e3a47',
+      light: '#d0d5dd',
+      400: '#98a2b3',
+      main: '#98a2b3',
+      dark: '#e4e7ec',
+      700: '#e4e7ec',
+      darker: '#f9fafb',
       900: '#ffffff',
-      contrastText: '#0f172a'
+      contrastText: '#101828'
     },
     text: {
-      primary: '#f8fafc',
-      secondary: '#94a3b8',
-      disabled: '#64748b'
+      primary: '#f9fafb',
+      secondary: '#98a2b3',
+      disabled: '#667085'
     },
     action: {
-      active: '#94a3b8',
-      hover: '#1e293b',
-      selected: '#27273a',
-      disabled: '#475569',
-      disabledBackground: '#162033'
+      active: '#98a2b3',
+      hover: 'rgba(255, 255, 255, 0.04)',
+      selected: 'rgba(70, 95, 255, 0.14)',
+      disabled: '#475467',
+      disabledBackground: '#1d2939'
     },
-    divider: '#1e293b',
+    divider: '#2e3a47',
     background: {
-      paper: '#131b2e',
-      default: '#090d16'
+      paper: '#171f2f',
+      default: '#101828'
     },
     grey: {
-      0: '#090d16',
-      50: '#0f172a',
-      100: '#131b2e',
-      200: '#162033',
-      300: '#1e293b',
-      400: '#334155',
-      500: '#64748b',
-      600: '#94a3b8',
-      700: '#cbd5e1',
-      800: '#e2e8f0',
-      900: '#f8fafc',
-      A50: '#0f172a',
-      A100: '#131b2e',
-      A200: '#162033',
-      A400: '#94a3b8',
-      A700: '#cbd5e1',
-      A800: '#64748b'
+      0: '#101828',
+      50: '#171f2f',
+      100: '#1d2939',
+      200: '#2e3a47',
+      300: '#344054',
+      400: '#475467',
+      500: '#667085',
+      600: '#98a2b3',
+      700: '#d0d5dd',
+      800: '#e4e7ec',
+      900: '#f9fafb',
+      A50: '#171f2f',
+      A100: '#1d2939',
+      A200: '#2e3a47',
+      A400: '#98a2b3',
+      A700: '#d0d5dd',
+      A800: '#667085'
     }
   });
 

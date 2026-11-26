@@ -9,7 +9,7 @@ export default function TableBody(theme) {
           backgroundColor: 'transparent',
           '& .MuiTableRow-root': {
             '&:hover': {
-              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : theme.vars.palette.action.hover
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#f9fafb'
             }
           }
         }

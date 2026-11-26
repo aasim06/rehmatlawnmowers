@@ -56,39 +56,45 @@ export default function Breadcrumbs({
   }
 
   useEffect(() => {
-    navigation?.items?.map((menu) => {
+    setMain(undefined);
+    setItem(undefined);
+
+    if (customLocation === '/profile') {
+      setMain({ title: 'Account', type: 'group' });
+      setItem({ title: 'Profile', type: 'item', url: '/profile', breadcrumbs: true });
+      return;
+    }
+
+    const resolveMenu = (menu) => {
+      if (!custom && menu.children) {
+        menu.children.forEach((collapse) => {
+          if (collapse.type && collapse.type === 'collapse') {
+            resolveMenu(collapse);
+            if (collapse.url === customLocation) {
+              setMain(collapse);
+              setItem(collapse);
+            }
+          } else if (collapse.type && collapse.type === 'item') {
+            if (customLocation === collapse.url) {
+              setMain(menu);
+              setItem(collapse);
+            }
+          }
+        });
+      }
+    };
+
+    navigation?.items?.forEach((menu) => {
       if (menu.type && menu.type === 'group') {
         if (menu?.url && menu.url === customLocation) {
           setMain(menu);
           setItem(menu);
         } else {
-          getCollapse(menu);
+          resolveMenu(menu);
         }
       }
-      return false;
     });
-  });
-
-  // set active item state
-  const getCollapse = (menu) => {
-    if (!custom && menu.children) {
-      menu.children.filter((collapse) => {
-        if (collapse.type && collapse.type === 'collapse') {
-          getCollapse(collapse);
-          if (collapse.url === customLocation) {
-            setMain(collapse);
-            setItem(collapse);
-          }
-        } else if (collapse.type && collapse.type === 'item') {
-          if (customLocation === collapse.url) {
-            setMain(menu);
-            setItem(collapse);
-          }
-        }
-        return false;
-      });
-    }
-  };
+  }, [custom, customLocation]);
 
   // item separator
   const SeparatorIcon = separator;

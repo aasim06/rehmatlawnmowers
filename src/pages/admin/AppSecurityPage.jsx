@@ -1,426 +1,633 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTheme } from '@mui/material/styles';
 import {
+  Alert,
   Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Stack,
-  Grid,
-  TextField,
   Chip,
   Dialog,
-  DialogTitle,
+  DialogActions,
   DialogContent,
   DialogContentText,
-  DialogActions,
-  Alert,
+  DialogTitle,
   Divider,
+  Grid,
   Paper,
-  InputAdornment
+  TextField,
+  Typography
 } from '@mui/material';
-import {
-  LockOutlined,
-  UnlockOutlined,
-  SafetyCertificateOutlined,
-  WhatsAppOutlined,
-  PhoneOutlined,
-  CloudSyncOutlined,
-  CheckCircleOutlined,
-  WarningOutlined,
-  EyeOutlined
-} from '@ant-design/icons';
+import { CheckCircleOutlined, LockOutlined } from '@ant-design/icons';
 import MainCard from 'components/MainCard';
+import { AppButton, PageHeader } from 'components/common';
 import { useAppSecurity } from 'context/AppSecurityContext';
 import { isTauriApp } from 'utils/platform';
+import { getCardSurfaceSx, getToneColors } from 'utils/themeSurface';
+
+const DEFAULT_LOCK_TITLE = 'Application License Verification Required';
+const DEFAULT_LOCK_MESSAGE =
+  'Your application license has been temporarily locked or requires activation. Please contact the software administrator or developer to activate your license.';
+const DEFAULT_CONTACT_PHONE = '+92 300 0000000';
+const DEFAULT_CONTACT_PERSON = 'Software Developer';
+const DEFAULT_OFFLINE_HOURS = 72;
+
+const CONFIRM_DIALOGS = {
+  lock: {
+    title: 'Confirm Remote Lock',
+    titleColor: 'error.main',
+    description:
+      'Are you sure you want to remotely LOCK all connected client installations? Users on the Windows desktop app will immediately see the full-screen activation lock and cannot access any records until unlocked.',
+    confirmLabel: 'Yes, Lock Application',
+    confirmIntent: 'danger',
+    confirmSx: {},
+    nextState: true
+  },
+  unlock: {
+    title: 'Confirm Remote Unlock',
+    titleColor: 'success.main',
+    description:
+      'Are you sure you want to UNLOCK client access? Connected desktop installations will automatically restore full normal functionality within seconds.',
+    confirmLabel: 'Yes, Unlock Application',
+    confirmIntent: 'primary',
+    confirmSx: { bgcolor: 'success.dark', '&:hover': { bgcolor: 'success.main' } },
+    nextState: false
+  }
+};
+
+function buildFormState(config = {}) {
+  return {
+    lockTitle: config.lockTitle || DEFAULT_LOCK_TITLE,
+    lockMessage: config.lockMessage || DEFAULT_LOCK_MESSAGE,
+    contactPhone: config.contactPhone || DEFAULT_CONTACT_PHONE,
+    contactPerson: config.contactPerson || DEFAULT_CONTACT_PERSON,
+    allowedOfflineHours: Number(config.allowedOfflineHours) || DEFAULT_OFFLINE_HOURS
+  };
+}
 
 export default function AppSecurityPage() {
+  const theme = useTheme();
   const isTauri = isTauriApp();
+  const { securityConfig, updateSecurityConfig, loading } = useAppSecurity();
 
-  // Desktop App Protection: Strictly forbidden from accessing Remote Control inside .exe
+  const [formData, setFormData] = useState(() => buildFormState(securityConfig));
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    setFormData(buildFormState(securityConfig));
+  }, [securityConfig]);
+
   if (isTauri) {
     return <Navigate to="/dashboard/default" replace />;
   }
 
-  const { securityConfig, updateSecurityConfig, refreshSecurityConfig, loading } = useAppSecurity();
+  const isLocked = Boolean(securityConfig.isLocked);
+  const statusTone = getToneColors(theme, isLocked ? 'error' : 'success');
+  const activeDialog = confirmAction ? CONFIRM_DIALOGS[confirmAction] : null;
 
-  const [formData, setFormData] = useState({
-    lockTitle: securityConfig.lockTitle || 'Application License Verification Required',
-    lockMessage: securityConfig.lockMessage || 'Your application license has been temporarily locked or requires activation. Please contact the software administrator or developer to activate your license.',
-    contactPhone: securityConfig.contactPhone || '+92 300 0000000',
-    contactPerson: securityConfig.contactPerson || 'Software Developer',
-    allowedOfflineHours: securityConfig.allowedOfflineHours || 72
+  const sectionEyebrowSx = {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    color: 'primary.main',
+    mb: 2
+  };
+
+  const fieldLabelSx = {
+    display: 'block',
+    fontSize: '0.8125rem',
+    fontWeight: 600,
+    color: 'text.primary',
+    mb: 0.75
+  };
+
+  const statusMeta = isLocked
+    ? {
+        pillLabel: 'Locked / blocked',
+        heading: 'Desktop app is currently locked',
+        description: 'Client installations cannot access store inventory, stock, or billing until you restore access.',
+        buttonLabel: 'Restore & unlock app',
+        buttonHint: 'Restores authorized client access immediately',
+        buttonIntent: 'primary',
+        buttonSx: { bgcolor: 'success.dark', '&:hover': { bgcolor: 'success.main' } },
+        actionType: 'unlock'
+      }
+    : {
+        pillLabel: 'Active & running',
+        heading: 'Desktop app is running normally',
+        description: 'Client has full authorized access to store inventory, stock and sales features.',
+        buttonLabel: 'Emergency lock app',
+        buttonHint: 'Shows the lock screen on the client at once',
+        buttonIntent: 'danger',
+        buttonSx: { bgcolor: '#b91c1c', '&:hover': { bgcolor: '#991b1b' } },
+        actionType: 'lock'
+      };
+
+  const normalizePayload = (data) => ({
+    ...data,
+    lockTitle: (data.lockTitle || '').trim() || DEFAULT_LOCK_TITLE,
+    lockMessage: (data.lockMessage || '').trim() || DEFAULT_LOCK_MESSAGE,
+    contactPerson: (data.contactPerson || '').trim() || DEFAULT_CONTACT_PERSON,
+    contactPhone: (data.contactPhone || '').trim() || DEFAULT_CONTACT_PHONE,
+    allowedOfflineHours: Math.max(1, Number(data.allowedOfflineHours) || DEFAULT_OFFLINE_HOURS)
   });
 
-  const [confirmLockOpen, setConfirmLockOpen] = useState(false);
-  const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const isLocked = Boolean(securityConfig.isLocked);
+  const handleFieldChange = (field) => (event) => {
+    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+  };
 
   const handleToggleLock = async (newLockState) => {
+    setSaveSuccess(false);
+    setSaveError('');
     const res = await updateSecurityConfig({
-      ...formData,
+      ...normalizePayload(formData),
       isLocked: newLockState
     });
     if (res?.success) {
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
+    } else if (res?.error) {
+      setSaveError(res.error);
     }
-    setConfirmLockOpen(false);
-    setConfirmUnlockOpen(false);
+    setConfirmAction(null);
   };
 
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    const res = await updateSecurityConfig(formData);
+  const handleSaveSettings = async (event) => {
+    event.preventDefault();
+    setSaveSuccess(false);
+    setSaveError('');
+    const payload = normalizePayload(formData);
+    setFormData(payload);
+    const res = await updateSecurityConfig(payload);
     if (res?.success) {
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
+    } else if (res?.error) {
+      setSaveError(res.error);
     }
+  };
+
+  const handleReset = () => {
+    setFormData(buildFormState(securityConfig));
+    setSaveSuccess(false);
+    setSaveError('');
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', pb: 5 }}>
-      {/* Executive Header */}
-      <Box sx={{ mb: 3 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <SafetyCertificateOutlined style={{ fontSize: '1.75rem', color: '#6366f1' }} />
-          <Typography variant="h3" fontWeight={700}>
-            Desktop Application Remote Kill Switch & License Control
-          </Typography>
-        </Stack>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-          Remotely control client installations of <strong>RehmatLawnMowers.exe</strong> in real-time from this Web URL. Toggle access ON or OFF with 1 click.
-        </Typography>
-      </Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+      <PageHeader
+        title="Remote License & Security"
+        subtitle={
+          <>
+            Remotely control client installations of <strong>RehmatLawnMowers.exe</strong> in real time. Lock or unlock access with one click.
+          </>
+        }
+        sx={{ mb: 0 }}
+      />
 
       {saveSuccess && (
-        <Alert severity="success" icon={<CheckCircleOutlined />} sx={{ mb: 3 }}>
-          <strong>Command Synced to Cloud!</strong> The desktop application will adopt this status within seconds.
+        <Alert severity="success" icon={<CheckCircleOutlined />} onClose={() => setSaveSuccess(false)}>
+          <strong>Command synced to cloud!</strong> The desktop application will adopt these security settings within seconds.
         </Alert>
       )}
 
-      {/* Main Kill Switch Control Card */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 3,
-          p: { xs: 2.5, sm: 3.5 },
-          bgcolor: isLocked ? '#450a0a' : '#064e3b',
-          color: '#ffffff',
-          border: isLocked ? '2px solid #ef4444' : '2px solid #10b981',
-          boxShadow: isLocked
-            ? '0 10px 30px rgba(239, 68, 68, 0.25)'
-            : '0 10px 30px rgba(16, 185, 129, 0.25)',
-          transition: 'all 0.3s ease'
-        }}
+      {saveError && (
+        <Alert severity="error" onClose={() => setSaveError('')}>
+          {saveError}
+        </Alert>
+      )}
+
+      {/* Client Desktop App Status Banner */}
+      <Paper
+        elevation={0}
+        sx={getCardSurfaceSx(theme, {
+          p: { xs: 2, sm: 2.75 },
+          borderLeftWidth: 3,
+          borderLeftStyle: 'solid',
+          borderLeftColor: statusTone.solid
+        })}
       >
-        <Stack direction={{ xs: 'column', md: 'row' }} alignItems="center" justifyContent="space-between" spacing={3}>
-          <Stack direction="row" alignItems="center" spacing={2.5}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: { xs: 'flex-start', md: 'center' },
+            justifyContent: 'space-between',
+            gap: 2.5
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box
               sx={{
-                width: 64,
-                height: 64,
+                width: 48,
+                height: 48,
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                bgcolor: isLocked ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-                border: isLocked ? '2px solid #ef4444' : '2px solid #10b981'
+                flexShrink: 0,
+                bgcolor: statusTone.bg,
+                border: '1px solid',
+                borderColor: statusTone.border,
+                color: statusTone.text
               }}
             >
-              {isLocked ? (
-                <LockOutlined style={{ fontSize: 32, color: '#fca5a5' }} />
-              ) : (
-                <UnlockOutlined style={{ fontSize: 32, color: '#a7f3d0' }} />
-              )}
+              <LockOutlined style={{ fontSize: 20 }} />
             </Box>
 
             <Box>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85, fontWeight: 700 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap', mb: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'text.secondary'
+                  }}
+                >
                   Client Desktop App Status
                 </Typography>
                 <Chip
-                  label={isLocked ? 'LOCKED / DISABLED' : 'ACTIVE & RUNNING'}
                   size="small"
+                  label={statusMeta.pillLabel}
                   sx={{
-                    bgcolor: isLocked ? '#ef4444' : '#10b981',
-                    color: '#fff',
-                    fontWeight: 800,
-                    fontSize: '0.7rem'
+                    height: 22,
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    bgcolor: statusTone.bg,
+                    color: statusTone.text,
+                    border: '1px solid',
+                    borderColor: statusTone.border
                   }}
                 />
-              </Stack>
-              <Typography variant="h3" fontWeight={800} sx={{ mt: 0.5 }}>
-                {isLocked
-                  ? 'Desktop App is CURRENTLY LOCKED'
-                  : 'Desktop App is RUNNING NORMALLY'}
+              </Box>
+              <Typography variant="h4" fontWeight={700} color="text.primary" sx={{ mb: 0.35 }}>
+                {statusMeta.heading}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
-                {isLocked
-                  ? 'Client cannot use the desktop application. An unclosable lock screen is being displayed on their PC.'
-                  : 'Client has full authorized access to store inventory, stock, and sales features.'}
+              <Typography variant="body2" color="text.secondary">
+                {statusMeta.description}
               </Typography>
             </Box>
-          </Stack>
-
-          <Box>
-            {isLocked ? (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<UnlockOutlined />}
-                onClick={() => setConfirmUnlockOpen(true)}
-                sx={{
-                  bgcolor: '#10b981',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: 2,
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                  '&:hover': { bgcolor: '#059669' }
-                }}
-              >
-                RESTORE & UNLOCK APP
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<LockOutlined />}
-                onClick={() => setConfirmLockOpen(true)}
-                sx={{
-                  bgcolor: '#ef4444',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: 2,
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-                  '&:hover': { bgcolor: '#dc2626' }
-                }}
-              >
-                EMERGENCY LOCK APP
-              </Button>
-            )}
           </Box>
-        </Stack>
-      </Card>
 
-      <Grid container spacing={3}>
-        {/* Left Column: Customization Form */}
-        <Grid item xs={12} md={7}>
-          <MainCard title="Lock Screen & Developer Contact Settings">
-            <form onSubmit={handleSaveSettings}>
-              <Stack spacing={2.5}>
-                <TextField
-                  label="Lock Screen Title"
-                  fullWidth
-                  required
-                  value={formData.lockTitle}
-                  onChange={(e) => setFormData({ ...formData, lockTitle: e.target.value })}
-                  helperText="Displayed at the top of client's screen when locked."
-                />
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: { xs: 'flex-start', md: 'flex-end' },
+              gap: 0.75,
+              flexShrink: 0
+            }}
+          >
+            <AppButton
+              intent={statusMeta.buttonIntent}
+              size="medium"
+              onClick={() => setConfirmAction(statusMeta.actionType)}
+              disabled={loading}
+              sx={{ px: 2.5, py: 1, ...statusMeta.buttonSx }}
+            >
+              {statusMeta.buttonLabel}
+            </AppButton>
+            <Typography variant="caption" color="text.secondary">
+              {statusMeta.buttonHint}
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
 
-                <TextField
-                  label="Lock Screen Explanation Message"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  required
-                  value={formData.lockMessage}
-                  onChange={(e) => setFormData({ ...formData, lockMessage: e.target.value })}
-                  helperText="Explain why the license is inactive (e.g. pending payment verification)."
-                />
+      {/* Main Two-Column Settings & Live Screen Preview */}
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <MainCard
+            content={false}
+            sx={getCardSurfaceSx(theme, {
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column'
+            })}
+          >
+            <Box
+              sx={{
+                px: { xs: 2, sm: 3 },
+                py: 2,
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}
+            >
+              <Typography variant="h5" fontWeight={700}>
+                Lock screen &amp; developer contact
+              </Typography>
+            </Box>
 
-                <Divider sx={{ my: 1 }} />
+            <Box
+              component="form"
+              onSubmit={handleSaveSettings}
+              sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}
+            >
+              {/* Section 1 */}
+              <Box sx={{ px: { xs: 2, sm: 3 }, py: 2.5 }}>
+                <Typography sx={sectionEyebrowSx}>1. Lock Screen Message</Typography>
 
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Contact Details for Client to Reach You
-                </Typography>
+                <Box sx={{ mb: 2.25 }}>
+                  <Typography component="label" htmlFor="security-lock-title" sx={fieldLabelSx}>
+                    Lock screen title *
+                  </Typography>
+                  <TextField
+                    id="security-lock-title"
+                    fullWidth
+                    size="small"
+                    required
+                    value={formData.lockTitle}
+                    onChange={handleFieldChange('lockTitle')}
+                    placeholder={DEFAULT_LOCK_TITLE}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    Shown at the top of the client&apos;s screen when locked.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography component="label" htmlFor="security-lock-message" sx={fieldLabelSx}>
+                    Explanation message *
+                  </Typography>
+                  <TextField
+                    id="security-lock-message"
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                    required
+                    value={formData.lockMessage}
+                    onChange={handleFieldChange('lockMessage')}
+                    placeholder="Explain why the license is inactive..."
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    Explain why the license is inactive (e.g. pending payment verification).
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {/* Section 2 */}
+              <Box sx={{ px: { xs: 2, sm: 3 }, py: 2.5 }}>
+                <Typography sx={sectionEyebrowSx}>2. Contact Details For Client</Typography>
 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography component="label" htmlFor="security-contact-person" sx={fieldLabelSx}>
+                      Developer / admin name
+                    </Typography>
                     <TextField
-                      label="Developer / Admin Name"
+                      id="security-contact-person"
                       fullWidth
+                      size="small"
                       value={formData.contactPerson}
-                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                      onChange={handleFieldChange('contactPerson')}
+                      placeholder={DEFAULT_CONTACT_PERSON}
                     />
                   </Grid>
-
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography component="label" htmlFor="security-contact-phone" sx={fieldLabelSx}>
+                      WhatsApp / phone number *
+                    </Typography>
                     <TextField
-                      label="WhatsApp / Phone Number"
+                      id="security-contact-phone"
                       fullWidth
+                      size="small"
                       required
-                      placeholder="+92 300 1234567"
                       value={formData.contactPhone}
-                      onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <WhatsAppOutlined style={{ color: '#22c55e' }} />
-                          </InputAdornment>
-                        )
-                      }}
+                      onChange={handleFieldChange('contactPhone')}
+                      placeholder={DEFAULT_CONTACT_PHONE}
                     />
                   </Grid>
                 </Grid>
+              </Box>
 
-                <TextField
-                  label="Max Allowed Offline Hours (Security Threshold)"
-                  type="number"
-                  fullWidth
-                  value={formData.allowedOfflineHours}
-                  onChange={(e) => setFormData({ ...formData, allowedOfflineHours: parseInt(e.target.value, 10) || 72 })}
-                  helperText="If client disconnects internet for longer than this time, desktop app locks automatically."
-                />
+              <Divider />
 
-                <Box sx={{ pt: 1 }}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    size="large"
-                    disabled={loading}
-                    startIcon={<CloudSyncOutlined />}
-                  >
-                    {loading ? 'Saving...' : 'Save & Sync Settings'}
-                  </Button>
+              {/* Section 3 & Form Footer */}
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 2.5,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  flex: 1
+                }}
+              >
+                <Typography sx={sectionEyebrowSx}>3. Security Threshold</Typography>
+
+                <Box>
+                  <Typography component="label" htmlFor="security-offline-hours" sx={fieldLabelSx}>
+                    Max allowed offline hours
+                  </Typography>
+                  <TextField
+                    id="security-offline-hours"
+                    size="small"
+                    type="number"
+                    value={formData.allowedOfflineHours}
+                    onChange={handleFieldChange('allowedOfflineHours')}
+                    slotProps={{ htmlInput: { min: 1, max: 720 } }}
+                    sx={{ width: 150 }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    If the client stays offline longer than this, the desktop app locks automatically.
+                  </Typography>
                 </Box>
-              </Stack>
-            </form>
+
+                <Box sx={{ mt: 'auto', pt: 2.5, display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+                  <AppButton intent="cancel" size="medium" onClick={handleReset} disabled={loading}>
+                    Reset
+                  </AppButton>
+                  <AppButton intent="primary" size="medium" type="submit" loading={loading} loadingText="Saving...">
+                    Save &amp; sync settings
+                  </AppButton>
+                </Box>
+              </Box>
+            </Box>
           </MainCard>
         </Grid>
 
-        {/* Right Column: Live Client Screen Simulation Preview */}
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <MainCard
-            title={
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <EyeOutlined />
-                <span>Live Client Screen Preview</span>
-              </Stack>
-            }
+            content={false}
+            sx={getCardSurfaceSx(theme, {
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column'
+            })}
           >
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              This is exactly what the client will see on their Windows monitor when you lock the app:
-            </Typography>
-
-            {/* Miniature Lock Screen Simulator */}
-            <Paper
-              elevation={4}
+            <Box
               sx={{
-                bgcolor: '#0f172a',
-                color: '#f8fafc',
-                borderRadius: 2.5,
-                p: 2.5,
-                textAlign: 'center',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                position: 'relative',
-                overflow: 'hidden'
+                px: { xs: 2, sm: 3 },
+                py: 2,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5
               }}
             >
-              <Box
+              <Typography variant="h5" fontWeight={700}>
+                Live client screen preview
+              </Typography>
+              <Chip
+                label="Preview only"
+                size="small"
+                variant="outlined"
                 sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 3,
-                  background: 'linear-gradient(90deg, #ef4444, #f59e0b, #ef4444)'
+                  borderRadius: '999px',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                  borderColor: 'divider'
                 }}
               />
+            </Box>
 
-              <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: '#ef4444', mx: 'auto', mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <LockOutlined style={{ color: '#fff', fontSize: 18 }} />
-              </Box>
-
-              <Chip
-                label="LICENSE INACTIVE"
-                size="small"
-                sx={{ bgcolor: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', fontWeight: 800, fontSize: '0.65rem', mb: 1.5 }}
-              />
-
-              <Typography variant="h5" fontWeight={700} sx={{ color: '#fff', mb: 1, fontSize: '1.05rem' }}>
-                {formData.lockTitle || 'Application License Verification Required'}
+            <Box sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                This is exactly what the client sees on their Windows monitor when you lock the app.
               </Typography>
 
-              <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 2, lineHeight: 1.5 }}>
-                {formData.lockMessage || 'Please contact administrator to activate.'}
-              </Typography>
-
-              <Box sx={{ bgcolor: 'rgba(30, 41, 59, 0.8)', p: 1.5, borderRadius: 1.5, mb: 2 }}>
-                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', display: 'block', textTransform: 'uppercase' }}>
-                  Authorized Administrator
-                </Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ color: '#38bdf8' }}>
-                  {formData.contactPerson || 'Software Developer'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#e2e8f0', fontWeight: 600 }}>
-                  {formData.contactPhone}
-                </Typography>
-              </Box>
-
-              <Button
-                variant="contained"
-                fullWidth
-                size="small"
-                startIcon={<WhatsAppOutlined />}
-                sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 700, pointerEvents: 'none' }}
+              <Paper
+                elevation={0}
+                sx={{
+                  bgcolor: '#0a1220',
+                  color: '#f8fafc',
+                  borderRadius: 2.5,
+                  border: '1px solid #1e293b',
+                  borderTop: '4px solid #b91c1c',
+                  p: { xs: 2.5, sm: 3.5 },
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1.75
+                }}
               >
-                Contact via WhatsApp
-              </Button>
-            </Paper>
+                <Box
+                  sx={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    bgcolor: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <LockOutlined style={{ color: '#fecaca', fontSize: 22 }} />
+                </Box>
+
+                <Box
+                  sx={{
+                    px: 1.75,
+                    py: 0.45,
+                    borderRadius: '999px',
+                    bgcolor: 'rgba(153, 27, 27, 0.35)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#fca5a5',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em'
+                  }}
+                >
+                  LICENSE INACTIVE
+                </Box>
+
+                <Typography variant="h4" fontWeight={700} sx={{ color: '#ffffff', lineHeight: 1.3 }}>
+                  {formData.lockTitle || DEFAULT_LOCK_TITLE}
+                </Typography>
+
+                <Typography variant="body2" sx={{ color: '#cbd5e1', lineHeight: 1.6, maxWidth: 420 }}>
+                  {formData.lockMessage || DEFAULT_LOCK_MESSAGE}
+                </Typography>
+
+                <Box
+                  sx={{
+                    width: '100%',
+                    bgcolor: '#172133',
+                    border: '1px solid #283548',
+                    borderRadius: 1.75,
+                    py: 2,
+                    px: 2.5,
+                    mt: 0.5
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      color: '#94a3b8',
+                      mb: 0.5
+                    }}
+                  >
+                    AUTHORIZED ADMINISTRATOR
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#60a5fa' }}>
+                    {formData.contactPerson || DEFAULT_CONTACT_PERSON}
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ color: '#f8fafc', mt: 0.25 }}>
+                    {formData.contactPhone || DEFAULT_CONTACT_PHONE}
+                  </Typography>
+                </Box>
+
+                <AppButton
+                  variant="contained"
+                  fullWidth
+                  size="medium"
+                  tabIndex={-1}
+                  sx={{
+                    mt: 0.5,
+                    py: 1.15,
+                    borderRadius: 1.5,
+                    bgcolor: '#047857',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    boxShadow: 'none',
+                    pointerEvents: 'none',
+                    '&:hover': { bgcolor: '#047857', boxShadow: 'none' }
+                  }}
+                >
+                  Contact via WhatsApp
+                </AppButton>
+              </Paper>
+            </Box>
           </MainCard>
         </Grid>
       </Grid>
 
-      {/* Confirmation Dialog: LOCK */}
-      <Dialog open={confirmLockOpen} onClose={() => setConfirmLockOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ color: 'error.main', fontWeight: 700 }}>
-          Confirm Remote Lock
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to <strong>LOCK the desktop application</strong>? The client will immediately be blocked from accessing inventory, sales, and ledger data until you reactivate it.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setConfirmLockOpen(false)} color="secondary">
-            Cancel
-          </Button>
-          <Button onClick={() => handleToggleLock(true)} variant="contained" color="error">
-            Yes, Lock Desktop App
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Confirmation Dialog: UNLOCK */}
-      <Dialog open={confirmUnlockOpen} onClose={() => setConfirmUnlockOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ color: 'success.main', fontWeight: 700 }}>
-          Confirm Remote Unlock
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to <strong>UNLOCK the desktop application</strong>? The client will immediately regain normal access to the application.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setConfirmUnlockOpen(false)} color="secondary">
-            Cancel
-          </Button>
-          <Button onClick={() => handleToggleLock(false)} variant="contained" color="success">
-            Yes, Unlock Desktop App
-          </Button>
-        </DialogActions>
+      {/* Confirm Remote Lock / Unlock Dialog */}
+      <Dialog open={Boolean(activeDialog)} onClose={() => setConfirmAction(null)} maxWidth="xs" fullWidth>
+        {activeDialog && (
+          <>
+            <DialogTitle sx={{ color: activeDialog.titleColor, fontWeight: 700 }}>
+              {activeDialog.title}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText>{activeDialog.description}</DialogContentText>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <AppButton intent="cancel" onClick={() => setConfirmAction(null)} disabled={loading}>
+                Cancel
+              </AppButton>
+              <AppButton
+                intent={activeDialog.confirmIntent}
+                onClick={() => handleToggleLock(activeDialog.nextState)}
+                disabled={loading}
+                loading={loading}
+                sx={activeDialog.confirmSx}
+              >
+                {activeDialog.confirmLabel}
+              </AppButton>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );
