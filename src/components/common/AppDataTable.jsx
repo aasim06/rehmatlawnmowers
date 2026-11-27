@@ -52,6 +52,7 @@ export default function AppDataTable({
   rowsPerPageOptions = [10, 25, 50, 100],
   toolbarLeft,
   toolbarRight,
+  footerRows,
   cardProps = {},
   sx = {}
 }) {
@@ -358,6 +359,7 @@ export default function AppDataTable({
                 );
               })
             )}
+            {!loading && footerRows}
           </TableBody>
         </Table>
       </TableContainer>
@@ -414,6 +416,7 @@ AppDataTable.propTypes = {
   rowsPerPageOptions: PropTypes.arrayOf(PropTypes.number),
   toolbarLeft: PropTypes.node,
   toolbarRight: PropTypes.node,
+  footerRows: PropTypes.node,
   cardProps: PropTypes.object,
   sx: PropTypes.object
 };
