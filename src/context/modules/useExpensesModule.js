@@ -110,6 +110,8 @@ const toFirestoreExpensePayload = (exp) => ({
 
 const toFirestoreFundPayload = (fund) => ({
   id: fund.id,
+  entry_type: fund.entryType || 'received',
+  entryType: fund.entryType || 'received',
   amount: fund.amount,
   fund_date: fund.fundDate,
   fundDate: fund.fundDate,
@@ -192,11 +194,17 @@ export function useExpensesModule({ logActivity }) {
 
   const addExpenseFund = async (fundData) => {
     const newId = String(fundData.id || `fund-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+    const entryType = fundData.entryType === 'returned' ? 'returned' : 'received';
     const newFund = {
       id: newId,
+      entryType,
       amount: parseFloat(fundData.amount) || 0,
       fundDate: fundData.fundDate || fundData.fund_date || getLocalDateISO(),
-      receivedFrom: (fundData.receivedFrom || fundData.received_from || 'Owner / Company Cash').trim(),
+      receivedFrom: (
+        fundData.receivedFrom ||
+        fundData.received_from ||
+        (entryType === 'returned' ? 'Returned to Owner' : 'Owner / Company Cash')
+      ).trim(),
       paymentMethod: fundData.paymentMethod || fundData.payment_method || 'Cash',
       notes: (fundData.notes || '').trim(),
       addedBy: fundData.addedBy || getActiveActorName(),
@@ -213,7 +221,10 @@ export function useExpensesModule({ logActivity }) {
     });
 
     if (logActivity) {
-      logActivity('Cash in Hand Added', `Received PKR ${newFund.amount} (${newFund.receivedFrom}) on ${newFund.fundDate}`);
+      logActivity(
+        entryType === 'returned' ? 'Cash Returned to Owner' : 'Cash in Hand Added',
+        `${entryType === 'returned' ? 'Returned' : 'Received'} PKR ${newFund.amount} (${newFund.receivedFrom}) on ${newFund.fundDate}`
+      );
     }
 
     await syncWithTimeout(
@@ -398,6 +409,7 @@ export function useExpensesModule({ logActivity }) {
         .filter((f) => !deletedFundSet.has(String(f.id)))
         .map((f) => ({
           id: f.id,
+          entryType: f.entry_type === 'returned' || f.entryType === 'returned' ? 'returned' : 'received',
           amount: parseFloat(f.amount) || 0,
           fundDate:
             f.fund_date ||

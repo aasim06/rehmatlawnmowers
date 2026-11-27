@@ -44,7 +44,11 @@ import CashInHandDialog from 'components/expenses/CashInHandDialog';
 import ExpensePrintDialog from 'components/expenses/ExpensePrintDialog';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import { DEFAULT_EXPENSE_CATEGORIES, getLocalDateISO } from 'context/modules/useExpensesModule';
-import { EXPENSE_PERIOD_OPTIONS, describeExpensePeriod, isDateInExpensePeriod } from 'utils/expenseHelpers';
+import {
+  EXPENSE_PERIOD_OPTIONS,
+  computeCashClosingSummary,
+  describeExpensePeriod
+} from 'utils/expenseHelpers';
 import { getCardSurfaceSx, getSubSurfaceSx, getToneColors } from 'utils/themeSurface';
 
 const QUICK_EXPENSE_SUGGESTIONS = [
@@ -57,7 +61,7 @@ const QUICK_EXPENSE_SUGGESTIONS = [
   'Stationery, Bill Books & Tape'
 ];
 
-const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
+const PAYMENT_METHODS = ['Cash', 'Online / Bank Transfer', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
 const CATEGORY_TONE_MAP = {
   'Tea & Refreshment': 'warning',
@@ -83,7 +87,6 @@ export default function ExpensesPage() {
   } = useStoreInventory();
 
   const todayStr = getLocalDateISO();
-  const currentMonthStr = todayStr.substring(0, 7);
 
   // Unified Period & Category Filter State ('today', 'week', 'fortnight', 'month', 'custom', 'all')
   const [dateFilter, setDateFilter] = useState('today');
@@ -91,7 +94,15 @@ export default function ExpensesPage() {
   const [customToDate, setCustomToDate] = useState(todayStr);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // Voucher Entry Form State
+  // Top Inline Quick Cash-in-Hand Entry State (for quick morning / evening / online cash entries)
+  const [quickFundType, setQuickFundType] = useState('received');
+  const [quickFundAmount, setQuickFundAmount] = useState('');
+  const [quickFundSource, setQuickFundSource] = useState('Owner / Boss');
+  const [quickFundMethod, setQuickFundMethod] = useState('Cash');
+  const [quickFundDate, setQuickFundDate] = useState(todayStr);
+  const [quickFundNotes, setQuickFundNotes] = useState('');
+
+  // Expense Voucher Entry Form State
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(expenseCategories[0] || 'Tea & Refreshment');
   const [amount, setAmount] = useState('');
@@ -116,58 +127,57 @@ export default function ExpensesPage() {
   );
   const periodInfo = useMemo(() => describeExpensePeriod(periodParams), [periodParams]);
 
-  const periodFunds = useMemo(
-    () => expenseFunds.filter((f) => isDateInExpensePeriod(f.fundDate, periodParams)),
-    [expenseFunds, periodParams]
-  );
-
-  const periodExpenses = useMemo(
-    () => expenses.filter((e) => isDateInExpensePeriod(e.expenseDate, periodParams)),
-    [expenses, periodParams]
+  const summary = useMemo(
+    () => computeCashClosingSummary({ expenseFunds, expenses, ...periodParams }),
+    [expenseFunds, expenses, periodParams]
   );
 
   const categoryFilteredExpenses = useMemo(
     () =>
-      periodExpenses
+      summary.periodExpenses
         .filter((e) => selectedCategory === 'All' || e.category === selectedCategory)
         .map((e, idx) => ({ ...e, srNo: idx + 1 })),
-    [periodExpenses, selectedCategory]
+    [summary.periodExpenses, selectedCategory]
   );
 
-  const financials = useMemo(() => {
-    const periodCashTotal = periodFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
-    const periodExpensesTotal = periodExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-    const categorySubtotal = categoryFilteredExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-    const periodRemainingBalance = periodCashTotal - periodExpensesTotal;
-
-    const allTimeCashTotal = expenseFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
-    const allTimeExpensesTotal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-    const allTimeRemainingBalance = allTimeCashTotal - allTimeExpensesTotal;
-    const monthExpensesTotal = expenses
-      .filter((e) => (e.expenseDate || '').startsWith(currentMonthStr))
-      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-
-    return {
-      periodCashTotal,
-      periodExpensesTotal,
-      categorySubtotal,
-      periodRemainingBalance,
-      allTimeCashTotal,
-      allTimeRemainingBalance,
-      monthExpensesTotal
-    };
-  }, [periodFunds, periodExpenses, categoryFilteredExpenses, expenseFunds, expenses, currentMonthStr]);
+  const categorySubtotal = useMemo(
+    () => categoryFilteredExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0),
+    [categoryFilteredExpenses]
+  );
 
   const draftAmountVal = parseFloat(amount) || 0;
-  const projectedAfterDraft = financials.periodRemainingBalance - draftAmountVal;
-  const isPeriodDeficit = financials.periodRemainingBalance < 0;
-  const isAllTimeDeficit = financials.allTimeRemainingBalance < 0;
+  const projectedAfterDraft = summary.closingBalance - draftAmountVal;
+  const isPeriodDeficit = summary.closingBalance < 0;
 
   const successTone = getToneColors(theme, 'success');
   const errorTone = getToneColors(theme, 'error');
   const subSurface = getSubSurfaceSx(theme);
 
   // Handlers
+  const handleQuickFundSubmit = async (e) => {
+    if (e) e.preventDefault();
+    const numAmt = parseFloat(quickFundAmount);
+    if (!numAmt || numAmt <= 0) {
+      alert('Please enter a valid cash amount greater than 0');
+      return;
+    }
+    await addExpenseFund({
+      entryType: quickFundType,
+      amount: numAmt,
+      fundDate: quickFundDate || todayStr,
+      receivedFrom: (
+        quickFundSource || (quickFundType === 'returned' ? 'Returned to Owner' : 'Owner / Boss')
+      ).trim(),
+      paymentMethod: quickFundMethod,
+      notes: quickFundNotes.trim()
+    });
+    setQuickFundAmount('');
+    setQuickFundNotes('');
+    setQuickFundType('received');
+    setQuickFundSource('Owner / Boss');
+    setQuickFundDate(todayStr);
+  };
+
   const handleSaveNewCategory = (e) => {
     if (e) e.preventDefault();
     const trimmed = newCategoryName.trim();
@@ -244,26 +254,42 @@ export default function ExpensesPage() {
     setPrintOpen(true);
   };
 
-  // Reusable Table Column Schemas
   const cashFundColumns = useMemo(
     () => [
-      { id: 'fundDate', label: 'Date', width: 115, render: (row) => <Typography fontWeight={600}>{row.fundDate}</Typography> },
+      { id: 'fundDate', label: 'Date', width: 110, render: (row) => <Typography fontWeight={600}>{row.fundDate}</Typography> },
+      {
+        id: 'entryType',
+        label: 'Type',
+        width: 120,
+        render: (row) => {
+          const isRet = row.entryType === 'returned';
+          return (
+            <Chip
+              label={isRet ? 'Returned (-)' : 'Received (+)'}
+              size="small"
+              color={isRet ? 'error' : 'success'}
+              variant="light"
+              sx={{ fontWeight: 700 }}
+            />
+          );
+        }
+      },
       {
         id: 'receivedFrom',
-        label: 'Received From / Source',
-        render: (row) => <Typography fontWeight={700}>{row.receivedFrom || 'Owner / Head Office'}</Typography>
+        label: 'Source / Party',
+        render: (row) => <Typography fontWeight={700}>{row.receivedFrom || 'Owner / Boss'}</Typography>
       },
       {
         id: 'paymentMethod',
         label: 'Method',
-        width: 125,
+        width: 145,
         render: (row) => <Chip label={row.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
       },
       { id: 'notes', label: 'Notes', render: (row) => <Typography color="text.secondary">{row.notes || '—'}</Typography> },
       {
         id: 'addedBy',
         label: 'Added By',
-        width: 145,
+        width: 135,
         render: (row) => (
           <Typography variant="caption" color="text.secondary">
             {row.addedBy || 'Counter'}
@@ -272,27 +298,25 @@ export default function ExpensesPage() {
       },
       {
         id: 'amount',
-        label: 'Cash In (PKR)',
+        label: 'Amount (PKR)',
         align: 'right',
-        width: 150,
-        render: (row) => (
-          <Typography fontWeight={800} sx={{ color: successTone.main }}>
-            + PKR {(parseFloat(row.amount) || 0).toLocaleString()}
-          </Typography>
-        )
+        width: 145,
+        render: (row) => {
+          const isRet = row.entryType === 'returned';
+          return (
+            <Typography fontWeight={800} sx={{ color: isRet ? errorTone.main : successTone.main }}>
+              {isRet ? '-' : '+'} PKR {(parseFloat(row.amount) || 0).toLocaleString()}
+            </Typography>
+          );
+        }
       }
     ],
-    [successTone.main]
+    [successTone.main, errorTone.main]
   );
 
   const expenseColumns = useMemo(
     () => [
-      {
-        id: 'srNo',
-        label: 'Sr',
-        width: 56,
-        render: (row) => <Typography color="text.secondary">{row.srNo}</Typography>
-      },
+      { id: 'srNo', label: 'Sr', width: 56, render: (row) => <Typography color="text.secondary">{row.srNo}</Typography> },
       {
         id: 'expenseDate',
         label: 'Date',
@@ -326,25 +350,14 @@ export default function ExpensesPage() {
         render: (row) => {
           const toneName = CATEGORY_TONE_MAP[row.category] || 'neutral';
           const chipTone = getToneColors(theme, toneName);
-          return (
-            <Chip
-              label={row.category || 'General'}
-              size="small"
-              sx={{ fontWeight: 600, bgcolor: chipTone.bg, color: chipTone.main }}
-            />
-          );
+          return <Chip label={row.category || 'General'} size="small" sx={{ fontWeight: 600, bgcolor: chipTone.bg, color: chipTone.main }} />;
         }
       },
-      {
-        id: 'paidTo',
-        label: 'Paid To',
-        width: 135,
-        render: (row) => row.paidTo || 'N/A'
-      },
+      { id: 'paidTo', label: 'Paid To', width: 135, render: (row) => row.paidTo || 'N/A' },
       {
         id: 'paymentMethod',
         label: 'Payment',
-        width: 120,
+        width: 135,
         render: (row) => <Chip label={row.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
       },
       {
@@ -362,9 +375,9 @@ export default function ExpensesPage() {
     [theme, errorTone.main]
   );
 
-  // Reusable Closing Summary Footer Rows for Expenses AppDataTable
+  // Rolling Cash Closing Footer Rows rendered seamlessly inside Expenses AppDataTable
   const expenseFooterRows =
-    categoryFilteredExpenses.length > 0 || periodFunds.length > 0 ? (
+    categoryFilteredExpenses.length > 0 || summary.periodFunds.length > 0 || summary.openingBalance !== 0 ? (
       <>
         {selectedCategory !== 'All' && (
           <TableRow sx={{ bgcolor: subSurface.bgcolor, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -372,28 +385,52 @@ export default function ExpensesPage() {
               Filtered Category Total:
             </TableCell>
             <TableCell align="right" sx={{ fontWeight: 700, color: errorTone.main }}>
-              PKR {financials.categorySubtotal.toLocaleString()}
+              PKR {categorySubtotal.toLocaleString()}
             </TableCell>
             <TableCell />
           </TableRow>
         )}
 
-        <TableRow sx={{ bgcolor: subSurface.bgcolor, borderTop: '1px solid', borderColor: 'divider' }}>
+        {summary.openingBalance !== 0 && (
+          <TableRow sx={{ bgcolor: subSurface.bgcolor, borderTop: '1px solid', borderColor: 'divider' }}>
+            <TableCell colSpan={7} align="right" sx={{ fontWeight: 700 }}>
+              Opening Balance (Previous Days Carryover):
+            </TableCell>
+            <TableCell align="right" sx={{ fontWeight: 800, color: summary.openingBalance >= 0 ? 'text.primary' : errorTone.main }}>
+              PKR {summary.openingBalance.toLocaleString()}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        )}
+
+        <TableRow sx={{ bgcolor: subSurface.bgcolor, borderTop: summary.openingBalance === 0 ? '1px solid' : 'none', borderColor: 'divider' }}>
           <TableCell colSpan={7} align="right" sx={{ fontWeight: 700 }}>
-            Cash in Hand / Received ({periodInfo.shortLabel}):
+            + Cash Received ({periodInfo.shortLabel}):
           </TableCell>
           <TableCell align="right" sx={{ fontWeight: 800, color: successTone.main }}>
-            + PKR {financials.periodCashTotal.toLocaleString()}
+            + PKR {summary.periodCashReceived.toLocaleString()}
           </TableCell>
           <TableCell />
         </TableRow>
 
+        {summary.periodCashReturned > 0 && (
+          <TableRow sx={{ bgcolor: subSurface.bgcolor }}>
+            <TableCell colSpan={7} align="right" sx={{ fontWeight: 700 }}>
+              - Cash Returned to Owner ({periodInfo.shortLabel}):
+            </TableCell>
+            <TableCell align="right" sx={{ fontWeight: 800, color: errorTone.main }}>
+              - PKR {summary.periodCashReturned.toLocaleString()}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        )}
+
         <TableRow sx={{ bgcolor: subSurface.bgcolor }}>
           <TableCell colSpan={7} align="right" sx={{ fontWeight: 700 }}>
-            Less: Total Expenses ({periodInfo.shortLabel}):
+            - Less: Total Expenses ({periodInfo.shortLabel}):
           </TableCell>
           <TableCell align="right" sx={{ fontWeight: 800, color: errorTone.main }}>
-            - PKR {financials.periodExpensesTotal.toLocaleString()}
+            - PKR {summary.periodExpensesTotal.toLocaleString()}
           </TableCell>
           <TableCell />
         </TableRow>
@@ -406,13 +443,15 @@ export default function ExpensesPage() {
           }}
         >
           <TableCell colSpan={7} align="right" sx={{ fontWeight: 800, fontSize: '0.95rem' }}>
-            {isPeriodDeficit ? 'Shortfall / Extra Paid Balance:' : 'Remaining / Closing Cash Balance (Baqaya):'}
+            {isPeriodDeficit
+              ? 'Shortfall / Extra Paid Balance:'
+              : 'Remaining / Closing Cash Balance (Carries Forward Next Day):'}
           </TableCell>
           <TableCell
             align="right"
             sx={{ fontWeight: 900, fontSize: '1.05rem', color: isPeriodDeficit ? errorTone.main : successTone.main }}
           >
-            PKR {financials.periodRemainingBalance.toLocaleString()}
+            PKR {summary.closingBalance.toLocaleString()}
           </TableCell>
           <TableCell />
         </TableRow>
@@ -424,8 +463,8 @@ export default function ExpensesPage() {
       {/* 1. REUSABLE PAGE HEADER */}
       <PageHeader
         title="Daily Expenses & Cash Closing"
-        subtitle="Track company cash received, log operational expenses, and reconcile daily, 7-day, or 15-day closing balances."
-        count={periodExpenses.length}
+        subtitle="Log morning/evening cash received, track daily expenses, and roll remaining cash forward automatically."
+        count={summary.periodExpenses.length}
         countLabel={`${periodInfo.shortLabel} Vouchers`}
         actions={
           <>
@@ -435,17 +474,16 @@ export default function ExpensesPage() {
               </AppButton>
             )}
             <AppButton
-              intent="primary"
-              color="success"
+              intent="secondary"
               startIcon={<WalletOutlined />}
               onClick={() => {
                 setEditingFund(null);
                 setFundDialogOpen(true);
               }}
             >
-              Add Cash in Hand
+              Add / Return Cash Popup
             </AppButton>
-            <AppButton intent="secondary" startIcon={<PrinterOutlined />} onClick={() => handleOpenPrint(null)}>
+            <AppButton intent="print" startIcon={<PrinterOutlined />} onClick={() => handleOpenPrint(null)}>
               Print Closing Sheet
             </AppButton>
           </>
@@ -453,49 +491,7 @@ export default function ExpensesPage() {
         sx={{ mb: 0 }}
       />
 
-      {/* 2. REUSABLE KPI GRID */}
-      <MasterKpiGrid
-        kpis={[
-          {
-            label: `Cash in Hand (${periodInfo.shortLabel})`,
-            value: `PKR ${financials.periodCashTotal.toLocaleString()}`,
-            helper: `${periodFunds.length} cash receipt${periodFunds.length !== 1 ? 's' : ''} added`,
-            icon: <WalletOutlined />,
-            tone: 'success',
-            highlightValue: true,
-            onClick: () => {
-              setEditingFund(null);
-              setFundDialogOpen(true);
-            }
-          },
-          {
-            label: `Expenses (${periodInfo.shortLabel})`,
-            value: `PKR ${financials.periodExpensesTotal.toLocaleString()}`,
-            helper: `${periodExpenses.length} expense voucher${periodExpenses.length !== 1 ? 's' : ''}`,
-            icon: <FallOutlined />,
-            tone: 'error',
-            highlightValue: true
-          },
-          {
-            label: `Remaining Balance (${periodInfo.shortLabel})`,
-            value: `PKR ${financials.periodRemainingBalance.toLocaleString()}`,
-            helper: isPeriodDeficit ? 'Shortfall / Extra Paid' : 'Closing Cash in Hand (Baqaya)',
-            icon: <CheckCircleOutlined />,
-            tone: isPeriodDeficit ? 'error' : 'primary',
-            highlightValue: true
-          },
-          {
-            label: 'Overall Net Cash (All Time)',
-            value: `PKR ${financials.allTimeRemainingBalance.toLocaleString()}`,
-            helper: `Total In: ${financials.allTimeCashTotal.toLocaleString()} • Month Exp: ${financials.monthExpensesTotal.toLocaleString()}`,
-            icon: <DollarOutlined />,
-            tone: isAllTimeDeficit ? 'warning' : 'success',
-            highlightValue: isAllTimeDeficit
-          }
-        ]}
-      />
-
-      {/* 3. REUSABLE FILTERBAR (Period Selector: Daily / Weekly 7D / 15 Days / Month / Custom / All) */}
+      {/* 2. REUSABLE FILTERBAR (Period Selector: Daily / Weekly / 15 Days / Month / Custom / All) */}
       <FilterBar
         hasActiveFilters={dateFilter !== 'today' || selectedCategory !== 'All'}
         onClear={() => {
@@ -577,86 +573,141 @@ export default function ExpensesPage() {
         </AppTextField>
       </FilterBar>
 
-      {/* 4. COMPANY CASH RECEIVED (CASH IN HAND) TABLE VIA APPDATATABLE */}
-      <AppDataTable
-        columns={cashFundColumns}
-        data={periodFunds}
-        searchable={false}
-        defaultRowsPerPage={5}
-        rowsPerPageOptions={[5, 10, 25]}
-        emptyTitle="No Cash in Hand Receipts"
-        emptySubtitle={`No cash receipt recorded for ${periodInfo.label} yet. Click "Add Cash" when company money arrives.`}
-        emptyAction={
-          <AppButton
-            intent="primary"
-            color="success"
-            startIcon={<WalletOutlined />}
-            onClick={() => {
-              setEditingFund(null);
-              setFundDialogOpen(true);
-            }}
-          >
-            Add Cash in Hand
-          </AppButton>
-        }
-        toolbarLeft={
-          <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
-            <WalletOutlined style={{ color: successTone.main, fontSize: 18 }} />
-            <Typography variant="h5" fontWeight={700}>
-              Company Cash Received (Cash in Hand)
-            </Typography>
+      {/* 3. REUSABLE KPI GRID */}
+      <MasterKpiGrid
+        kpis={[
+          {
+            label: `Total Available Cash (${periodInfo.shortLabel})`,
+            value: `PKR ${summary.totalAvailableCash.toLocaleString()}`,
+            helper: `Opening ${summary.openingBalance.toLocaleString()} + Added ${summary.periodCashReceived.toLocaleString()}`,
+            icon: <WalletOutlined />,
+            tone: 'success',
+            highlightValue: true
+          },
+          {
+            label: `Cash Added (${periodInfo.shortLabel})`,
+            value: `PKR ${summary.periodCashReceived.toLocaleString()}`,
+            helper:
+              summary.periodCashReturned > 0
+                ? `${summary.periodFunds.length} entries • Returned: ${summary.periodCashReturned.toLocaleString()}`
+                : `${summary.periodFunds.length} top-up${summary.periodFunds.length !== 1 ? 's' : ''} received`,
+            icon: <DollarOutlined />,
+            tone: 'info',
+            highlightValue: true
+          },
+          {
+            label: `Expenses (${periodInfo.shortLabel})`,
+            value: `PKR ${summary.periodExpensesTotal.toLocaleString()}`,
+            helper: `${summary.periodExpenses.length} expense voucher${summary.periodExpenses.length !== 1 ? 's' : ''}`,
+            icon: <FallOutlined />,
+            tone: 'error',
+            highlightValue: true
+          },
+          {
+            label: `Remaining / Closing Balance`,
+            value: `PKR ${summary.closingBalance.toLocaleString()}`,
+            helper: isPeriodDeficit ? 'Shortfall / Extra Paid' : 'Carries forward into next day automatically',
+            icon: <CheckCircleOutlined />,
+            tone: isPeriodDeficit ? 'error' : 'primary',
+            highlightValue: true
+          }
+        ]}
+      />
+
+      {/* 4. QUICK INLINE CASH IN HAND ENTRY (UPAR ENTRY FOR MORNING / EVENING / ONLINE CASH) */}
+      <MainCard
+        title="Add Cash in Hand (Morning / Evening / Online Received)"
+        secondary={
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            {summary.openingBalance !== 0 && (
+              <Chip
+                label={`Yesterday Carryover: PKR ${summary.openingBalance.toLocaleString()}`}
+                size="small"
+                color="info"
+                variant="light"
+                sx={{ fontWeight: 700 }}
+              />
+            )}
             <Chip
-              label={`${periodFunds.length} receipt${periodFunds.length === 1 ? '' : 's'} • PKR ${financials.periodCashTotal.toLocaleString()}`}
+              label={`Live Remaining Balance: PKR ${summary.closingBalance.toLocaleString()}`}
               size="small"
-              color="success"
+              color={isPeriodDeficit ? 'error' : 'success'}
               variant="light"
               sx={{ fontWeight: 700 }}
             />
           </Stack>
         }
-        toolbarRight={
-          <AppButton
-            intent="secondary"
-            size="small"
-            startIcon={<PlusOutlined />}
-            onClick={() => {
-              setEditingFund(null);
-              setFundDialogOpen(true);
-            }}
-          >
-            Add Cash
-          </AppButton>
-        }
-        actions={(row) => (
-          <Stack direction="row" spacing={0.5} justifyContent="center">
-            <Tooltip title="Edit Cash Entry">
-              <IconButton
-                size="small"
-                color="primary"
-                onClick={() => {
-                  setEditingFund(row);
-                  setFundDialogOpen(true);
+        sx={getCardSurfaceSx(theme)}
+      >
+        <form onSubmit={handleQuickFundSubmit}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, sm: 6, md: 2.2 }}>
+              <AppTextField
+                select
+                label="Entry Type"
+                value={quickFundType}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setQuickFundType(val);
+                  setQuickFundSource(val === 'returned' ? 'Returned to Owner / Boss' : 'Owner / Boss');
                 }}
               >
-                <EditOutlined style={{ fontSize: 15 }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete Cash Entry">
-              <IconButton
-                size="small"
-                color="error"
-                onClick={() => {
-                  if (window.confirm(`Delete Cash in Hand entry of PKR ${(parseFloat(row.amount) || 0).toLocaleString()}?`)) {
-                    deleteExpenseFund(row.id);
-                  }
+                <MenuItem value="received">Cash Received (+)</MenuItem>
+                <MenuItem value="returned">Return to Owner (-)</MenuItem>
+              </AppTextField>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 2.3 }}>
+              <AppTextField
+                label="Cash Amount (PKR) *"
+                type="number"
+                placeholder="e.g. 11000"
+                value={quickFundAmount}
+                onChange={(e) => setQuickFundAmount(e.target.value)}
+                required
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">PKR</InputAdornment>
                 }}
-              >
-                <DeleteOutlined style={{ fontSize: 15 }} />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        )}
-      />
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 2.2 }}>
+              <AppTextField
+                label={quickFundType === 'returned' ? 'Handed Over To' : 'Received From'}
+                placeholder="Owner / Boss"
+                value={quickFundSource}
+                onChange={(e) => setQuickFundSource(e.target.value)}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <AppTextField select label="Method" value={quickFundMethod} onChange={(e) => setQuickFundMethod(e.target.value)}>
+                {PAYMENT_METHODS.map((pm) => (
+                  <MenuItem key={pm} value={pm}>
+                    {pm}
+                  </MenuItem>
+                ))}
+              </AppTextField>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
+              <AppTextField
+                label="Date"
+                type="date"
+                value={quickFundDate}
+                onChange={(e) => setQuickFundDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 1.5 }}>
+              <AppButton intent="primary" color={quickFundType === 'returned' ? 'error' : 'success'} type="submit" fullWidth startIcon={<PlusOutlined />}>
+                {quickFundType === 'returned' ? 'Return' : 'Add Cash'}
+              </AppButton>
+            </Grid>
+          </Grid>
+        </form>
+      </MainCard>
 
       {/* 5. RECORD NEW EXPENSE VOUCHER FORM CARD */}
       <MainCard
@@ -664,7 +715,7 @@ export default function ExpensesPage() {
         secondary={
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Chip
-              label={`Closing Balance: PKR ${financials.periodRemainingBalance.toLocaleString()}`}
+              label={`Closing Balance: PKR ${summary.closingBalance.toLocaleString()}`}
               color={isPeriodDeficit ? 'error' : 'success'}
               variant="light"
               size="small"
@@ -812,7 +863,7 @@ export default function ExpensesPage() {
         </form>
       </MainCard>
 
-      {/* 6. EXPENSES HISTORY & CLOSING REGISTER VIA APPDATATABLE */}
+      {/* 6. EXPENSES HISTORY & ROLLING CLOSING REGISTER VIA APPDATATABLE */}
       <AppDataTable
         columns={expenseColumns}
         data={categoryFilteredExpenses}
@@ -860,7 +911,75 @@ export default function ExpensesPage() {
         )}
       />
 
-      {/* 7. CASH IN HAND ENTRY FORMDIALOG */}
+      {/* 7. COMPANY CASH RECEIVED & HANDOVERS HISTORY VIA APPDATATABLE */}
+      <AppDataTable
+        columns={cashFundColumns}
+        data={summary.periodFunds}
+        searchable={false}
+        defaultRowsPerPage={5}
+        rowsPerPageOptions={[5, 10, 25]}
+        emptyTitle="No Cash Entries in Selected Period"
+        emptySubtitle={`No cash received or handover recorded inside ${periodInfo.label}. Use the "Add Cash in Hand" box above anytime cash arrives.`}
+        toolbarLeft={
+          <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
+            <WalletOutlined style={{ color: successTone.main, fontSize: 18 }} />
+            <Typography variant="h5" fontWeight={700}>
+              Cash Received &amp; Handovers ({periodInfo.shortLabel})
+            </Typography>
+            <Chip
+              label={`${summary.periodFunds.length} entry${summary.periodFunds.length === 1 ? '' : 's'} • +PKR ${summary.periodCashReceived.toLocaleString()}`}
+              size="small"
+              color="success"
+              variant="light"
+              sx={{ fontWeight: 700 }}
+            />
+          </Stack>
+        }
+        toolbarRight={
+          <AppButton
+            intent="secondary"
+            size="small"
+            startIcon={<PlusOutlined />}
+            onClick={() => {
+              setEditingFund(null);
+              setFundDialogOpen(true);
+            }}
+          >
+            Add / Return Cash
+          </AppButton>
+        }
+        actions={(row) => (
+          <Stack direction="row" spacing={0.5} justifyContent="center">
+            <Tooltip title="Edit Cash Entry">
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={() => {
+                  setEditingFund(row);
+                  setFundDialogOpen(true);
+                }}
+              >
+                <EditOutlined style={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete Cash Entry">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => {
+                  if (window.confirm(`Delete Cash entry of PKR ${(parseFloat(row.amount) || 0).toLocaleString()}?`)) {
+                    deleteExpenseFund(row.id);
+                  }
+                }}
+              >
+                <DeleteOutlined style={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
+      />
+
+      {/* 8. CASH IN HAND ENTRY / EDIT FORMDIALOG */}
       <CashInHandDialog
         open={fundDialogOpen}
         onClose={() => {
@@ -871,21 +990,24 @@ export default function ExpensesPage() {
         editingFund={editingFund}
       />
 
-      {/* 8. PRINTABLE CLOSING STATEMENT VIA UNIVERSALPRINTMODAL */}
+      {/* 9. PRINTABLE CLOSING STATEMENT VIA UNIVERSALPRINTMODAL */}
       <ExpensePrintDialog
         open={printOpen}
         onClose={() => setPrintOpen(false)}
         selectedExpenseForPrint={selectedExpenseForPrint}
         periodInfo={periodInfo}
-        periodFunds={periodFunds}
+        periodFunds={summary.periodFunds}
         filteredExpenses={categoryFilteredExpenses}
-        periodCashTotal={financials.periodCashTotal}
-        periodExpensesTotal={financials.periodExpensesTotal}
-        filteredTotal={financials.categorySubtotal}
-        periodRemainingBalance={financials.periodRemainingBalance}
+        openingBalance={summary.openingBalance}
+        periodCashReceived={summary.periodCashReceived}
+        periodCashReturned={summary.periodCashReturned}
+        totalAvailableCash={summary.totalAvailableCash}
+        periodExpensesTotal={summary.periodExpensesTotal}
+        filteredTotal={categorySubtotal}
+        closingBalance={summary.closingBalance}
       />
 
-      {/* 9. ADD / MANAGE EXPENSE CATEGORY FORMDIALOG */}
+      {/* 10. ADD / MANAGE EXPENSE CATEGORY FORMDIALOG */}
       <FormDialog
         open={addCategoryOpen}
         onClose={() => setAddCategoryOpen(false)}

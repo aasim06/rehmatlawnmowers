@@ -6,10 +6,11 @@ import WalletOutlined from '@ant-design/icons/WalletOutlined';
 import { AppTextField, FormDialog } from 'components/common';
 import { getLocalDateISO } from 'context/modules/useExpensesModule';
 
-const FUND_SOURCES = ['Owner / Head Office', 'Shop Counter Cash', 'Factory Cash', 'Bank Withdrawal', 'Opening Closing Carryover'];
-const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
+const FUND_SOURCES = ['Owner / Head Office', 'Shop Counter Cash', 'Factory Cash', 'Online Settlement', 'Bank Withdrawal'];
+const PAYMENT_METHODS = ['Cash', 'Online / Bank Transfer', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
 export default function CashInHandDialog({ open, onClose, onSave, editingFund = null }) {
+  const [entryType, setEntryType] = useState('received');
   const [amount, setAmount] = useState('');
   const [fundDate, setFundDate] = useState(getLocalDateISO());
   const [receivedFrom, setReceivedFrom] = useState('Owner / Head Office');
@@ -21,12 +22,14 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
   useEffect(() => {
     if (!open) return;
     if (editingFund) {
+      setEntryType(editingFund.entryType === 'returned' ? 'returned' : 'received');
       setAmount(String(editingFund.amount || ''));
       setFundDate(editingFund.fundDate || getLocalDateISO());
       setReceivedFrom(editingFund.receivedFrom || 'Owner / Head Office');
       setPaymentMethod(editingFund.paymentMethod || 'Cash');
       setNotes(editingFund.notes || '');
     } else {
+      setEntryType('received');
       setAmount('');
       setFundDate(getLocalDateISO());
       setReceivedFrom('Owner / Head Office');
@@ -40,7 +43,7 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
     if (e) e.preventDefault();
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
-      setError('Please enter a valid cash amount greater than 0');
+      setError('Please enter a valid amount greater than 0');
       return;
     }
 
@@ -48,9 +51,12 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
     try {
       await onSave(
         {
+          entryType,
           amount: numAmount,
           fundDate: fundDate || getLocalDateISO(),
-          receivedFrom: (receivedFrom || 'Owner / Head Office').trim(),
+          receivedFrom: (
+            receivedFrom || (entryType === 'returned' ? 'Returned to Owner' : 'Owner / Head Office')
+          ).trim(),
           paymentMethod,
           notes: notes.trim()
         },
@@ -72,20 +78,36 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
       title={
         <Stack direction="row" spacing={1} alignItems="center">
           <WalletOutlined style={{ fontSize: 18 }} />
-          <span>{editingFund ? 'Edit Cash in Hand Entry' : 'Add Cash in Hand'}</span>
+          <span>{editingFund ? 'Edit Cash Entry' : 'Add Cash in Hand / Handover'}</span>
         </Stack>
       }
-      subtitle="Enter company cash received. Expenses deduct automatically from this balance."
-      saveText={editingFund ? 'Save Changes' : 'Add Cash in Hand'}
+      subtitle="Log cash received from boss/online or cash returned to owner at settlement."
+      saveText={editingFund ? 'Save Changes' : entryType === 'returned' ? 'Record Cash Returned' : 'Add Cash in Hand'}
       saveButtonProps={{ startIcon: <PlusOutlined /> }}
     >
       <Stack spacing={2}>
         <AppTextField
+          select
+          label="Entry Type"
+          value={entryType}
+          onChange={(e) => {
+            const next = e.target.value;
+            setEntryType(next);
+            if (!editingFund) {
+              setReceivedFrom(next === 'returned' ? 'Returned to Owner / Boss' : 'Owner / Head Office');
+            }
+          }}
+        >
+          <MenuItem value="received">Cash Received (+ Add to Cash in Hand)</MenuItem>
+          <MenuItem value="returned">Cash Returned to Owner (- Handover / Settlement)</MenuItem>
+        </AppTextField>
+
+        <AppTextField
           autoFocus
           required
           type="number"
-          label="Amount Received (PKR) *"
-          placeholder="e.g. 20000"
+          label="Amount (PKR) *"
+          placeholder="e.g. 11000"
           value={amount}
           onChange={(e) => {
             setAmount(e.target.value);
@@ -104,7 +126,13 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
           value={receivedFrom}
           onChange={(_, val) => setReceivedFrom(typeof val === 'string' ? val : val || '')}
           onInputChange={(_, val) => setReceivedFrom(val)}
-          renderInput={(params) => <AppTextField {...params} label="Received From / Source" placeholder="Owner / Head Office" />}
+          renderInput={(params) => (
+            <AppTextField
+              {...params}
+              label={entryType === 'returned' ? 'Handed Over To' : 'Received From / Source'}
+              placeholder="Owner / Head Office"
+            />
+          )}
         />
 
         <Stack direction="row" spacing={1.5}>
@@ -126,13 +154,13 @@ export default function CashInHandDialog({ open, onClose, onSave, editingFund = 
 
         <AppTextField
           label="Notes / Reference (Optional)"
-          placeholder="e.g. Morning opening cash, 7-day imprest"
+          placeholder="e.g. Morning cash, Evening online transfer"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
 
         <Typography variant="caption" color="text.secondary">
-          This cash entry syncs automatically to Firebase Cloud for Super Admin tracking.
+          Remaining cash balance rolls forward automatically into the next day&rsquo;s Opening Balance and syncs live to Firebase Cloud.
         </Typography>
       </Stack>
     </FormDialog>

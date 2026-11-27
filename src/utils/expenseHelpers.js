@@ -19,32 +19,101 @@ export const shiftLocalDateISO = (baseISO, deltaDays) => {
   return getLocalDateISO(dt);
 };
 
+export function getPeriodBounds({ period = 'today', todayStr = getLocalDateISO(), fromDate = '', toDate = '' } = {}) {
+  if (period === 'today') return { startISO: todayStr, endISO: todayStr };
+  if (period === 'week') return { startISO: shiftLocalDateISO(todayStr, -6), endISO: todayStr };
+  if (period === 'fortnight') return { startISO: shiftLocalDateISO(todayStr, -14), endISO: todayStr };
+  if (period === 'month') return { startISO: `${todayStr.slice(0, 7)}-01`, endISO: `${todayStr.slice(0, 7)}-31` };
+  if (period === 'custom') return { startISO: fromDate || '', endISO: toDate || '' };
+  return { startISO: '', endISO: '' };
+}
+
 /**
  * Checks whether a YYYY-MM-DD record date falls inside the active period filter.
  */
-export function isDateInExpensePeriod(recordDate, { period = 'today', todayStr = getLocalDateISO(), fromDate = '', toDate = '' } = {}) {
+export function isDateInExpensePeriod(recordDate, options = {}) {
   const cleanDate = String(recordDate || '').slice(0, 10);
-  if (period === 'all') return true;
+  if (options.period === 'all') return true;
   if (!cleanDate) return false;
-
-  if (period === 'today') return cleanDate === todayStr;
-  if (period === 'week') {
-    const start = shiftLocalDateISO(todayStr, -6);
-    return cleanDate >= start && cleanDate <= todayStr;
-  }
-  if (period === 'fortnight') {
-    const start = shiftLocalDateISO(todayStr, -14);
-    return cleanDate >= start && cleanDate <= todayStr;
-  }
-  if (period === 'month') {
-    return cleanDate.startsWith(todayStr.slice(0, 7));
-  }
-  if (period === 'custom') {
-    if (fromDate && cleanDate < fromDate) return false;
-    if (toDate && cleanDate > toDate) return false;
-    return true;
-  }
+  const { startISO, endISO } = getPeriodBounds(options);
+  if (startISO && cleanDate < startISO) return false;
+  if (endISO && cleanDate > endISO) return false;
   return true;
+}
+
+/**
+ * Computes rolling cash drawer accounting across periods:
+ * Opening Balance (prior days' net remaining cash) + Cash Received - Cash Returned - Expenses = Closing Balance.
+ */
+export function computeCashClosingSummary({
+  expenseFunds = [],
+  expenses = [],
+  period = 'today',
+  todayStr = getLocalDateISO(),
+  fromDate = '',
+  toDate = ''
+} = {}) {
+  const { startISO, endISO } = getPeriodBounds({ period, todayStr, fromDate, toDate });
+  const bounds = { period, todayStr, fromDate, toDate };
+
+  const signedFundAmount = (f) => {
+    const amt = parseFloat(f.amount) || 0;
+    return f.entryType === 'returned' ? -amt : amt;
+  };
+
+  let openingBalance = 0;
+  if (period !== 'all' && startISO) {
+    const priorCashNet = expenseFunds
+      .filter((f) => {
+        const d = String(f.fundDate || '').slice(0, 10);
+        return Boolean(d) && d < startISO;
+      })
+      .reduce((sum, f) => sum + signedFundAmount(f), 0);
+
+    const priorExpenses = expenses
+      .filter((e) => {
+        const d = String(e.expenseDate || '').slice(0, 10);
+        return Boolean(d) && d < startISO;
+      })
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+    openingBalance = priorCashNet - priorExpenses;
+  }
+
+  const periodFunds = expenseFunds.filter((f) => isDateInExpensePeriod(f.fundDate, bounds));
+  const periodExpenses = expenses.filter((e) => isDateInExpensePeriod(e.expenseDate, bounds));
+
+  const periodCashReceived = periodFunds
+    .filter((f) => f.entryType !== 'returned')
+    .reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+
+  const periodCashReturned = periodFunds
+    .filter((f) => f.entryType === 'returned')
+    .reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+
+  const totalAvailableCash = openingBalance + periodCashReceived - periodCashReturned;
+  const periodExpensesTotal = periodExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  const closingBalance = totalAvailableCash - periodExpensesTotal;
+
+  const allTimeCashNet = expenseFunds.reduce((sum, f) => sum + signedFundAmount(f), 0);
+  const allTimeExpensesTotal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  const allTimeClosingBalance = allTimeCashNet - allTimeExpensesTotal;
+
+  return {
+    startISO,
+    endISO,
+    periodFunds,
+    periodExpenses,
+    openingBalance,
+    periodCashReceived,
+    periodCashReturned,
+    totalAvailableCash,
+    periodExpensesTotal,
+    closingBalance,
+    allTimeCashNet,
+    allTimeExpensesTotal,
+    allTimeClosingBalance
+  };
 }
 
 /**
