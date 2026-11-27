@@ -88,8 +88,68 @@ export function useStoreFinanceModule({ usageLogs = [], updateLog, vendorPayment
   const [storePayments, setStorePayments] = useState(() => safeParseJSON(STORAGE_KEYS.payments, []));
 
   const syncStoreFinanceFromCloud = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
     const deletedCustSet = new Set(safeParseJSON(DELETED_KEYS.customers, []).map(String));
     const deletedPaySet = new Set(safeParseJSON(DELETED_KEYS.payments, []).map(String));
+
+    // Flush any locally queued offline customers or vouchers first
+    const pendingCustIds = safeParseJSON(PENDING_KEYS.customers, []).map(String);
+    if (pendingCustIds.length > 0) {
+      const localCusts = safeParseJSON(STORAGE_KEYS.customers, []);
+      await Promise.allSettled(
+        pendingCustIds.map(async (id) => {
+          const c = localCusts.find((item) => String(item.id) === id);
+          if (!c || deletedCustSet.has(id)) {
+            removeTrackedId(PENDING_KEYS.customers, id);
+            return;
+          }
+          await setDoc(
+            doc(db, 'store_customers', id),
+            {
+              ...c,
+              opening_balance: parseFloat(c.openingBalance) || 0,
+              created_at: c.createdAt || ''
+            },
+            { merge: true }
+          );
+          removeTrackedId(PENDING_KEYS.customers, id);
+        })
+      );
+    }
+
+    const pendingPayIds = safeParseJSON(PENDING_KEYS.payments, []).map(String);
+    if (pendingPayIds.length > 0) {
+      const localPays = safeParseJSON(STORAGE_KEYS.payments, []);
+      await Promise.allSettled(
+        pendingPayIds.map(async (id) => {
+          const p = localPays.find((item) => String(item.id) === id);
+          if (!p || deletedPaySet.has(id)) {
+            removeTrackedId(PENDING_KEYS.payments, id);
+            return;
+          }
+          await setDoc(
+            doc(db, 'store_payments', id),
+            {
+              ...p,
+              voucher_no: p.voucherNo,
+              entry_type: p.entryType,
+              reference_type: p.referenceType,
+              invoice_id: p.invoiceId,
+              reference_label: p.referenceLabel,
+              customer_name: p.customerName,
+              amount_paid: p.amountPaid,
+              payment_method: p.paymentMethod,
+              reference_no: p.referenceNo,
+              payment_date: p.time,
+              created_at: p.createdAt
+            },
+            { merge: true }
+          );
+          removeTrackedId(PENDING_KEYS.payments, id);
+        })
+      );
+    }
 
     const [custSnap, paySnap] = await Promise.allSettled([
       getDocs(collection(db, 'store_customers')),
@@ -122,7 +182,7 @@ export function useStoreFinanceModule({ usageLogs = [], updateLog, vendorPayment
       const unsynced = localCusts.filter((c) => pendingSet.has(String(c.id)) && !remoteIds.has(String(c.id)));
       const merged = [...unsynced, ...cleanCusts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-      if (merged.length > 0) {
+      if (merged.length > 0 || !custSnap.value.metadata?.fromCache) {
         setStoreCustomers(merged);
         persistJSON(STORAGE_KEYS.customers, merged);
       }
@@ -157,7 +217,7 @@ export function useStoreFinanceModule({ usageLogs = [], updateLog, vendorPayment
       const unsynced = localPays.filter((p) => pendingSet.has(String(p.id)) && !remoteIds.has(String(p.id)));
       const merged = [...unsynced, ...cleanPays].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-      if (merged.length > 0) {
+      if (merged.length > 0 || !paySnap.value.metadata?.fromCache) {
         setStorePayments(merged);
         persistJSON(STORAGE_KEYS.payments, merged);
       }

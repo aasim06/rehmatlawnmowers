@@ -8,6 +8,7 @@ import {
   Button,
   Checkbox,
   Chip,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -35,27 +36,23 @@ import {
 import MainCard from 'components/MainCard';
 import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
 import { useStoreInventory } from 'context/StoreInventoryContext';
-import CeoSignature from 'components/CeoSignature';
+import { DEFAULT_EXPENSE_CATEGORIES, getLocalDateISO } from 'context/modules/useExpensesModule';
+import CashInHandDialog from 'components/expenses/CashInHandDialog';
+import ExpensePrintDialog from 'components/expenses/ExpensePrintDialog';
+import { EXPENSE_PERIOD_OPTIONS, describeExpensePeriod, isDateInExpensePeriod } from 'utils/expenseHelpers';
 import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx } from 'utils/themeSurface';
 
 // assets
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
+import EditOutlined from '@ant-design/icons/EditOutlined';
 import PrinterOutlined from '@ant-design/icons/PrinterOutlined';
 import ClearOutlined from '@ant-design/icons/ClearOutlined';
+import WalletOutlined from '@ant-design/icons/WalletOutlined';
+import DownOutlined from '@ant-design/icons/DownOutlined';
+import UpOutlined from '@ant-design/icons/UpOutlined';
 
-// project imports
 import { AppButton } from 'components/common';
-
-const DEFAULT_EXPENSE_CATEGORIES = [
-  'Tea & Refreshment',
-  'Fuel & Transport',
-  'Utilities & Bills',
-  'Staff Wages & Labor',
-  'Shop Maintenance & Tools',
-  'Stationery & Office',
-  'Miscellaneous & Others'
-];
 
 const QUICK_EXPENSE_SUGGESTIONS = [
   'Daily Workshop Staff Lunch & Tea',
@@ -69,33 +66,147 @@ const QUICK_EXPENSE_SUGGESTIONS = [
 
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Cheque'];
 
+const CATEGORY_BADGE_COLORS = {
+  'Tea & Refreshment': { lightBg: '#fef3c7', lightText: '#b45309', darkBg: 'rgba(245, 158, 11, 0.2)', darkText: '#fbbf24' },
+  'Fuel & Transport': { lightBg: '#fee2e2', lightText: '#b91c1c', darkBg: 'rgba(239, 68, 68, 0.2)', darkText: '#f87171' },
+  'Utilities & Bills': { lightBg: '#dbeafe', lightText: '#1d4ed8', darkBg: 'rgba(59, 130, 246, 0.2)', darkText: '#60a5fa' },
+  'Staff Wages & Labor': { lightBg: '#e0e7ff', lightText: '#4338ca', darkBg: 'rgba(99, 102, 241, 0.2)', darkText: '#818cf8' },
+  default: { lightBg: '#f1f5f9', lightText: '#475569', darkBg: 'rgba(255, 255, 255, 0.1)', darkText: '#e2e8f0' }
+};
+
 const tableHeadCellSx = getTableHeadCellSx();
 
 export default function ExpensesPage() {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const {
     expenses = [],
+    expenseFunds = [],
     addExpense,
     deleteExpense,
+    addExpenseFund,
+    updateExpenseFund,
+    deleteExpenseFund,
     expenseCategories = DEFAULT_EXPENSE_CATEGORIES,
     addExpenseCategory,
     deleteExpenseCategory
   } = useStoreInventory();
 
+  const todayStr = getLocalDateISO();
+  const currentMonthStr = todayStr.substring(0, 7);
+
+  // Unified Period & Filter State ('today', 'week', 'fortnight', 'month', 'custom', 'all')
+  const [dateFilter, setDateFilter] = useState('today');
+  const [customFromDate, setCustomFromDate] = useState(todayStr);
+  const [customToDate, setCustomToDate] = useState(todayStr);
+
   // Form State
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Tea & Refreshment');
+  const [category, setCategory] = useState(expenseCategories[0] || 'Tea & Refreshment');
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paidTo, setPaidTo] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState(todayStr);
   const [notes, setNotes] = useState('');
+
+  // Cash in Hand Dialog & Drawer State
+  const [fundDialogOpen, setFundDialogOpen] = useState(false);
+  const [editingFund, setEditingFund] = useState(null);
+  const [showFundsTable, setShowFundsTable] = useState(true);
 
   // Add Custom Category Modal State
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
 
+  // Table Selection, Search & Category Filter
+  const [selected, setSelected] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Pagination
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Print Dialog
+  const [printOpen, setPrintOpen] = useState(false);
+  const [selectedExpenseForPrint, setSelectedExpenseForPrint] = useState(null);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, selectedCategory, dateFilter, customFromDate, customToDate]);
+
+  const periodParams = useMemo(
+    () => ({
+      period: dateFilter,
+      todayStr,
+      fromDate: customFromDate,
+      toDate: customToDate
+    }),
+    [dateFilter, todayStr, customFromDate, customToDate]
+  );
+
+  const periodInfo = useMemo(() => describeExpensePeriod(periodParams), [periodParams]);
+
+  // Period-filtered Cash in Hand & Expenses (used consistently across KPIs, Table Closing & Print)
+  const periodFunds = useMemo(
+    () => expenseFunds.filter((f) => isDateInExpensePeriod(f.fundDate, periodParams)),
+    [expenseFunds, periodParams]
+  );
+
+  const periodExpenses = useMemo(
+    () => expenses.filter((e) => isDateInExpensePeriod(e.expenseDate, periodParams)),
+    [expenses, periodParams]
+  );
+
+  const filteredExpenses = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return periodExpenses.filter((e) => {
+      if (selectedCategory !== 'All' && e.category !== selectedCategory) return false;
+      if (q) {
+        const matchesTitle = (e.title || '').toLowerCase().includes(q);
+        const matchesPaidTo = (e.paidTo || '').toLowerCase().includes(q);
+        const matchesNotes = (e.notes || '').toLowerCase().includes(q);
+        if (!matchesTitle && !matchesPaidTo && !matchesNotes) return false;
+      }
+      return true;
+    });
+  }, [periodExpenses, selectedCategory, searchQuery]);
+
+  // Financial Aggregations
+  const financials = useMemo(() => {
+    const periodCashTotal = periodFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+    const periodExpensesTotal = periodExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const filteredExpensesTotal = filteredExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const periodRemainingBalance = periodCashTotal - periodExpensesTotal;
+
+    const allTimeCashTotal = expenseFunds.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+    const allTimeExpensesTotal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const allTimeRemainingBalance = allTimeCashTotal - allTimeExpensesTotal;
+    const monthExpensesTotal = expenses
+      .filter((e) => (e.expenseDate || '').startsWith(currentMonthStr))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+    return {
+      periodCashTotal,
+      periodExpensesTotal,
+      filteredExpensesTotal,
+      periodRemainingBalance,
+      allTimeCashTotal,
+      allTimeExpensesTotal,
+      allTimeRemainingBalance,
+      monthExpensesTotal
+    };
+  }, [periodFunds, periodExpenses, filteredExpenses, expenseFunds, expenses, currentMonthStr]);
+
+  const draftAmountVal = parseFloat(amount) || 0;
+  const projectedBalanceAfterDraft = financials.periodRemainingBalance - draftAmountVal;
+  const isSubFiltered = Boolean(searchQuery.trim()) || selectedCategory !== 'All';
+  const isPeriodDeficit = financials.periodRemainingBalance < 0;
+  const isAllTimeDeficit = financials.allTimeRemainingBalance < 0;
+
+  // Handlers
   const handleSaveNewCategory = (e) => {
     if (e) e.preventDefault();
     const trimmed = newCategoryName.trim();
@@ -107,9 +218,7 @@ export default function ExpensesPage() {
       setCategoryError('Category with this name already exists');
       return;
     }
-    if (addExpenseCategory) {
-      addExpenseCategory(trimmed);
-    }
+    if (addExpenseCategory) addExpenseCategory(trimmed);
     setCategory(trimmed);
     setNewCategoryName('');
     setCategoryError('');
@@ -118,119 +227,31 @@ export default function ExpensesPage() {
 
   const handleDeleteCategory = (catToDelete) => {
     if (window.confirm(`Are you sure you want to delete category "${catToDelete}"?`)) {
-      if (deleteExpenseCategory) {
-        deleteExpenseCategory(catToDelete);
-      }
+      if (deleteExpenseCategory) deleteExpenseCategory(catToDelete);
       if (category === catToDelete) {
         setCategory(expenseCategories.find((c) => c !== catToDelete) || 'Miscellaneous & Others');
       }
     }
   };
 
-  // Table Selection & Filter State
-  const [selected, setSelected] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [dateFilter, setDateFilter] = useState('today'); // 'today', 'month', 'all'
-
-  // Pagination State
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
+  const handleClearForm = () => {
+    setTitle('');
+    setAmount('');
+    setPaidTo('');
+    setNotes('');
+    setCategory(expenseCategories[0] || 'Tea & Refreshment');
+    setPaymentMethod('Cash');
+    setExpenseDate(todayStr);
   };
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  useEffect(() => {
-    setPage(0);
-  }, [searchQuery, selectedCategory, dateFilter]);
-
-  // Print Dialog State
-  const [printOpen, setPrintOpen] = useState(false);
-  const [selectedExpenseForPrint, setSelectedExpenseForPrint] = useState(null);
-
-  // Today Date String
-  const todayStr = new Date().toISOString().split('T')[0];
-  const currentMonthStr = todayStr.substring(0, 7);
-
-  // KPI Calculations
-  const stats = useMemo(() => {
-    let todayTotal = 0;
-    let todayCount = 0;
-    let monthTotal = 0;
-    let allTimeTotal = 0;
-    const catMap = {};
-
-    expenses.forEach((e) => {
-      const amt = parseFloat(e.amount) || 0;
-      allTimeTotal += amt;
-
-      if (e.expenseDate === todayStr) {
-        todayTotal += amt;
-        todayCount += 1;
-      }
-
-      if ((e.expenseDate || '').startsWith(currentMonthStr)) {
-        monthTotal += amt;
-      }
-
-      const cat = e.category || 'General';
-      catMap[cat] = (catMap[cat] || 0) + amt;
-    });
-
-    let topCat = 'None';
-    let topCatAmt = 0;
-    Object.entries(catMap).forEach(([cat, sum]) => {
-      if (sum > topCatAmt) {
-        topCat = cat;
-        topCatAmt = sum;
-      }
-    });
-
-    return { todayTotal, todayCount, monthTotal, allTimeTotal, topCat };
-  }, [expenses, todayStr, currentMonthStr]);
-
-  // Filtered Expenses List
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((e) => {
-      // Date filter
-      if (dateFilter === 'today' && e.expenseDate !== todayStr) return false;
-      if (dateFilter === 'month' && !(e.expenseDate || '').startsWith(currentMonthStr)) return false;
-
-      // Category filter
-      if (selectedCategory !== 'All' && e.category !== selectedCategory) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = (e.title || '').toLowerCase().includes(q);
-        const matchesPaidTo = (e.paidTo || '').toLowerCase().includes(q);
-        const matchesNotes = (e.notes || '').toLowerCase().includes(q);
-        if (!matchesTitle && !matchesPaidTo && !matchesNotes) return false;
-      }
-
-      return true;
-    });
-  }, [expenses, dateFilter, todayStr, currentMonthStr, selectedCategory, searchQuery]);
-
-  const filteredTotal = useMemo(() => {
-    return filteredExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  }, [filteredExpenses]);
-
-  // Submit Add Expense
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     if (e) e.preventDefault();
     if (!title.trim() || !amount || parseFloat(amount) <= 0) {
       alert('Please enter a valid expense title and amount');
       return;
     }
 
-    addExpense({
+    await addExpense({
       title: title.trim(),
       category,
       amount: parseFloat(amount),
@@ -239,49 +260,31 @@ export default function ExpensesPage() {
       expenseDate,
       notes: notes.trim()
     });
-
-    // Reset Form
     handleClearForm();
   };
 
-  const handleClearForm = () => {
-    setTitle('');
-    setAmount('');
-    setPaidTo('');
-    setNotes('');
-    setCategory('Tea & Refreshment');
-    setPaymentMethod('Cash');
-    setExpenseDate(new Date().toISOString().split('T')[0]);
+  const handleSaveCashFund = async (fundPayload, existingId) => {
+    if (existingId && updateExpenseFund) {
+      await updateExpenseFund(existingId, fundPayload);
+    } else if (addExpenseFund) {
+      await addExpenseFund(fundPayload);
+    }
+    setEditingFund(null);
   };
 
-  // Table Checkbox Selection
   const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = filteredExpenses.map((n) => n.id);
-      setSelected(newSelected);
-      return;
-    }
-    setSelected([]);
+    setSelected(event.target.checked ? filteredExpenses.map((n) => n.id) : []);
   };
 
   const handleSelectOne = (event, id) => {
     event.stopPropagation();
     const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
-
     if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
+      setSelected([...selected, id]);
+    } else {
+      setSelected(selected.filter((item) => item !== id));
     }
-    setSelected(newSelected);
   };
-
-  const isSelected = (id) => selected.indexOf(id) !== -1;
 
   const handleBulkDelete = () => {
     if (window.confirm(`Are you sure you want to delete ${selected.length} selected expense records?`)) {
@@ -290,69 +293,290 @@ export default function ExpensesPage() {
     }
   };
 
-  // Open Print Dialog
   const handleOpenPrint = (expenseItem = null) => {
     setSelectedExpenseForPrint(expenseItem);
     setPrintOpen(true);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <Stack spacing={3}>
-      {/* 1. TOP 4 MANTIS KPI STATS CARDS */}
+      {/* 1. PERIOD SELECTOR BAR + QUICK CASH IN HAND ACTION */}
+      <MainCard content={false} sx={getCardSurfaceSx(theme, { px: { xs: 2, sm: 2.5 }, py: 1.75 })}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} spacing={1.5}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Box sx={getSubSurfaceSx(theme, { display: 'inline-flex', p: 0.5, borderRadius: 2, gap: 0.5, flexWrap: 'wrap' })}>
+              {EXPENSE_PERIOD_OPTIONS.map((tab) => {
+                const isActive = dateFilter === tab.key;
+                return (
+                  <Box
+                    key={tab.key}
+                    component="button"
+                    type="button"
+                    onClick={() => setDateFilter(tab.key)}
+                    sx={{
+                      border: 0,
+                      px: 1.5,
+                      py: 0.65,
+                      borderRadius: 1.5,
+                      fontSize: '0.8125rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      bgcolor: isActive ? 'background.paper' : 'transparent',
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                      boxShadow: isActive ? theme.shadows[1] : 'none'
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <Chip label={periodInfo.rangeText} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600 }} />
+
+            {dateFilter === 'custom' && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  type="date"
+                  size="small"
+                  label="From"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: 150 }}
+                />
+                <TextField
+                  type="date"
+                  size="small"
+                  label="To"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: 150 }}
+                />
+              </Stack>
+            )}
+          </Stack>
+
+          <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
+            <AppButton
+              intent="primary"
+              startIcon={<WalletOutlined />}
+              onClick={() => {
+                setEditingFund(null);
+                setFundDialogOpen(true);
+              }}
+              sx={{
+                bgcolor: '#059669',
+                '&:hover': { bgcolor: '#047857' }
+              }}
+            >
+              + Add Cash in Hand
+            </AppButton>
+            <AppButton intent="secondary" startIcon={<PrinterOutlined />} onClick={() => handleOpenPrint(null)}>
+              Print Closing Sheet
+            </AppButton>
+          </Stack>
+        </Stack>
+      </MainCard>
+
+      {/* 2. TOP 4 FINANCIAL KPI STATS CARDS */}
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
-            title="TODAY'S EXPENSES"
-            count={`PKR ${stats.todayTotal.toLocaleString()}`}
-            extra={`${stats.todayCount} voucher${stats.todayCount !== 1 ? 's' : ''} recorded today`}
+            title={`CASH IN HAND (${periodInfo.shortLabel.toUpperCase()})`}
+            count={`PKR ${financials.periodCashTotal.toLocaleString()}`}
+            extra={`${periodFunds.length} cash receipt${periodFunds.length !== 1 ? 's' : ''} added`}
+            color="success"
+            accentColor="#10b981"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <AnalyticEcommerce
+            title={`EXPENSES (${periodInfo.shortLabel.toUpperCase()})`}
+            count={`PKR ${financials.periodExpensesTotal.toLocaleString()}`}
+            extra={`${periodExpenses.length} voucher${periodExpenses.length !== 1 ? 's' : ''} spent`}
             color="error"
             accentColor="#ef4444"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
-            title="THIS MONTH'S EXPENSES"
-            count={`PKR ${stats.monthTotal.toLocaleString()}`}
-            extra="Current Month Cycle"
-            color="primary"
-            accentColor="#1677ff"
+            title={`REMAINING BALANCE (${periodInfo.shortLabel.toUpperCase()})`}
+            count={`PKR ${financials.periodRemainingBalance.toLocaleString()}`}
+            extra={isPeriodDeficit ? 'Shortfall / Extra Paid' : 'Closing Cash in Hand (Baqaya)'}
+            color={isPeriodDeficit ? 'error' : 'primary'}
+            accentColor={isPeriodDeficit ? '#dc2626' : '#1677ff'}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticEcommerce
-            title="TOP EXPENSE CATEGORY"
-            count={stats.topCat}
-            extra="Major cost driver"
-            color="warning"
-            accentColor="#faad14"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <AnalyticEcommerce
-            title="ALL-TIME TOTAL EXPENSES"
-            count={`PKR ${stats.allTimeTotal.toLocaleString()}`}
-            extra={`${expenses.length} total recorded entries`}
-            color="success"
-            accentColor="#52c41a"
+            title="OVERALL NET CASH (ALL TIME)"
+            count={`PKR ${financials.allTimeRemainingBalance.toLocaleString()}`}
+            extra={
+              isAllTimeDeficit
+                ? `Month Exp: PKR ${financials.monthExpensesTotal.toLocaleString()}`
+                : `Total In: ${financials.allTimeCashTotal.toLocaleString()} • Month Exp: ${financials.monthExpensesTotal.toLocaleString()}`
+            }
+            color={isAllTimeDeficit ? 'warning' : 'success'}
+            accentColor={isAllTimeDeficit ? '#f59e0b' : '#52c41a'}
           />
         </Grid>
       </Grid>
 
-      {/* 2. RECORD NEW EXPENSE FORM CARD */}
+      {/* 3. COMPANY CASH IN HAND RECEIPTS PANEL */}
+      <MainCard content={false} sx={getCardSurfaceSx(theme, { overflow: 'hidden' })}>
+        <Box
+          sx={{
+            px: { xs: 2, sm: 3 },
+            py: 1.5,
+            borderBottom: showFundsTable ? '1px solid' : 'none',
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.25} flexWrap="wrap">
+            <WalletOutlined style={{ color: '#10b981', fontSize: 18 }} />
+            <Typography variant="h5" fontWeight={700} color="text.primary">
+              Company Cash Received (Cash in Hand)
+            </Typography>
+            <Chip
+              label={`${periodFunds.length} ${periodFunds.length === 1 ? 'receipt' : 'receipts'} • PKR ${financials.periodCashTotal.toLocaleString()}`}
+              size="small"
+              color="success"
+              variant="light"
+              sx={{ fontWeight: 700 }}
+            />
+          </Stack>
+
+          <Stack direction="row" spacing={1} alignItems="center">
+            <AppButton
+              intent="secondary"
+              size="small"
+              startIcon={<PlusOutlined />}
+              onClick={() => {
+                setEditingFund(null);
+                setFundDialogOpen(true);
+              }}
+            >
+              Add Cash
+            </AppButton>
+            <IconButton size="small" onClick={() => setShowFundsTable((prev) => !prev)} aria-label="Toggle Cash Received List">
+              {showFundsTable ? <UpOutlined /> : <DownOutlined />}
+            </IconButton>
+          </Stack>
+        </Box>
+
+        <Collapse in={showFundsTable}>
+          {periodFunds.length === 0 ? (
+            <Box sx={{ px: { xs: 2, sm: 3 }, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                No cash receipt recorded for <strong>{periodInfo.label}</strong> yet. Click &ldquo;+ Add Cash in Hand&rdquo; whenever company cash is received.
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ ...tableHeadCellSx, width: 115 }}>DATE</TableCell>
+                    <TableCell sx={tableHeadCellSx}>RECEIVED FROM / SOURCE</TableCell>
+                    <TableCell sx={{ ...tableHeadCellSx, width: 130 }}>METHOD</TableCell>
+                    <TableCell sx={tableHeadCellSx}>NOTES</TableCell>
+                    <TableCell sx={{ ...tableHeadCellSx, width: 150 }}>ADDED BY</TableCell>
+                    <TableCell align="right" sx={{ ...tableHeadCellSx, width: 150 }}>
+                      CASH IN (PKR)
+                    </TableCell>
+                    <TableCell align="center" sx={{ ...tableHeadCellSx, width: 95 }}>
+                      ACTION
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {periodFunds.map((fund) => (
+                    <TableRow key={fund.id} hover>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fund.fundDate}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{fund.receivedFrom || 'Owner / Head Office'}</TableCell>
+                      <TableCell>
+                        <Chip label={fund.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+                      </TableCell>
+                      <TableCell sx={{ color: 'text.secondary' }}>{fund.notes || '—'}</TableCell>
+                      <TableCell sx={{ color: 'text.secondary', fontSize: '0.80rem' }}>{fund.addedBy || 'Counter'}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: isDark ? '#34d399' : '#059669' }}>
+                        + PKR {(parseFloat(fund.amount) || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
+                          <Tooltip title="Edit Cash Entry">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => {
+                                setEditingFund(fund);
+                                setFundDialogOpen(true);
+                              }}
+                            >
+                              <EditOutlined style={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Cash Entry">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => {
+                                if (window.confirm(`Delete Cash in Hand entry of PKR ${parseFloat(fund.amount).toLocaleString()}?`)) {
+                                  deleteExpenseFund(fund.id);
+                                }
+                              }}
+                            >
+                              <DeleteOutlined style={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Collapse>
+      </MainCard>
+
+      {/* 4. RECORD NEW EXPENSE VOUCHER FORM CARD */}
       <MainCard
         title="Record New Expense Voucher"
+        secondary={
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Chip
+              label={`Closing Balance: PKR ${financials.periodRemainingBalance.toLocaleString()}`}
+              color={isPeriodDeficit ? 'error' : 'success'}
+              variant="light"
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
+            {draftAmountVal > 0 && (
+              <Chip
+                label={`After This Expense: PKR ${projectedBalanceAfterDraft.toLocaleString()}`}
+                color={projectedBalanceAfterDraft < 0 ? 'warning' : 'primary'}
+                variant="outlined"
+                size="small"
+                sx={{ fontWeight: 700 }}
+              />
+            )}
+          </Stack>
+        }
         sx={{
-          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
+          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)',
           borderRadius: 2
         }}
       >
         <form onSubmit={handleAddExpense}>
           <Grid container spacing={2.5} alignItems="center">
-            {/* ROW 1: Expense Title (50%), Category (25%), Amount (25%) */}
             <Grid size={{ xs: 12, md: 6 }}>
               <Autocomplete
                 freeSolo
@@ -364,13 +588,7 @@ export default function ExpensesPage() {
                 onInputChange={(event, newInputValue) => {
                   setTitle(newInputValue);
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px',
-                    py: 0
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px', py: 0 } }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -388,7 +606,7 @@ export default function ExpensesPage() {
                   select
                   fullWidth
                   label="EXPENSE CATEGORY *"
-                  value={category}
+                  value={expenseCategories.includes(category) ? category : expenseCategories[0] || 'Miscellaneous & Others'}
                   onChange={(e) => {
                     if (e.target.value === '__add_new_cat__') {
                       setAddCategoryOpen(true);
@@ -396,12 +614,7 @@ export default function ExpensesPage() {
                       setCategory(e.target.value);
                     }
                   }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      height: '44px',
-                      minHeight: '44px'
-                    }
-                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
                 >
                   {expenseCategories.map((cat) => (
                     <MenuItem key={cat} value={cat}>
@@ -456,16 +669,10 @@ export default function ExpensesPage() {
                 InputProps={{
                   startAdornment: <InputAdornment position="start">PKR</InputAdornment>
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
               />
             </Grid>
 
-            {/* ROW 2: Paid To (30%), Payment Method (20%), Expense Date (20%), Notes (30%) */}
             <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
               <TextField
                 fullWidth
@@ -473,12 +680,7 @@ export default function ExpensesPage() {
                 placeholder="e.g. Hotel, PSO Petrol Pump, LESCO, Ali"
                 value={paidTo}
                 onChange={(e) => setPaidTo(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
               />
             </Grid>
 
@@ -489,12 +691,7 @@ export default function ExpensesPage() {
                 label="PAYMENT METHOD"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
               >
                 {PAYMENT_METHODS.map((pm) => (
                   <MenuItem key={pm} value={pm}>
@@ -512,12 +709,7 @@ export default function ExpensesPage() {
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
               />
             </Grid>
 
@@ -528,17 +720,11 @@ export default function ExpensesPage() {
                 placeholder="Optional voucher details"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '44px',
-                    minHeight: '44px'
-                  }
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: '44px', minHeight: '44px' } }}
               />
             </Grid>
           </Grid>
 
-          {/* ROW 3: Action Buttons (Right Aligned) */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, pt: 2.5, width: '100%' }}>
             <AppButton intent="cancel" startIcon={<ClearOutlined />} onClick={handleClearForm}>
               Clear Form
@@ -550,9 +736,8 @@ export default function ExpensesPage() {
         </form>
       </MainCard>
 
-      {/* 3. EXPENSES REGISTER & TABLE CARD */}
+      {/* 5. EXPENSES REGISTER & CLOSING TABLE CARD */}
       <MainCard content={false} sx={getCardSurfaceSx(theme, { overflow: 'hidden' })}>
-        {/* Card Header */}
         <Box
           sx={{
             px: { xs: 2, sm: 3 },
@@ -568,7 +753,7 @@ export default function ExpensesPage() {
         >
           <Stack direction="row" alignItems="center" spacing={1.25} flexWrap="wrap">
             <Typography variant="h5" fontWeight={700} color="text.primary">
-              Expenses history &amp; daily register
+              Expenses history &amp; closing register
             </Typography>
             <Chip
               label={`${filteredExpenses.length} ${filteredExpenses.length === 1 ? 'record' : 'records'}`}
@@ -594,56 +779,15 @@ export default function ExpensesPage() {
                 Delete ({selected.length})
               </AppButton>
             )}
-            <AppButton intent="secondary" size="small" onClick={() => handleOpenPrint(null)}>
+            <AppButton intent="secondary" size="small" startIcon={<PrinterOutlined />} onClick={() => handleOpenPrint(null)}>
               Print expense sheet
             </AppButton>
           </Stack>
         </Box>
 
         <Box sx={{ p: { xs: 2, sm: 3 } }}>
-          {/* Search & Filter Toolbar */}
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: 1.5,
-              mb: 2
-            }}
-          >
-            {/* Segmented Date Filter Pills */}
-            <Box sx={getSubSurfaceSx(theme, { display: 'inline-flex', p: 0.5, borderRadius: 2, gap: 0.5 })}>
-              {[
-                { key: 'today', label: 'Today' },
-                { key: 'month', label: 'This month' },
-                { key: 'all', label: 'All records' }
-              ].map((tab) => {
-                const isActive = dateFilter === tab.key;
-                return (
-                  <Box
-                    key={tab.key}
-                    component="button"
-                    type="button"
-                    onClick={() => setDateFilter(tab.key)}
-                    sx={{
-                      border: 0,
-                      px: 1.5,
-                      py: 0.65,
-                      borderRadius: 1.5,
-                      fontSize: '0.8125rem',
-                      fontWeight: isActive ? 700 : 500,
-                      cursor: 'pointer',
-                      bgcolor: isActive ? 'background.paper' : 'transparent',
-                      color: isActive ? 'primary.main' : 'text.secondary',
-                      boxShadow: isActive ? theme.shadows[1] : 'none'
-                    }}
-                  >
-                    {tab.label}
-                  </Box>
-                );
-              })}
-            </Box>
-
+          {/* Search & Category Toolbar */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
             <OutlinedInput
               size="small"
               placeholder="Search title, person, notes..."
@@ -657,7 +801,7 @@ export default function ExpensesPage() {
               size="small"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              sx={{ width: { xs: '100%', sm: 185 } }}
+              sx={{ width: { xs: '100%', sm: 210 } }}
             >
               <MenuItem value="All">All categories</MenuItem>
               {expenseCategories.map((cat) => (
@@ -668,7 +812,7 @@ export default function ExpensesPage() {
             </TextField>
           </Box>
 
-          {/* Expenses Data Table */}
+          {/* Expenses Table */}
           <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
             <Table>
               <TableHead>
@@ -687,7 +831,7 @@ export default function ExpensesPage() {
                   <TableCell sx={{ ...tableHeadCellSx, width: 165 }}>CATEGORY</TableCell>
                   <TableCell sx={{ ...tableHeadCellSx, width: 135 }}>PAID TO</TableCell>
                   <TableCell sx={{ ...tableHeadCellSx, width: 120 }}>PAYMENT</TableCell>
-                  <TableCell align="right" sx={{ ...tableHeadCellSx, width: 135 }}>
+                  <TableCell align="right" sx={{ ...tableHeadCellSx, width: 140 }}>
                     AMOUNT (PKR)
                   </TableCell>
                   <TableCell align="center" sx={{ ...tableHeadCellSx, width: 95, pr: 2 }}>
@@ -698,141 +842,149 @@ export default function ExpensesPage() {
               <TableBody>
                 {filteredExpenses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                      No expense records found for the selected filter.
+                    <TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                      No expense records found for {periodInfo.label}.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredExpenses
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((exp, idx) => {
-                      const isItemSelected = isSelected(exp.id);
-                      return (
-                        <TableRow
-                          key={exp.id || idx}
-                          hover
-                          selected={isItemSelected}
-                          sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              color="primary"
-                              checked={isItemSelected}
-                              onChange={(event) => handleSelectOne(event, exp.id)}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ color: 'text.secondary' }}>{page * rowsPerPage + idx + 1}</TableCell>
-                          <TableCell sx={{ fontWeight: 600, color: 'text.primary', whiteSpace: 'nowrap' }}>{exp.expenseDate}</TableCell>
-                          <TableCell>
-                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'text.primary' }}>
-                              {exp.title}
+                  filteredExpenses.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((exp, idx) => {
+                    const isItemSelected = selected.indexOf(exp.id) !== -1;
+                    const badgeStyle = CATEGORY_BADGE_COLORS[exp.category] || CATEGORY_BADGE_COLORS.default;
+                    return (
+                      <TableRow
+                        key={exp.id || idx}
+                        hover
+                        selected={isItemSelected}
+                        sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
+                      >
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            color="primary"
+                            checked={isItemSelected}
+                            onChange={(event) => handleSelectOne(event, exp.id)}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{page * rowsPerPage + idx + 1}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: 'text.primary', whiteSpace: 'nowrap' }}>{exp.expenseDate}</TableCell>
+                        <TableCell>
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'text.primary' }}>
+                            {exp.title}
+                          </Typography>
+                          {(exp.notes || exp.addedBy) && (
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {[exp.notes, exp.addedBy ? `By: ${exp.addedBy}` : ''].filter(Boolean).join(' • ')}
                             </Typography>
-                            {exp.notes && (
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                {exp.notes}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={exp.category || 'General'}
-                              size="small"
-                              sx={{
-                                fontWeight: 600,
-                                bgcolor: (t) =>
-                                  t.palette.mode === 'dark'
-                                    ? exp.category === 'Tea & Refreshment'
-                                      ? 'rgba(245, 158, 11, 0.2)'
-                                      : exp.category === 'Fuel & Transport'
-                                        ? 'rgba(239, 68, 68, 0.2)'
-                                        : exp.category === 'Utilities & Bills'
-                                          ? 'rgba(59, 130, 246, 0.2)'
-                                          : exp.category === 'Staff Wages & Labor'
-                                            ? 'rgba(99, 102, 241, 0.2)'
-                                            : 'rgba(255, 255, 255, 0.1)'
-                                    : exp.category === 'Tea & Refreshment'
-                                      ? '#fef3c7'
-                                      : exp.category === 'Fuel & Transport'
-                                        ? '#fee2e2'
-                                        : exp.category === 'Utilities & Bills'
-                                          ? '#dbeafe'
-                                          : exp.category === 'Staff Wages & Labor'
-                                            ? '#e0e7ff'
-                                            : '#f1f5f9',
-                                color: (t) =>
-                                  t.palette.mode === 'dark'
-                                    ? exp.category === 'Tea & Refreshment'
-                                      ? '#fbbf24'
-                                      : exp.category === 'Fuel & Transport'
-                                        ? '#f87171'
-                                        : exp.category === 'Utilities & Bills'
-                                          ? '#60a5fa'
-                                          : exp.category === 'Staff Wages & Labor'
-                                            ? '#818cf8'
-                                            : '#e2e8f0'
-                                    : exp.category === 'Tea & Refreshment'
-                                      ? '#b45309'
-                                      : exp.category === 'Fuel & Transport'
-                                        ? '#b91c1c'
-                                        : exp.category === 'Utilities & Bills'
-                                          ? '#1d4ed8'
-                                          : exp.category === 'Staff Wages & Labor'
-                                            ? '#4338ca'
-                                            : '#475569'
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ color: 'text.primary' }}>{exp.paidTo || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Chip label={exp.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: (t) => (t.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '0.875rem' }}>
-                            PKR {parseFloat(exp.amount || 0).toLocaleString()}
-                          </TableCell>
-                          <TableCell align="center" sx={{ pr: 2 }}>
-                            <Stack direction="row" spacing={0.5} justifyContent="center">
-                              <Tooltip title="Print Voucher">
-                                <IconButton size="small" color="primary" onClick={() => handleOpenPrint(exp)}>
-                                  <PrinterOutlined style={{ fontSize: 15 }} />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete Expense">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => {
-                                    if (window.confirm(`Are you sure you want to delete "${exp.title}"?`)) {
-                                      deleteExpense(exp.id);
-                                    }
-                                  }}
-                                >
-                                  <DeleteOutlined style={{ fontSize: 15 }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={exp.category || 'General'}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: isDark ? badgeStyle.darkBg : badgeStyle.lightBg,
+                              color: isDark ? badgeStyle.darkText : badgeStyle.lightText
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ color: 'text.primary' }}>{exp.paidTo || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Chip label={exp.paymentMethod || 'Cash'} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, color: isDark ? '#f87171' : '#dc2626', fontSize: '0.875rem' }}>
+                          PKR {(parseFloat(exp.amount) || 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell align="center" sx={{ pr: 2 }}>
+                          <Stack direction="row" spacing={0.5} justifyContent="center">
+                            <Tooltip title="Print Voucher">
+                              <IconButton size="small" color="primary" onClick={() => handleOpenPrint(exp)}>
+                                <PrinterOutlined style={{ fontSize: 15 }} />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete Expense">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete "${exp.title}"?`)) {
+                                    deleteExpense(exp.id);
+                                  }
+                                }}
+                              >
+                                <DeleteOutlined style={{ fontSize: 15 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
 
-                {/* Total Summary Row */}
-                {filteredExpenses.length > 0 && (
-                  <TableRow
-                    sx={{
-                      bgcolor: getSubSurfaceSx(theme).bgcolor,
-                      borderTop: '1px solid',
-                      borderColor: 'divider'
-                    }}
-                  >
-                    <TableCell colSpan={7} align="right" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.875rem' }}>
-                      Total Amount:
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, color: (t) => (t.palette.mode === 'dark' ? '#f87171' : '#dc2626'), fontSize: '1rem' }}>
-                      PKR {filteredTotal.toLocaleString()}
-                    </TableCell>
-                    <TableCell />
-                  </TableRow>
+                {/* Day-End / Period Closing Calculation Rows */}
+                {(filteredExpenses.length > 0 || periodFunds.length > 0) && (
+                  <>
+                    {isSubFiltered && (
+                      <TableRow sx={{ bgcolor: getSubSurfaceSx(theme).bgcolor, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <TableCell colSpan={7} align="right" sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.84rem' }}>
+                          Filtered Rows Total:
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, color: isDark ? '#fca5a5' : '#b91c1c', fontSize: '0.92rem' }}>
+                          PKR {financials.filteredExpensesTotal.toLocaleString()}
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                    )}
+
+                    <TableRow sx={{ bgcolor: getSubSurfaceSx(theme).bgcolor, borderTop: '1px solid', borderColor: 'divider' }}>
+                      <TableCell colSpan={7} align="right" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.875rem' }}>
+                        Cash in Hand / Received ({periodInfo.shortLabel}):
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: isDark ? '#34d399' : '#059669', fontSize: '0.95rem' }}>
+                        + PKR {financials.periodCashTotal.toLocaleString()}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+
+                    <TableRow sx={{ bgcolor: getSubSurfaceSx(theme).bgcolor }}>
+                      <TableCell colSpan={7} align="right" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.875rem' }}>
+                        Less: Total Expenses ({periodInfo.shortLabel}):
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: isDark ? '#f87171' : '#dc2626', fontSize: '0.95rem' }}>
+                        - PKR {financials.periodExpensesTotal.toLocaleString()}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+
+                    <TableRow
+                      sx={{
+                        bgcolor: isDark
+                          ? isPeriodDeficit
+                            ? 'rgba(239, 68, 68, 0.14)'
+                            : 'rgba(16, 185, 129, 0.14)'
+                          : isPeriodDeficit
+                            ? '#fef2f2'
+                            : '#ecfdf5',
+                        borderTop: '2px solid',
+                        borderColor: isPeriodDeficit ? 'error.main' : 'success.main'
+                      }}
+                    >
+                      <TableCell colSpan={7} align="right" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem' }}>
+                        {isPeriodDeficit ? 'Shortfall / Extra Paid Balance:' : 'Remaining / Closing Cash Balance (Baqaya):'}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 900,
+                          color: isPeriodDeficit ? (isDark ? '#f87171' : '#b91c1c') : isDark ? '#34d399' : '#047857',
+                          fontSize: '1.08rem'
+                        }}
+                      >
+                        PKR {financials.periodRemainingBalance.toLocaleString()}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -844,242 +996,42 @@ export default function ExpensesPage() {
             count={filteredExpenses.length}
             rowsPerPage={rowsPerPage}
             page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
+            onPageChange={(event, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
             sx={{ mt: 0.5 }}
           />
         </Box>
       </MainCard>
 
-      {/* 4. PRINTABLE VOUCHER / STATEMENT DIALOG */}
-      <Dialog
+      {/* 6. CASH IN HAND ENTRY DIALOG */}
+      <CashInHandDialog
+        open={fundDialogOpen}
+        onClose={() => {
+          setFundDialogOpen(false);
+          setEditingFund(null);
+        }}
+        onSave={handleSaveCashFund}
+        editingFund={editingFund}
+      />
+
+      {/* 7. PRINTABLE CLOSING STATEMENT / VOUCHER DIALOG */}
+      <ExpensePrintDialog
         open={printOpen}
         onClose={() => setPrintOpen(false)}
-        maxWidth="md"
-        fullWidth
-        sx={{
-          '@media print': {
-            '& .MuiDialog-container': {
-              display: 'block !important',
-              padding: '0 !important',
-              margin: '0 !important'
-            },
-            '& .MuiPaper-root': {
-              boxShadow: 'none !important',
-              border: 'none !important',
-              maxWidth: '100% !important',
-              margin: '0 !important',
-              padding: '0 !important',
-              borderRadius: '0 !important',
-              overflow: 'visible !important'
-            }
-          }
-        }}
-      >
-        <style>
-          {`
-            @media print {
-              @page {
-                size: A4 portrait;
-                margin: 4mm 5mm;
-              }
-              body * {
-                visibility: hidden !important;
-              }
-              #printable-expense-sheet, #printable-expense-sheet * {
-                visibility: visible !important;
-              }
-              #printable-expense-sheet {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 60px 4px 6px 4px !important;
-                background: #ffffff !important;
-                color: #000000 !important;
-              }
-              .no-print, .MuiDialogTitle-root, .MuiDialogActions-root, .MuiBackdrop-root {
-                display: none !important;
-                visibility: hidden !important;
-              }
-              .MuiDialogContent-root {
-                padding: 0 !important;
-                margin: 0 !important;
-                border: none !important;
-                overflow: visible !important;
-              }
-            }
-          `}
-        </style>
+        selectedExpenseForPrint={selectedExpenseForPrint}
+        periodInfo={periodInfo}
+        periodFunds={periodFunds}
+        filteredExpenses={filteredExpenses}
+        periodCashTotal={financials.periodCashTotal}
+        periodExpensesTotal={financials.periodExpensesTotal}
+        filteredTotal={financials.filteredExpensesTotal}
+        periodRemainingBalance={financials.periodRemainingBalance}
+      />
 
-        <DialogTitle className="no-print" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5" fontWeight={700}>
-            {selectedExpenseForPrint ? 'Expense Payment Voucher' : 'Daily Expenses Statement'}
-          </Typography>
-          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint} className="no-print">
-            Print Now
-          </Button>
-        </DialogTitle>
-
-        <DialogContent sx={{ p: { xs: 1, sm: 1.5 }, bgcolor: '#ffffff' }}>
-          <Box id="printable-expense-sheet" sx={{ position: 'relative', overflow: 'hidden', pt: { xs: 5, sm: 7 }, px: { xs: 1, sm: 1.5 }, pb: { xs: 1, sm: 1.5 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              {/* Structured Metadata Card */}
-              <div style={{
-                border: '1.5px solid #111827',
-                borderRadius: '4px',
-                marginBottom: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.45)',
-                overflow: 'hidden'
-              }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-                  <div style={{ flex: '1.2', padding: '6px 10px', borderRight: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
-                      Statement Type
-                    </div>
-                    <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>
-                      {selectedExpenseForPrint ? 'Expense Voucher' : 'Daily Expenses Statement'}
-                    </div>
-                  </div>
-
-                  <div style={{ flex: '1', padding: '6px 10px', backgroundColor: 'rgba(249, 250, 251, 0.45)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.80rem' }}>
-                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Statement Date:</span>
-                      <span style={{ fontWeight: 700, color: '#374151' }}>
-                        {selectedExpenseForPrint ? selectedExpenseForPrint.expenseDate : dateFilter === 'today' ? todayStr : 'Filtered Records'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.80rem' }}>
-                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Total Count:</span>
-                      <span style={{ fontWeight: 800, color: '#16a34a' }}>
-                        {selectedExpenseForPrint ? '01 Entry' : `${filteredExpenses.length} Entries`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* EXACT TABLE AS SHOWN IN OFFICIAL PRINT FORMAT */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid #111827', marginBottom: '10px', backgroundColor: 'transparent' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1.5px solid #111827', backgroundColor: 'transparent' }}>
-                    <th style={{ width: '8%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                      <strong>Sr</strong>
-                    </th>
-                    <th style={{ width: '52%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                      <strong>Expense Title / Description</strong>
-                    </th>
-                    <th style={{ width: '12%', borderRight: '1.5px solid #111827', padding: '4px 4px', textAlign: 'center', fontSize: '0.82rem' }}>
-                      <strong>Category</strong>
-                    </th>
-                    <th style={{ width: '14%', borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                      <strong>Paid To</strong>
-                    </th>
-                    <th style={{ width: '14%', padding: '4px 8px', textAlign: 'center', fontSize: '0.82rem' }}>
-                      <strong>Amount (PKR)</strong>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedExpenseForPrint ? (
-                    <tr style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                        01
-                      </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                        {selectedExpenseForPrint.title} {selectedExpenseForPrint.notes ? `(${selectedExpenseForPrint.notes})` : ''}
-                      </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                        {selectedExpenseForPrint.category}
-                      </td>
-                      <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                        {selectedExpenseForPrint.paidTo || 'N/A'}
-                      </td>
-                      <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                        {parseFloat(selectedExpenseForPrint.amount).toLocaleString()}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredExpenses.map((exp, idx) => (
-                      <tr key={exp.id || idx} style={{ borderBottom: '1px solid #111827', backgroundColor: 'transparent' }}>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                          {String(idx + 1).padStart(2, '0')}
-                        </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.25 }}>
-                          {exp.title} {exp.notes ? `(${exp.notes})` : ''}
-                        </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.82rem' }}>
-                          {exp.category}
-                        </td>
-                        <td style={{ borderRight: '1.5px solid #111827', padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                          {exp.paidTo || 'N/A'}
-                        </td>
-                        <td style={{ padding: '3px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.82rem' }}>
-                          {parseFloat(exp.amount).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-
-                  {/* Total Amount Bottom Row */}
-                  <tr style={{ backgroundColor: 'transparent', borderTop: '1.5px solid #111827' }}>
-                    <td colSpan={2} style={{ borderRight: '1.5px solid #111827', padding: '4px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem' }}>
-                      Total amount
-                    </td>
-                    <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                    <td style={{ borderRight: '1.5px solid #111827', padding: '4px' }}></td>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, fontSize: '0.92rem', color: '#111827' }}>
-                      {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* Financial Summary Box */}
-              <Box sx={{ bgcolor: 'transparent', py: 0.8, px: 1.2, borderRadius: 1, border: '1px solid #86efac', mb: 1.2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Box>
-                    <Typography variant="body2" fontWeight={700} color="textSecondary" display="block">
-                      TOTAL EXPENSE VOUCHERS: {selectedExpenseForPrint ? 1 : filteredExpenses.length}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ lineHeight: 1.2 }}>
-                      NET TOTAL EXPENSES: Rs. {(selectedExpenseForPrint ? parseFloat(selectedExpenseForPrint.amount) : filteredTotal).toLocaleString()}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-
-              {/* Signatures Footer */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', mt: 1.5, pt: 1 }}>
-                <Box>
-                  <Typography variant="caption" display="block" sx={{ borderTop: '1px dashed #9ca3af', pt: 0.5, pb: 0.25, width: 170 }}>
-                    Cashier / Manager Signature
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Box sx={{ display: 'inline-block', textAlign: 'left' }}>
-                    <CeoSignature />
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        </DialogContent>
-
-        <DialogActions className="no-print" sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
-          <Button onClick={() => setPrintOpen(false)} color="secondary" variant="outlined" className="no-print">
-            Close
-          </Button>
-          <Button variant="contained" color="primary" startIcon={<PrinterOutlined />} onClick={handlePrint} className="no-print" sx={{ fontWeight: 700 }}>
-            Print Statement
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* 5. ADD / MANAGE EXPENSE CATEGORY DIALOG */}
+      {/* 8. ADD / MANAGE EXPENSE CATEGORY DIALOG */}
       <Dialog open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -1091,8 +1043,8 @@ export default function ExpensesPage() {
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5}>
-            <Typography variant="body2" color="textSecondary">
-              Create custom expense categories to categorize workshop, factory, and store spending.
+            <Typography variant="body2" color="text.secondary">
+              Create custom expense categories to categorize workshop, factory, and store spending. All categories sync automatically to the cloud.
             </Typography>
 
             <form onSubmit={handleSaveNewCategory}>
@@ -1110,15 +1062,8 @@ export default function ExpensesPage() {
                   error={Boolean(categoryError)}
                   helperText={categoryError}
                 />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  startIcon={<PlusOutlined />}
-                  sx={{ fontWeight: 700, py: 1 }}
-                >
-                  Save & Select Category
+                <Button type="submit" variant="contained" color="primary" fullWidth startIcon={<PlusOutlined />} sx={{ fontWeight: 700, py: 1 }}>
+                  Save &amp; Select Category
                 </Button>
               </Stack>
             </form>
@@ -1132,7 +1077,6 @@ export default function ExpensesPage() {
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {expenseCategories.map((cat) => {
                   const isDefault = DEFAULT_EXPENSE_CATEGORIES.includes(cat);
-
                   return (
                     <Chip
                       key={cat}

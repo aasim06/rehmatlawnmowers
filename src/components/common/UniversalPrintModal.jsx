@@ -38,7 +38,7 @@ export default function UniversalPrintModal({
   // Company Header
   companyName = 'REHMAT LAWN MOWERS',
   companyTagline = 'Factory Store & Workshop • Sales, Spares & Machine Services',
-  companyAddress = 'Workshop Counter • Ph: 0315-4630026 / 0300-8438183',
+  companyAddress = 'Workshop Counter • Ph: 0315-4630026',
   showCompanyHeader = true,
   // Party / Customer / Vendor
   partyLabel = 'Customer / Party Details',

@@ -226,6 +226,7 @@ export function StoreInventoryProvider({ children }) {
     logActivity,
     deleteAuditLog,
     clearAuditLogs,
+    syncAuditLogsFromCloud,
     notifications,
     addNotification,
     markNotificationRead,
@@ -236,12 +237,18 @@ export function StoreInventoryProvider({ children }) {
   const {
     expenses,
     setExpenses,
+    expenseFunds,
+    setExpenseFunds,
     expenseCategories,
     setExpenseCategories,
     addExpense,
     deleteExpense,
+    addExpenseFund,
+    updateExpenseFund,
+    deleteExpenseFund,
     addExpenseCategory,
-    deleteExpenseCategory
+    deleteExpenseCategory,
+    syncExpensesFromCloud
   } = useExpensesModule({ logActivity });
 
   const {
@@ -262,7 +269,8 @@ export function StoreInventoryProvider({ children }) {
     deleteVendor,
     deleteMultipleVendors,
     addVendorPayment,
-    deleteVendorPayment
+    deleteVendorPayment,
+    syncVendorsFromCloud
   } = useVendorsModule();
 
   const updateLogRef = useRef(null);
@@ -302,33 +310,58 @@ export function StoreInventoryProvider({ children }) {
       const deletedRepairSet = new Set(safeParseJSON('rehmat_deleted_repair_ids', []).map(String));
       const deletedCustPaySet = new Set(safeParseJSON('rehmat_deleted_customer_payment_ids', []).map(String));
       const deletedMachineCustomerSet = new Set(safeParseJSON('rehmat_deleted_machine_customer_ids', []).map(String));
-      const deletedVendorSet = new Set(safeParseJSON('rehmat_deleted_vendor_ids', []).map(String));
       const deletedCategorySet = new Set(safeParseJSON('rehmat_deleted_category_ids', []).map((x) => String(x).toLowerCase()));
+
+      // Flush any offline pending customer payments to Firestore before fetching
+      const pendingCustPayIds = safeParseJSON('rehmat_pending_customer_payment_ids', []).map(String);
+      if (pendingCustPayIds.length > 0) {
+        const localCustPays = safeParseJSON('rehmat_store_customer_payments_v2', []);
+        await Promise.allSettled(
+          pendingCustPayIds.map(async (id) => {
+            const p = localCustPays.find((item) => String(item.id) === id);
+            if (!p || deletedCustPaySet.has(id)) return;
+            await setDoc(
+              doc(db, 'customer_payments', id),
+              {
+                id: p.id,
+                voucher_no: p.voucherNo,
+                entry_type: p.entryType || 'Receipt',
+                reference_type: p.referenceType || 'Account',
+                invoice_id: p.invoiceId || '',
+                repair_id: p.repairId || '',
+                reference_label: p.referenceLabel || '',
+                customer_name: p.customerName,
+                payment_date: p.time,
+                amount_paid: parseFloat(p.amountPaid) || 0,
+                payment_method: p.paymentMethod || 'Cash',
+                reference_no: p.referenceNo || '',
+                notes: p.notes || '',
+                created_at: p.createdAt
+              },
+              { merge: true }
+            );
+          })
+        );
+      }
 
       const [
         itemsSnap,
         logsSnap,
-        vendorsSnap,
         salesSnap,
         catSnap,
         masterItemsSnap,
         custPaySnap,
-        vendPaySnap,
         repairsSnap,
-        expensesSnap,
         recipesSnap,
         machineCustomersSnap
       ] = await Promise.allSettled([
         getDocs(collection(db, 'store_items')),
         getDocs(collection(db, 'usage_logs')),
-        getDocs(collection(db, 'vendors')),
         getDocs(collection(db, 'machine_sales')),
         getDocs(collection(db, 'categories')),
         getDocs(collection(db, 'master_item_names')),
         getDocs(collection(db, 'customer_payments')),
-        getDocs(collection(db, 'vendor_payments')),
         getDocs(collection(db, 'machine_repairs')),
-        getDocs(collection(db, 'expenses')),
         getDocs(collection(db, 'machine_recipes')),
         getDocs(collection(db, 'machine_customers'))
       ]);
@@ -336,14 +369,11 @@ export function StoreInventoryProvider({ children }) {
       const toDocs = (res) => (res.status === 'fulfilled' && res.value?.docs ? res.value.docs.map((d) => ({ id: d.id, ...d.data() })) : []);
       const itemsList = toDocs(itemsSnap);
       const logsList = toDocs(logsSnap);
-      const vendorsList = toDocs(vendorsSnap);
       const salesList = toDocs(salesSnap);
       const catList = toDocs(catSnap);
       const masterItemsList = toDocs(masterItemsSnap);
       const custPayList = toDocs(custPaySnap);
-      const vendPayList = toDocs(vendPaySnap);
       const repairsList = toDocs(repairsSnap);
-      const expensesList = toDocs(expensesSnap);
       const recipesList = toDocs(recipesSnap);
       const machineCustomersList = toDocs(machineCustomersSnap);
 
@@ -427,29 +457,6 @@ export function StoreInventoryProvider({ children }) {
         if (mappedLogs.length > 0) {
           setUsageLogs(mappedLogs);
           safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
-        }
-      }
-
-      if (vendorsSnap.status === 'fulfilled') {
-        const cleanVendorsData = vendorsList.filter(
-          (v) => !deletedVendorSet.has(String(v.id))
-        );
-        cleanVendorsData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        const mappedVendors = cleanVendorsData.map((v) => ({
-          id: v.id,
-          name: (v.name || '').trim(),
-          contactPerson: v.company_name || v.contact_person || v.contactPerson || v.name,
-          companyName: v.company_name || v.companyName || v.name,
-          phone: v.phone || 'N/A',
-          email: v.email || 'N/A',
-          address: v.city_address || v.address || 'Local',
-          suppliedCategory: v.supplied_category || v.suppliedCategory || 'General',
-          openingBalance: parseFloat(v.opening_balance || v.openingBalance) || 0,
-          currentBalance: parseFloat(v.current_balance || v.currentBalance) || 0
-        }));
-        if (mappedVendors.length > 0) {
-          setVendors(mappedVendors);
-          safeSetJSON('rehmat_store_vendors_v2', JSON.stringify(mappedVendors));
         }
       }
 
@@ -588,27 +595,6 @@ export function StoreInventoryProvider({ children }) {
         }
       }
 
-      if (vendPaySnap.status === 'fulfilled') {
-        const deletedVendPaySet = new Set(safeParseJSON('rehmat_deleted_vendor_payment_ids', []).map(String));
-        const cleanVendPay = vendPayList.filter((p) => !deletedVendPaySet.has(String(p.id)));
-        const mappedVendPay = cleanVendPay.map((p) => ({
-          id: p.id,
-          voucherNo: p.voucher_no || p.voucherNo || `VP-${String(p.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`,
-          vendorName: (p.vendor_name || p.vendorName || '').trim(),
-          amountPaid: parseFloat(p.amount_paid !== undefined ? p.amount_paid : p.amountPaid) || 0,
-          paymentMethod: p.payment_method || p.paymentMethod || 'Cash',
-          referenceNo: p.reference_no || p.referenceNo || '',
-          items: Array.isArray(p.items) ? p.items : [],
-          notes: p.notes || '',
-          time: p.payment_date || p.time || (p.created_at ? new Date(p.created_at).toLocaleString() : new Date().toLocaleString()),
-          createdAt: p.created_at || p.createdAt
-        }));
-        if (mappedVendPay.length > 0) {
-          setVendorPayments(mappedVendPay);
-          safeSetJSON('rehmat_store_vendor_payments_v2', JSON.stringify(mappedVendPay));
-        }
-      }
-
       if (repairsSnap.status === 'fulfilled') {
         const cleanRepairs = repairsList.filter((r) => !deletedRepairSet.has(String(r.id)));
         cleanRepairs.sort((a, b) => new Date(b.created_at || b.dateISO || 0) - new Date(a.created_at || a.dateISO || 0));
@@ -656,24 +642,6 @@ export function StoreInventoryProvider({ children }) {
         }
       }
 
-      if (expensesSnap.status === 'fulfilled') {
-        const mappedExpenses = expensesList.map((e) => ({
-          id: e.id,
-          title: e.title,
-          category: e.category || 'General',
-          amount: parseFloat(e.amount) || 0,
-          paymentMethod: e.payment_method || e.paymentMethod || 'Cash',
-          paidTo: e.paid_to || e.paidTo || 'N/A',
-          expenseDate: e.expense_date || e.expenseDate || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
-          notes: e.notes || '',
-          createdAt: e.created_at || e.createdAt || new Date().toISOString()
-        }));
-        if (mappedExpenses.length > 0) {
-          setExpenses(mappedExpenses);
-          safeSetJSON('rehmat_store_expenses_v1', JSON.stringify(mappedExpenses));
-        }
-      }
-
       if (recipesSnap.status === 'fulfilled') {
         const cleanRecipeData = recipesList.filter(
           (r) => r.id !== '__APP_SECURITY__' && !r.model_name?.startsWith('__APP_')
@@ -689,7 +657,13 @@ export function StoreInventoryProvider({ children }) {
           safeSetJSON('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
         }
       }
-      await syncStoreFinanceFromCloud();
+
+      await Promise.allSettled([
+        syncStoreFinanceFromCloud(),
+        syncVendorsFromCloud(),
+        syncExpensesFromCloud(),
+        syncAuditLogsFromCloud()
+      ]);
     } catch {
       // Cloud fetch notification
     } finally {
@@ -711,13 +685,18 @@ export function StoreInventoryProvider({ children }) {
         fetchFirebaseData();
       }
     };
+    const handleOnline = () => {
+      fetchFirebaseData();
+    };
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
 
     // Periodic cloud poll every 90 seconds
     const interval = setInterval(fetchFirebaseData, 90000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
       clearInterval(interval);
     };
   }, [user]);
@@ -2114,6 +2093,7 @@ export function StoreInventoryProvider({ children }) {
       storeCustomers,
       storePayments,
       expenses,
+      expenseFunds,
       expenseCategories
     };
     return JSON.stringify(backupObj, null, 2);
@@ -2176,12 +2156,37 @@ export function StoreInventoryProvider({ children }) {
         }));
         await Promise.allSettled(salesToInsert.map((sale) => setDoc(doc(db, 'machine_sales', String(sale.id)), sale, { merge: true })));
       }
-      if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
-      if (data.storeCustomers && Array.isArray(data.storeCustomers)) setStoreCustomers(data.storeCustomers);
-      if (data.storePayments && Array.isArray(data.storePayments)) setStorePayments(data.storePayments);
-      if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
-      if (data.expenses && Array.isArray(data.expenses)) setExpenses(data.expenses);
-      if (data.expenseCategories && Array.isArray(data.expenseCategories)) setExpenseCategories(data.expenseCategories);
+      if (data.vendors && Array.isArray(data.vendors)) {
+        setVendors(data.vendors);
+        await Promise.allSettled(data.vendors.map((v) => setDoc(doc(db, 'vendors', String(v.id)), v, { merge: true })));
+      }
+      if (data.vendorPayments && Array.isArray(data.vendorPayments)) {
+        setVendorPayments(data.vendorPayments);
+        await Promise.allSettled(data.vendorPayments.map((p) => setDoc(doc(db, 'vendor_payments', String(p.id)), p, { merge: true })));
+      }
+      if (data.storeCustomers && Array.isArray(data.storeCustomers)) {
+        setStoreCustomers(data.storeCustomers);
+        await Promise.allSettled(data.storeCustomers.map((c) => setDoc(doc(db, 'store_customers', String(c.id)), c, { merge: true })));
+      }
+      if (data.storePayments && Array.isArray(data.storePayments)) {
+        setStorePayments(data.storePayments);
+        await Promise.allSettled(data.storePayments.map((p) => setDoc(doc(db, 'store_payments', String(p.id)), p, { merge: true })));
+      }
+      if (data.categories && Array.isArray(data.categories)) {
+        setCategories(data.categories);
+        await Promise.allSettled(data.categories.map((c) => setDoc(doc(db, 'categories', String(c.id)), c, { merge: true })));
+      }
+      if (data.expenses && Array.isArray(data.expenses)) {
+        setExpenses(data.expenses);
+        await Promise.allSettled(data.expenses.map((e) => setDoc(doc(db, 'expenses', String(e.id)), e, { merge: true })));
+      }
+      if (data.expenseFunds && Array.isArray(data.expenseFunds)) {
+        setExpenseFunds(data.expenseFunds);
+        await Promise.allSettled(data.expenseFunds.map((f) => setDoc(doc(db, 'expense_funds', String(f.id)), f, { merge: true })));
+      }
+      if (data.expenseCategories && Array.isArray(data.expenseCategories)) {
+        setExpenseCategories(data.expenseCategories);
+      }
 
       fetchFirebaseData();
       return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
@@ -2205,6 +2210,10 @@ export function StoreInventoryProvider({ children }) {
         'store_customers',
         'store_payments',
         'vendors',
+        'expenses',
+        'expense_funds',
+        'expense_categories',
+        'audit_logs',
         'shop_items',
         'shop_usage_logs',
         'shop_vendors',
@@ -2237,6 +2246,8 @@ export function StoreInventoryProvider({ children }) {
       setVendorPayments([]);
       setStoreCustomers([]);
       setStorePayments([]);
+      setExpenses([]);
+      setExpenseFunds([]);
 
       // 4. Refetch live state from Supabase immediately so the UI reflects an empty state across all browsers
       fetchFirebaseData();
@@ -2376,11 +2387,16 @@ export function StoreInventoryProvider({ children }) {
       markAllNotificationsRead,
       clearNotifications,
       expenses,
+      expenseFunds,
       addExpense,
       deleteExpense,
+      addExpenseFund,
+      updateExpenseFund,
+      deleteExpenseFund,
       expenseCategories,
       addExpenseCategory,
       deleteExpenseCategory,
+      fetchFirebaseData,
       shopSales: machineSales,
       addShopSale: addMachineSale,
       updateShopSale: updateMachineSale,
@@ -2403,6 +2419,7 @@ export function StoreInventoryProvider({ children }) {
       storeCustomers,
       storePayments,
       expenses,
+      expenseFunds,
       expenseCategories,
       totalInventoryCount,
       totalValuation,

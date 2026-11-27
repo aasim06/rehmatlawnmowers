@@ -265,6 +265,30 @@ export function ShopInventoryProvider({ children }) {
       const deletedPayments = new Set(safeParseJSON(DELETED_KEYS.payments, []).map(String));
       const deletedCustomers = new Set(safeParseJSON(DELETED_KEYS.customers, []).map(String));
 
+      // Flush any locally queued offline Shop sales, payments, or customers before fetching
+      const flushPendingCollection = async (pendingKey, storageKey, deletedSet, colName) => {
+        const pendingIds = safeParseJSON(pendingKey, []).map(String);
+        if (pendingIds.length === 0) return;
+        const localRows = safeParseJSON(storageKey, []);
+        await Promise.allSettled(
+          pendingIds.map(async (id) => {
+            const row = localRows.find((r) => String(r.id) === id);
+            if (!row || deletedSet.has(id)) {
+              removeTrackedId(pendingKey, id);
+              return;
+            }
+            await setDoc(doc(db, colName, id), row, { merge: true });
+            removeTrackedId(pendingKey, id);
+          })
+        );
+      };
+
+      await Promise.allSettled([
+        flushPendingCollection(PENDING_KEYS.sales, STORAGE_KEYS.sales, deletedSales, 'shop_sales'),
+        flushPendingCollection(PENDING_KEYS.payments, STORAGE_KEYS.payments, deletedPayments, 'shop_customer_payments'),
+        flushPendingCollection(PENDING_KEYS.customers, STORAGE_KEYS.customers, deletedCustomers, 'shop_customers')
+      ]);
+
       const [itemsSnap, logsSnap, vendorsSnap, catsSnap, salesSnap, paySnap, custSnap] = await Promise.allSettled([
         getDocs(collection(db, 'shop_items')),
         getDocs(collection(db, 'shop_usage_logs')),
@@ -370,9 +394,11 @@ export function ShopInventoryProvider({ children }) {
       }
     };
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', fetchShopFirebaseData);
     const interval = setInterval(fetchShopFirebaseData, 90000);
     return () => {
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', fetchShopFirebaseData);
       clearInterval(interval);
     };
   }, [fetchShopFirebaseData]);
