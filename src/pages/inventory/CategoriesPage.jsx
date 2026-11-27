@@ -5,11 +5,6 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 import {
   Box,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Drawer,
   IconButton,
   InputAdornment,
@@ -32,7 +27,7 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant
 
 // project imports
 import MainCard from 'components/MainCard';
-import { AppButton } from 'components/common';
+import { AppButton, ConfirmDialog } from 'components/common';
 import usePermission from 'hooks/usePermission';
 
 export default function CategoriesPage() {
@@ -429,45 +424,32 @@ export default function CategoriesPage() {
         </Box>
       </Drawer>
 
-      {/* Modal 3: Confirm Single Delete Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete Category Confirmation
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete category <strong>"{categoryToDelete?.name}"</strong>?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmSingleDelete}>
-            Confirm Delete
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+      {/* Modal 3 & 4: Reusable Delete Dialogs */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmSingleDelete}
+        title="Delete Category Confirmation"
+        message={
+          <>
+            Are you sure you want to delete category <strong>&quot;{categoryToDelete?.name}&quot;</strong>?
+          </>
+        }
+        confirmText="Confirm Delete"
+      />
 
-      {/* Modal 4: Confirm Bulk Delete Dialog */}
-      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete All Selected Categories Confirmation
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+      <ConfirmDialog
+        open={bulkDeleteDialogOpen}
+        onClose={() => setBulkDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Delete All Selected Categories Confirmation"
+        message={
+          <>
             Are you sure you want to delete all <strong>{selected.length} selected categories</strong>?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setBulkDeleteDialogOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmBulkDelete}>
-            Delete All {selected.length} Categories
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirmText={`Delete All ${selected.length} Categories`}
+      />
     </MainCard>
   );
 }

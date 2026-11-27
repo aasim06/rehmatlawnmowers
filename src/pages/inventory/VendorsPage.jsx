@@ -8,11 +8,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Drawer,
   Grid,
   IconButton,
@@ -37,6 +32,7 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlin
 
 // project imports
 import MainCard from 'components/MainCard';
+import { ConfirmDialog } from 'components/common';
 
 const PARTY_TYPE_OPTIONS = ['Supplier (Vendor)', 'Customer (Party)', 'Contractor', 'Transporter', 'Other'];
 
@@ -491,45 +487,34 @@ export default function VendorsPage() {
         </Box>
       </Drawer>
 
-      {/* Modal 3: Confirm Single Delete Vendor Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete Vendor Confirmation
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete vendor <strong>"{vendorToDelete?.name}"</strong> ({vendorToDelete?.id})? This action will remove the vendor from your directory.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="secondary">
-            Cancel
-          </Button>
-          <Button onClick={handleConfirmSingleDelete} variant="contained" color="error">
-            Confirm Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Modal 3 & 4: Reusable Delete Dialogs */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmSingleDelete}
+        title="Delete Vendor Confirmation"
+        message={
+          <>
+            Are you sure you want to delete vendor <strong>&quot;{vendorToDelete?.name}&quot;</strong> ({vendorToDelete?.id})? This action
+            will remove the vendor from your directory.
+          </>
+        }
+        confirmText="Confirm Delete"
+      />
 
-      {/* Modal 4: Confirm Bulk Delete Multiple Vendors Dialog */}
-      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
-          Delete All Selected Vendors Confirmation
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete all <strong>{selected.length} selected vendors</strong> from your directory? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBulkDeleteDialogOpen(false)} color="secondary">
-            Cancel
-          </Button>
-          <Button onClick={handleConfirmBulkDelete} variant="contained" color="error">
-            Delete All {selected.length} Vendors
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={bulkDeleteDialogOpen}
+        onClose={() => setBulkDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Delete All Selected Vendors Confirmation"
+        message={
+          <>
+            Are you sure you want to delete all <strong>{selected.length} selected vendors</strong> from your directory? This action cannot
+            be undone.
+          </>
+        }
+        confirmText={`Delete All ${selected.length} Vendors`}
+      />
     </MainCard>
   );
 }

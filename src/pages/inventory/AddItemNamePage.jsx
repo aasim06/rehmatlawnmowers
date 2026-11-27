@@ -5,11 +5,6 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Snackbar from '@mui/material/Snackbar';
@@ -26,7 +21,7 @@ import PlusSquareOutlined from '@ant-design/icons/PlusSquareOutlined';
 import ReloadOutlined from '@ant-design/icons/ReloadOutlined';
 
 // project imports (New Master Components)
-import { PageHeader, AppDataTable, FormDialog, AppButton } from 'components/common';
+import { PageHeader, AppDataTable, FormDialog, ConfirmDialog, AppButton } from 'components/common';
 import { formatCategoryLabel } from 'utils/formatText';
 
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
@@ -600,39 +595,31 @@ export default function AddItemNamePage() {
       </FormDialog>
 
       {/* 5. Delete Dialogs */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Delete Item Name</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete master item name <strong>"{itemToDelete?.name}"</strong>?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmSingleDelete}>
-            Confirm Delete
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmSingleDelete}
+        title="Delete Item Name"
+        message={
+          <>
+            Are you sure you want to delete master item name <strong>&quot;{itemToDelete?.name}&quot;</strong>?
+          </>
+        }
+        confirmText="Confirm Delete"
+      />
 
-      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Bulk Delete Confirmation</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+      <ConfirmDialog
+        open={bulkDeleteDialogOpen}
+        onClose={() => setBulkDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Bulk Delete Confirmation"
+        message={
+          <>
             Are you sure you want to delete all <strong>{selected.length} selected item names</strong>?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setBulkDeleteDialogOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmBulkDelete}>
-            Delete Selected ({selected.length})
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirmText={`Delete Selected (${selected.length})`}
+      />
 
       {/* Snackbar for restore alert */}
       <Snackbar

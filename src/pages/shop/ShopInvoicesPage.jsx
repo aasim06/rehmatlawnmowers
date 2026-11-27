@@ -42,7 +42,7 @@ import {
 } from '@ant-design/icons';
 
 import MainCard from 'components/MainCard';
-import { AppButton, FilterBar, MasterKpiGrid, PageHeader, UniversalPrintModal } from 'components/common';
+import { AppButton, ConfirmDialog, FilterBar, MasterKpiGrid, PageHeader, UniversalPrintModal } from 'components/common';
 import PaymentVoucherDialog from 'components/machine/PaymentVoucherDialog';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
@@ -1211,22 +1211,18 @@ export default function ShopInvoicesPage() {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Delete Invoice {deleteTarget?.docNo}?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title={`Delete Invoice ${deleteTarget?.docNo || ''}?`}
+        message={
+          <>
             Are you sure you want to delete <strong>{deleteTarget?.docNo}</strong> for <strong>{deleteTarget?.customerName}</strong>?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setDeleteTarget(null)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmDelete}>
-            Delete Invoice
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirmText="Delete Invoice"
+      />
 
       <Snackbar
         open={snackbar.open}

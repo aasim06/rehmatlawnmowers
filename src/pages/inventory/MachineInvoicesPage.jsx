@@ -47,7 +47,7 @@ import {
 
 // project imports
 import MainCard from 'components/MainCard';
-import { AppButton, MasterKpiGrid, PageHeader, UniversalPrintModal } from 'components/common';
+import { AppButton, ConfirmDialog, MasterKpiGrid, PageHeader, UniversalPrintModal } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import usePermission from 'hooks/usePermission';
 import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx, getToneColors } from 'utils/themeSurface';
@@ -1171,23 +1171,19 @@ export default function MachineInvoicesPage() {
       </Dialog>
 
       {/* DELETE DIALOG */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete {selectedBill?.docNo}?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={`Delete ${selectedBill?.docNo || ''}?`}
+        message={
+          <>
             Are you sure you want to delete <strong>{selectedBill?.docNo}</strong> for <strong>{selectedBill?.customerName}</strong>? This
             action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setDeleteDialogOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleConfirmDelete}>
-            Yes, Delete
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirmText="Yes, Delete"
+      />
 
       <Snackbar
         open={snackbar.open}

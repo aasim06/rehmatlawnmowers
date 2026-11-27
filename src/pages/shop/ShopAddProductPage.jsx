@@ -7,11 +7,6 @@ import {
   Avatar,
   Box,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -44,7 +39,7 @@ import ShoppingCartOutlined from '@ant-design/icons/ShoppingCartOutlined';
 import UploadOutlined from '@ant-design/icons/UploadOutlined';
 
 import MainCard from 'components/MainCard';
-import { AppButton, FilterBar, PageHeader } from 'components/common';
+import { AppButton, ConfirmDialog, FilterBar, PageHeader } from 'components/common';
 import { ShopResetDialog } from 'components/shop';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 import { getCardSurfaceSx, getSubSurfaceSx, getTableHeadCellSx, getToneColors } from 'utils/themeSurface';
@@ -761,22 +756,18 @@ export default function ShopAddProductPage() {
         )}
       </MainCard>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Delete Product?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteItem}
+        title="Delete Product?"
+        message={
+          <>
             Are you sure you want to delete <strong>&quot;{itemToDelete?.name}&quot;</strong> from the Shop catalogue?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton intent="cancel" onClick={() => setDeleteConfirmOpen(false)}>
-            Cancel
-          </AppButton>
-          <AppButton intent="danger" onClick={handleDeleteItem}>
-            Delete Product
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirmText="Delete Product"
+      />
 
       <ShopResetDialog
         open={resetConfirmOpen}

@@ -1,20 +1,21 @@
 import PropTypes from 'prop-types';
-import { Stack, Typography } from '@mui/material';
-import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
-import ExclamationCircleOutlined from '@ant-design/icons/ExclamationCircleOutlined';
-import FormDialog from './FormDialog';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Typography from '@mui/material/Typography';
+import AppButton from './AppButton';
 
 /**
- * Reusable confirmation dialog built on FormDialog and AppButton for delete
- * and destructive actions across all modules.
+ * Reusable Delete / Confirmation Dialog matching the app-wide compact delete modal:
+ * bold error title, concise body text, and side-by-side Cancel / Confirm AppButtons.
  */
 export default function ConfirmDialog({
   open = false,
   onClose,
   onConfirm,
-  title = 'Confirm Action',
-  subtitle,
-  message = 'Are you sure you want to proceed?',
+  title = 'Confirm Delete',
+  message = 'Are you sure you want to delete this record?',
   confirmText = 'Confirm Delete',
   cancelText = 'Cancel',
   intent = 'danger',
@@ -22,40 +23,29 @@ export default function ConfirmDialog({
   maxWidth = 'xs',
   children
 }) {
-  const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    if (onConfirm) {
-      await onConfirm();
-    }
-  };
-
   return (
-    <FormDialog
-      open={Boolean(open)}
-      onClose={onClose}
-      onSubmit={handleSubmit}
-      loading={loading}
-      maxWidth={maxWidth}
-      title={
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ color: intent === 'danger' ? 'error.main' : 'primary.main' }}>
-          {intent === 'danger' ? <DeleteOutlined style={{ fontSize: 18 }} /> : <ExclamationCircleOutlined style={{ fontSize: 18 }} />}
-          <span>{title}</span>
-        </Stack>
-      }
-      subtitle={subtitle}
-      saveText={confirmText}
-      cancelText={cancelText}
-      saveButtonProps={{
-        intent,
-        startIcon: intent === 'danger' ? <DeleteOutlined /> : undefined
-      }}
-    >
-      {children || (
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-          {message}
-        </Typography>
-      )}
-    </FormDialog>
+    <Dialog open={Boolean(open)} onClose={loading ? undefined : onClose} maxWidth={maxWidth} fullWidth>
+      <DialogTitle sx={{ fontWeight: 700, color: intent === 'danger' ? 'error.main' : 'primary.main' }}>
+        {title}
+      </DialogTitle>
+
+      <DialogContent>
+        {children || (
+          <Typography variant="body2" color="text.secondary">
+            {message}
+          </Typography>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <AppButton intent="cancel" onClick={onClose} disabled={loading}>
+          {cancelText}
+        </AppButton>
+        <AppButton intent={intent} onClick={onConfirm} loading={loading} loadingText="Deleting...">
+          {confirmText}
+        </AppButton>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -64,7 +54,6 @@ ConfirmDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
   title: PropTypes.node,
-  subtitle: PropTypes.string,
   message: PropTypes.node,
   confirmText: PropTypes.string,
   cancelText: PropTypes.string,
