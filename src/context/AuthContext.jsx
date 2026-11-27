@@ -263,7 +263,9 @@ export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('rehmat_erp_active_user') || localStorage.getItem('rehmat_erp_active_user');
+      // Clean up any legacy localStorage persistent user so desktop app always prompts for login on open
+      localStorage.removeItem('rehmat_erp_active_user');
+      const saved = sessionStorage.getItem('rehmat_erp_active_user');
       if (saved) {
         const parsedUser = JSON.parse(saved);
         return {
@@ -472,7 +474,6 @@ export function AuthProvider({ children }) {
         };
         setUser(rootAdmin);
         sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(rootAdmin));
-        localStorage.setItem('rehmat_erp_active_user', JSON.stringify(rootAdmin));
         setLoading(false);
         return { success: true, user: rootAdmin };
       }
@@ -545,7 +546,6 @@ export function AuthProvider({ children }) {
 
       setUser(matchWithPerms);
       sessionStorage.setItem('rehmat_erp_active_user', JSON.stringify(matchWithPerms));
-      localStorage.setItem('rehmat_erp_active_user', JSON.stringify(matchWithPerms));
       setLoading(false);
       return { success: true, user: matchWithPerms };
     }
