@@ -24,6 +24,8 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 
 // ant design icons
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
@@ -35,7 +37,7 @@ import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import CloseCircleOutlined from '@ant-design/icons/CloseCircleOutlined';
 
 import MainCard from 'components/MainCard';
-import { AppButton } from 'components/common';
+import { AppButton, ConfirmDialog } from 'components/common';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 export default function VendorLedgerPage() {
@@ -78,9 +80,11 @@ export default function VendorLedgerPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printVendorData, setPrintVendorData] = useState(null);
 
-  // Vendor Delete Confirmation State
+  // Vendor Delete & Payment Delete Confirmation State
   const [deleteVendorModalOpen, setDeleteVendorModalOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState(null);
+  const [paymentToDelete, setPaymentToDelete] = useState(null);
+  const [vendorToast, setVendorToast] = useState({ open: false, message: '', severity: 'warning' });
   const [deletedVendorNames, setDeletedVendorNames] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('rehmat_deleted_vendor_ledger_names') || '[]');
@@ -187,7 +191,7 @@ export default function VendorLedgerPage() {
     e.preventDefault();
     const paidNum = parseFloat(paymentForm.amountPaid) || 0;
     if (paidNum <= 0) {
-      alert('Please enter a valid payment amount');
+      setVendorToast({ open: true, message: 'Please enter a valid payment amount', severity: 'warning' });
       return;
     }
 
@@ -716,20 +720,14 @@ export default function VendorLedgerPage() {
                         <TableCell>{p.referenceNo || '—'}</TableCell>
                         <TableCell>{p.notes || '—'}</TableCell>
                         <TableCell align="center">
-                          <Button
+                          <AppButton
                             size="small"
-                            color="error"
-                            variant="outlined"
+                            intent="danger-outlined"
                             startIcon={<DeleteOutlined />}
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete this payment of Rs. ${(parseFloat(p.amountPaid) || 0).toLocaleString()}?`)) {
-                                deleteVendorPayment(p.id);
-                              }
-                            }}
-                            sx={{ fontWeight: 700 }}
+                            onClick={() => setPaymentToDelete(p)}
                           >
                             Delete
-                          </Button>
+                          </AppButton>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1030,6 +1028,42 @@ export default function VendorLedgerPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(paymentToDelete)}
+        onClose={() => setPaymentToDelete(null)}
+        onConfirm={async () => {
+          if (paymentToDelete) {
+            await deleteVendorPayment(paymentToDelete.id);
+            setVendorToast({ open: true, message: 'Vendor payment deleted', severity: 'success' });
+            setPaymentToDelete(null);
+          }
+        }}
+        title="Delete Vendor Payment"
+        message={
+          <>
+            Are you sure you want to delete this payment of{' '}
+            <strong>Rs. {(parseFloat(paymentToDelete?.amountPaid) || 0).toLocaleString()}</strong>?
+          </>
+        }
+        confirmText="Confirm Delete"
+      />
+
+      <Snackbar
+        open={vendorToast.open}
+        autoHideDuration={3500}
+        onClose={() => setVendorToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setVendorToast((prev) => ({ ...prev, open: false }))}
+          severity={vendorToast.severity}
+          variant="filled"
+          sx={{ fontWeight: 600 }}
+        >
+          {vendorToast.message}
+        </Alert>
+      </Snackbar>
     </Box >
   );
 }

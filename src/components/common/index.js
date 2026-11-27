@@ -11,3 +11,4 @@ export { default as MasterKpiGrid } from './MasterKpiGrid';
 export { default as DepartmentSwitcher } from './DepartmentSwitcher';
 export { default as AppButton } from './AppButton';
 export { default as AppTextField } from './AppTextField';
+export { default as ConfirmDialog } from './ConfirmDialog';

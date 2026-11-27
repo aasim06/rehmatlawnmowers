@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 // material-ui
 import { useTheme } from '@mui/material/styles';
 import {
+  Alert,
   Autocomplete,
   Box,
   Chip,
@@ -11,6 +12,7 @@ import {
   IconButton,
   InputAdornment,
   MenuItem,
+  Snackbar,
   Stack,
   TableCell,
   TableRow,
@@ -35,6 +37,7 @@ import {
   AppButton,
   AppDataTable,
   AppTextField,
+  ConfirmDialog,
   FilterBar,
   FormDialog,
   MasterKpiGrid,
@@ -120,6 +123,13 @@ export default function ExpensesPage() {
   const [selected, setSelected] = useState([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [selectedExpenseForPrint, setSelectedExpenseForPrint] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
+  const [toast, setToast] = useState({ open: false, severity: 'success', message: '' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, severity, message });
+  };
 
   const periodParams = useMemo(
     () => ({ period: dateFilter, todayStr, fromDate: customFromDate, toDate: customToDate }),
@@ -158,7 +168,7 @@ export default function ExpensesPage() {
     if (e) e.preventDefault();
     const numAmt = parseFloat(quickFundAmount);
     if (!numAmt || numAmt <= 0) {
-      alert('Please enter a valid cash amount greater than 0');
+      showToast('Please enter a valid cash amount greater than 0', 'warning');
       return;
     }
     await addExpenseFund({
@@ -171,6 +181,11 @@ export default function ExpensesPage() {
       paymentMethod: quickFundMethod,
       notes: quickFundNotes.trim()
     });
+    showToast(
+      quickFundType === 'returned'
+        ? `Recorded return of PKR ${numAmt.toLocaleString()} to owner`
+        : `Added PKR ${numAmt.toLocaleString()} to Cash in Hand`
+    );
     setQuickFundAmount('');
     setQuickFundNotes('');
     setQuickFundType('received');
@@ -194,15 +209,17 @@ export default function ExpensesPage() {
     setNewCategoryName('');
     setCategoryError('');
     setAddCategoryOpen(false);
+    showToast(`Category "${trimmed}" added`);
   };
 
   const handleDeleteCategory = (catToDelete) => {
-    if (window.confirm(`Are you sure you want to delete category "${catToDelete}"?`)) {
-      if (deleteExpenseCategory) deleteExpenseCategory(catToDelete);
-      if (category === catToDelete) {
-        setCategory(expenseCategories.find((c) => c !== catToDelete) || 'Miscellaneous & Others');
-      }
-    }
+    setConfirmState({
+      type: 'category',
+      title: 'Delete Expense Category',
+      message: `Are you sure you want to delete category "${catToDelete}"?`,
+      confirmText: 'Delete Category',
+      target: catToDelete
+    });
   };
 
   const handleClearForm = () => {
@@ -217,35 +234,75 @@ export default function ExpensesPage() {
 
   const handleAddExpense = async (e) => {
     if (e) e.preventDefault();
-    if (!title.trim() || !amount || parseFloat(amount) <= 0) {
-      alert('Please enter a valid expense title and amount');
+    const numAmt = parseFloat(amount);
+    if (!title.trim() || !amount || numAmt <= 0) {
+      showToast('Please enter a valid expense title and amount', 'warning');
       return;
     }
     await addExpense({
       title: title.trim(),
       category,
-      amount: parseFloat(amount),
+      amount: numAmt,
       paymentMethod,
       paidTo: paidTo.trim() || 'N/A',
       expenseDate,
       notes: notes.trim()
     });
+    showToast(`Saved expense "${title.trim()}" (PKR ${numAmt.toLocaleString()})`);
     handleClearForm();
   };
 
   const handleSaveCashFund = async (fundPayload, existingId) => {
     if (existingId && updateExpenseFund) {
       await updateExpenseFund(existingId, fundPayload);
+      showToast('Cash entry updated');
     } else if (addExpenseFund) {
       await addExpenseFund(fundPayload);
+      showToast(
+        fundPayload.entryType === 'returned'
+          ? `Recorded return of PKR ${fundPayload.amount.toLocaleString()}`
+          : `Added PKR ${fundPayload.amount.toLocaleString()} to Cash in Hand`
+      );
     }
     setEditingFund(null);
   };
 
   const handleBulkDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${selected.length} selected expense records?`)) {
-      selected.forEach((id) => deleteExpense(id));
-      setSelected([]);
+    if (selected.length === 0) return;
+    setConfirmState({
+      type: 'bulk_expenses',
+      title: 'Bulk Delete Expenses',
+      message: `Are you sure you want to delete ${selected.length} selected expense record(s)? This will update cloud records immediately.`,
+      confirmText: `Delete (${selected.length})`,
+      target: [...selected]
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmState) return;
+    setDeletingConfirm(true);
+    try {
+      if (confirmState.type === 'expense') {
+        await deleteExpense(confirmState.target.id);
+        showToast(`Deleted expense "${confirmState.target.title}"`);
+      } else if (confirmState.type === 'bulk_expenses') {
+        await Promise.all(confirmState.target.map((id) => deleteExpense(id)));
+        setSelected([]);
+        showToast(`Deleted ${confirmState.target.length} expense records`);
+      } else if (confirmState.type === 'fund') {
+        await deleteExpenseFund(confirmState.target.id);
+        showToast('Cash entry deleted');
+      } else if (confirmState.type === 'category') {
+        const catToDelete = confirmState.target;
+        if (deleteExpenseCategory) await deleteExpenseCategory(catToDelete);
+        if (category === catToDelete) {
+          setCategory(expenseCategories.find((c) => c !== catToDelete) || 'Miscellaneous & Others');
+        }
+        showToast(`Category "${catToDelete}" deleted`);
+      }
+      setConfirmState(null);
+    } finally {
+      setDeletingConfirm(false);
     }
   };
 
@@ -898,11 +955,20 @@ export default function ExpensesPage() {
               <IconButton
                 size="small"
                 color="error"
-                onClick={() => {
-                  if (window.confirm(`Are you sure you want to delete "${row.title}"?`)) {
-                    deleteExpense(row.id);
-                  }
-                }}
+                onClick={() =>
+                  setConfirmState({
+                    type: 'expense',
+                    title: 'Delete Expense Voucher',
+                    message: (
+                      <>
+                        Are you sure you want to delete expense <strong>&ldquo;{row.title}&rdquo;</strong> (PKR{' '}
+                        {(parseFloat(row.amount) || 0).toLocaleString()})?
+                      </>
+                    ),
+                    confirmText: 'Confirm Delete',
+                    target: row
+                  })
+                }
               >
                 <DeleteOutlined style={{ fontSize: 15 }} />
               </IconButton>
@@ -966,11 +1032,20 @@ export default function ExpensesPage() {
               <IconButton
                 size="small"
                 color="error"
-                onClick={() => {
-                  if (window.confirm(`Delete Cash entry of PKR ${(parseFloat(row.amount) || 0).toLocaleString()}?`)) {
-                    deleteExpenseFund(row.id);
-                  }
-                }}
+                onClick={() =>
+                  setConfirmState({
+                    type: 'fund',
+                    title: 'Delete Cash Entry',
+                    message: (
+                      <>
+                        Are you sure you want to delete cash entry of{' '}
+                        <strong>PKR {(parseFloat(row.amount) || 0).toLocaleString()}</strong> ({row.receivedFrom || 'Owner'})?
+                      </>
+                    ),
+                    confirmText: 'Confirm Delete',
+                    target: row
+                  })
+                }
               >
                 <DeleteOutlined style={{ fontSize: 15 }} />
               </IconButton>
@@ -1066,6 +1141,34 @@ export default function ExpensesPage() {
           </Box>
         </Stack>
       </FormDialog>
+
+      {/* 11. REUSABLE DELETE CONFIRMATION DIALOG */}
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onClose={() => !deletingConfirm && setConfirmState(null)}
+        onConfirm={handleConfirmDelete}
+        loading={deletingConfirm}
+        title={confirmState?.title || 'Confirm Delete'}
+        message={confirmState?.message || 'Are you sure you want to delete this record?'}
+        confirmText={confirmState?.confirmText || 'Confirm Delete'}
+      />
+
+      {/* 12. FEEDBACK / VALIDATION TOAST */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ fontWeight: 600 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }
