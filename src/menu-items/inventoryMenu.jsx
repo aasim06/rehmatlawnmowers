@@ -101,6 +101,13 @@ export const factoryStoreGroup = {
       icon: icons.ExportOutlined
     },
     {
+      id: 'factory-invoices',
+      title: 'Factory Invoices',
+      type: 'item',
+      url: '/inventory/factory-invoices',
+      icon: icons.FileTextOutlined
+    },
+    {
       id: 'store-payments',
       title: 'Store Payments',
       type: 'item',

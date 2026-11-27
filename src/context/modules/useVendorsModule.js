@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { db } from 'api/firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, setDoc, deleteDoc, getDocs, syncWithTimeout } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   vendors: 'rehmat_store_vendors_v2',
@@ -41,8 +41,6 @@ const untrackId = (key, id) => {
     existing.filter((x) => x !== String(id))
   );
 };
-
-const syncWithTimeout = (promise, ms = 1500) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
 
 const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -235,7 +233,7 @@ export function useVendorsModule() {
   };
 
   const syncVendorsFromCloud = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!CLOUD_SYNC_ENABLED || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
 
     const deletedVendorSet = new Set(safeParse(STORAGE_KEYS.deletedVendors, []).map(String));
     const deletedPaySet = new Set(safeParse(STORAGE_KEYS.deletedVendorPayments, []).map(String));

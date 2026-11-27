@@ -3,14 +3,8 @@ import { createContext, useContext, useState, useEffect, useMemo, useRef } from 
 import { useAuth } from 'context/AuthContext';
 import { initialCategories, defaultMasterItemNames, defaultStoreItems } from 'data/factoryStoreData';
 import { formatItemsSummaryLabel } from 'utils/machineLedgerHelpers';
-import { db } from 'api/firebase';
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  deleteDoc
-} from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, getDocs, setDoc, deleteDoc } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 // Modular Data Hooks
 import {
@@ -295,7 +289,7 @@ export function StoreInventoryProvider({ children }) {
   // Parallel Data Fetching via Firebase Firestore for zero-latency initial load & clean error handling
   const isFetchingRef = useRef(false);
   const fetchFirebaseData = async () => {
-    if (isFetchingRef.current) return;
+    if (!CLOUD_SYNC_ENABLED || isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -672,7 +666,7 @@ export function StoreInventoryProvider({ children }) {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !CLOUD_SYNC_ENABLED) return;
 
     fetchFirebaseData();
 

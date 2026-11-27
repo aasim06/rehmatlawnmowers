@@ -2,8 +2,8 @@ import PropTypes from 'prop-types';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { StoreInventoryContext } from 'context/StoreInventoryContext';
 import { defaultMasterItemNames } from 'data/factoryStoreData';
-import { db } from 'api/firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, getDocs, setDoc, deleteDoc, syncWithTimeout } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { getTodayISO, isRecordInDateRange } from 'utils/ledgerHelpers';
 
 const STORAGE_KEYS = {
@@ -79,8 +79,6 @@ const removeTrackedId = (key, id) => {
     existing.filter((item) => item !== String(id))
   );
 };
-
-const syncWithTimeout = (promise, ms = 1200) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
 
 const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -256,6 +254,7 @@ export function ShopInventoryProvider({ children }) {
 
   const fetchShopFirebaseData = useCallback(async () => {
     try {
+      if (!CLOUD_SYNC_ENABLED) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
       const deletedItems = new Set(safeParseJSON(DELETED_KEYS.items, []).map(String));
@@ -384,6 +383,7 @@ export function ShopInventoryProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!CLOUD_SYNC_ENABLED) return;
     fetchShopFirebaseData();
     let lastFocusFetch = Date.now();
     const handleFocus = () => {

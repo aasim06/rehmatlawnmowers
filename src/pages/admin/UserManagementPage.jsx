@@ -84,7 +84,7 @@ const MODULE_GROUPS = [
       { key: 'categories', label: 'Categories' },
       { key: 'stock-in', label: 'Stock In' },
       { key: 'stock-out', label: 'Stock Out' },
-      { key: 'store-ledger', syncKeys: ['store-payments'], label: 'Store Payments & Party Ledger' },
+      { key: 'store-ledger', syncKeys: ['store-payments', 'factory-invoices'], label: 'Store Invoices, Payments & Party Ledger' },
       { key: 'ledger', label: 'Store History & Ledger' }
     ]
   },
@@ -183,6 +183,7 @@ const getPresetPermissions = (presetType) => {
       'stock-out': true,
       'store-ledger': true,
       'store-payments': true,
+      'factory-invoices': true,
       ledger: true,
       'shop-dashboard': true,
       'shop-add-product': true,

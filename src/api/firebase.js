@@ -1,6 +1,20 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  disableNetwork,
+  setDoc as fsSetDoc,
+  deleteDoc as fsDeleteDoc,
+  getDocs as fsGetDocs,
+  getDoc as fsGetDoc,
+  onSnapshot as fsOnSnapshot
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+
+// Master cloud toggle: set to `true` for live Firebase Cloud sync, or `false` for instant Local Mode.
+export const CLOUD_SYNC_ENABLED = true;
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDxEITlu72KfPd6zdY3mfzwBRX_MSCVNBs',
@@ -26,6 +40,21 @@ try {
 } catch {
   db = getFirestore(app);
 }
+
+if (!CLOUD_SYNC_ENABLED) {
+  disableNetwork(db).catch(() => {});
+}
+
+// Guarded Firestore helpers that resolve immediately while Cloud Sync is paused
+export const setDoc = (...args) => (CLOUD_SYNC_ENABLED ? fsSetDoc(...args) : Promise.resolve());
+export const deleteDoc = (...args) => (CLOUD_SYNC_ENABLED ? fsDeleteDoc(...args) : Promise.resolve());
+export const getDocs = (...args) =>
+  CLOUD_SYNC_ENABLED ? fsGetDocs(...args) : Promise.resolve({ empty: true, docs: [], size: 0, metadata: { fromCache: true } });
+export const getDoc = (...args) =>
+  CLOUD_SYNC_ENABLED ? fsGetDoc(...args) : Promise.resolve({ exists: () => false, data: () => undefined });
+export const onSnapshot = (...args) => (CLOUD_SYNC_ENABLED ? fsOnSnapshot(...args) : () => {});
+export const syncWithTimeout = (promise, ms = 1200) =>
+  CLOUD_SYNC_ENABLED ? Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]) : Promise.resolve();
 
 export { db };
 export const auth = getAuth(app);

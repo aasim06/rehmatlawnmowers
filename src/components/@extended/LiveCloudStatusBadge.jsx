@@ -7,6 +7,7 @@ import DisconnectOutlined from '@ant-design/icons/DisconnectOutlined';
 import RocketOutlined from '@ant-design/icons/RocketOutlined';
 import { useAppUpdate } from 'hooks/useAppUpdate';
 import { useStoreInventory } from 'context/StoreInventoryContext';
+import { CLOUD_SYNC_ENABLED } from 'api/firebase';
 
 export default function LiveCloudStatusBadge() {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -30,7 +31,7 @@ export default function LiveCloudStatusBadge() {
     if (hasUpdate) {
       applyUpdate();
     } else {
-      if (fetchFirebaseData) {
+      if (CLOUD_SYNC_ENABLED && fetchFirebaseData) {
         try {
           await fetchFirebaseData();
         } catch (err) {
@@ -76,14 +77,16 @@ export default function LiveCloudStatusBadge() {
     );
   }
 
-  const isCloud = isOnline;
+  const isCloud = CLOUD_SYNC_ENABLED && isOnline;
 
   return (
     <Tooltip
       title={
-        isCloud
-          ? 'Live Cloud Active: Connected to Firebase Cloud Database. Click to sync now.'
-          : 'Offline Mode: No internet connection. Click to retry connection.'
+        !CLOUD_SYNC_ENABLED
+          ? 'Local Mode Active: Cloud / Firebase sync is temporarily paused for fast offline/local operation.'
+          : isCloud
+            ? 'Live Cloud Active: Connected to Firebase Cloud Database. Click to sync now.'
+            : 'Offline Mode: No internet connection. Click to retry connection.'
       }
     >
       <Chip
@@ -96,9 +99,9 @@ export default function LiveCloudStatusBadge() {
             <DisconnectOutlined style={{ fontSize: 13 }} />
           )
         }
-        label={checking ? 'Syncing...' : isCloud ? 'Cloud Live' : 'Offline'}
+        label={checking ? 'Syncing...' : !CLOUD_SYNC_ENABLED ? 'Cloud Off (Local)' : isCloud ? 'Cloud Live' : 'Offline'}
         size="small"
-        color={isCloud ? 'success' : 'default'}
+        color={isCloud ? 'success' : !CLOUD_SYNC_ENABLED ? 'warning' : 'default'}
         variant="outlined"
         onClick={handleClick}
         sx={{
@@ -108,9 +111,13 @@ export default function LiveCloudStatusBadge() {
           height: 28,
           px: 0.75,
           borderRadius: 2,
-          borderColor: isCloud ? 'success.main' : 'divider',
+          borderColor: isCloud ? 'success.main' : !CLOUD_SYNC_ENABLED ? 'warning.main' : 'divider',
           '&:hover': {
-            backgroundColor: isCloud ? 'rgba(82, 196, 26, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+            backgroundColor: isCloud
+              ? 'rgba(82, 196, 26, 0.1)'
+              : !CLOUD_SYNC_ENABLED
+                ? 'rgba(245, 158, 11, 0.1)'
+                : 'rgba(0, 0, 0, 0.05)'
           }
         }}
       />

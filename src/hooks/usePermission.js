@@ -57,6 +57,7 @@ export function usePermission() {
     '/inventory/customer-ledgers': 'customer-ledgers',
     '/inventory/vendor-ledgers': 'vendor-ledgers',
     '/inventory/vendors': 'vendors',
+    '/inventory/factory-invoices': 'store-ledger',
     '/inventory/store-payments': 'store-ledger',
     '/inventory/store-ledger': 'store-ledger',
     '/inventory/ledger': 'ledger',

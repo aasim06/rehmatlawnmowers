@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { db } from 'api/firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, setDoc, deleteDoc, getDocs, syncWithTimeout } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Tea & Refreshment',
@@ -68,8 +68,6 @@ const untrackId = (key, id) => {
     existing.filter((x) => x !== String(id))
   );
 };
-
-const syncWithTimeout = (promise, ms = 1500) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
 
 const getActiveActorName = () => {
   try {
@@ -322,7 +320,7 @@ export function useExpensesModule({ logActivity }) {
   };
 
   const syncExpensesFromCloud = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!CLOUD_SYNC_ENABLED || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
 
     const deletedExpenseSet = new Set(safeParse(STORAGE_KEYS.deletedExpenses, []).map(String));
     const deletedFundSet = new Set(safeParse(STORAGE_KEYS.deletedFunds, []).map(String));

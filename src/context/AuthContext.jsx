@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { db, auth } from 'api/firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { db, auth, CLOUD_SYNC_ENABLED, getDocs, setDoc, deleteDoc, onSnapshot } from 'api/firebase';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -27,6 +27,7 @@ export const defaultSuperAdminPermissions = {
   'customer-ledgers': true,
   'vendor-ledgers': true,
   'vendors': true,
+  'factory-invoices': true,
   'store-payments': true,
   'store-ledger': true,
   'ledger': true,
@@ -62,6 +63,7 @@ export const defaultAdminPermissions = {
   'customer-ledgers': true,
   'vendor-ledgers': true,
   'vendors': true,
+  'factory-invoices': true,
   'store-payments': true,
   'store-ledger': true,
   'ledger': true,
@@ -302,6 +304,7 @@ export function AuthProvider({ children }) {
 
   // Real-time multi-device synchronization of staff users and permissions from Firestore
   useEffect(() => {
+    if (!CLOUD_SYNC_ENABLED) return;
     let unsubscribeUsers;
     let isMounted = true;
 
@@ -435,7 +438,7 @@ export function AuthProvider({ children }) {
       let isPassValid = cleanPass === expectedPass || (expectedPass === '123456' && cleanPass === 'admin123');
 
       // If local password didn't match, check cloud in case it was updated remotely
-      if (!isPassValid && (typeof navigator === 'undefined' || navigator.onLine)) {
+      if (!isPassValid && CLOUD_SYNC_ENABLED && (typeof navigator === 'undefined' || navigator.onLine)) {
         try {
           const q = query(collection(db, 'users'), where('email', '==', 'admin@rehmat.com'));
           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));

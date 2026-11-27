@@ -208,7 +208,7 @@ export default function AuthLogin() {
               </Grid>
 
               <Grid size={12}>
-                <AnimateButton>
+                <AnimateButton scale={{ hover: 1.005, tap: 0.99 }}>
                   <Button
                     disableElevation
                     disabled={isSubmitting}

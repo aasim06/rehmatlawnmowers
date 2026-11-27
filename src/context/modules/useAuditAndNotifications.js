@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { db } from 'api/firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, setDoc, deleteDoc, getDocs } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   auditLogs: 'rehmat_store_audit_logs',
@@ -81,7 +81,7 @@ export function useAuditAndNotifications() {
   };
 
   const syncAuditLogsFromCloud = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!CLOUD_SYNC_ENABLED || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     try {
       const snap = await getDocs(collection(db, 'audit_logs'));
       if (!snap?.docs) return;

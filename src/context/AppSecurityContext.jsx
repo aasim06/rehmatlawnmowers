@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { db } from 'api/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, getDoc, setDoc, onSnapshot } from 'api/firebase';
+import { doc } from 'firebase/firestore';
 import { isTauriApp, isWebApp } from 'utils/platform';
 
 const AppSecurityContext = createContext();
@@ -49,7 +49,7 @@ export function AppSecurityProvider({ children }) {
 
   // Fetch latest security state from Firebase Firestore (only when online)
   const refreshSecurityConfig = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (!CLOUD_SYNC_ENABLED || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       return;
     }
     try {
@@ -112,6 +112,7 @@ export function AppSecurityProvider({ children }) {
 
   // Initial fetch and Realtime Firebase subscription
   useEffect(() => {
+    if (!CLOUD_SYNC_ENABLED) return;
     refreshSecurityConfig();
 
     let unsubscribe = null;

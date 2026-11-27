@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 // third-party
 import { motion, useCycle } from 'framer-motion';
 
-export default function AnimateButton({ children, type = 'scale', direction = 'right', offset = 10, scale = { hover: 1.05, tap: 0.954 } }) {
+export default function AnimateButton({ children, type = 'scale', direction = 'right', offset = 10, scale = { hover: 1.006, tap: 0.99 } }) {
   let offset1;
   let offset2;
   switch (direction) {
@@ -61,7 +61,7 @@ export default function AnimateButton({ children, type = 'scale', direction = 'r
         };
       }
       return (
-        <motion.div whileHover={{ scale: scale?.hover }} whileTap={{ scale: scale?.tap }}>
+        <motion.div whileHover={{ scale: scale?.hover }} whileTap={{ scale: scale?.tap }} transition={{ duration: 0.15, ease: 'easeOut' }}>
           {children}
         </motion.div>
       );

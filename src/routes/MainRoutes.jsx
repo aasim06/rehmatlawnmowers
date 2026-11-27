@@ -15,6 +15,7 @@ const MachinePaymentsPage = Loadable(lazy(() => import('pages/inventory/MachineP
 const MachineRepairsPage = Loadable(lazy(() => import('pages/inventory/MachineRepairsPage')));
 const CategoriesPage = Loadable(lazy(() => import('pages/inventory/CategoriesPage')));
 const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
+const FactoryInvoicesPage = Loadable(lazy(() => import('pages/inventory/FactoryInvoicesPage')));
 const StorePaymentsPage = Loadable(lazy(() => import('pages/inventory/StorePaymentsPage')));
 const StoreLedgerPage = Loadable(lazy(() => import('pages/inventory/StoreLedgerPage')));
 const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
@@ -226,6 +227,14 @@ const MainRoutes = {
           element: (
             <RoleGuard permission="ledger">
               <UsageLogPage />
+            </RoleGuard>
+          )
+        },
+        {
+          path: 'factory-invoices',
+          element: (
+            <RoleGuard permission="store-ledger">
+              <FactoryInvoicesPage />
             </RoleGuard>
           )
         },

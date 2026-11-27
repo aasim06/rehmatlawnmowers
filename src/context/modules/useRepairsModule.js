@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { db } from 'api/firebase';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, setDoc, deleteDoc } from 'api/firebase';
+import { doc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'rehmat_store_machine_repairs_v1';
 const DELETED_STORAGE_KEY = 'rehmat_deleted_repair_ids';

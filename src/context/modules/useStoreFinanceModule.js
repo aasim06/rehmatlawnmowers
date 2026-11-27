@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { db } from 'api/firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { db, CLOUD_SYNC_ENABLED, setDoc, deleteDoc, getDocs, syncWithTimeout } from 'api/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   customers: 'rehmat_store_customers_v1',
@@ -65,8 +65,6 @@ const removeTrackedId = (key, id) => {
   );
 };
 
-const syncWithTimeout = (promise, ms = 1200) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
-
 const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -88,7 +86,7 @@ export function useStoreFinanceModule({ usageLogs = [], updateLog, vendorPayment
   const [storePayments, setStorePayments] = useState(() => safeParseJSON(STORAGE_KEYS.payments, []));
 
   const syncStoreFinanceFromCloud = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!CLOUD_SYNC_ENABLED || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
 
     const deletedCustSet = new Set(safeParseJSON(DELETED_KEYS.customers, []).map(String));
     const deletedPaySet = new Set(safeParseJSON(DELETED_KEYS.payments, []).map(String));
