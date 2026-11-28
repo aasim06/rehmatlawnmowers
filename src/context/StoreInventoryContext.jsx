@@ -132,19 +132,19 @@ export function StoreInventoryProvider({ children }) {
   const [, setDeletedSaleIds] = useState(() => safeParseJSON('rehmat_deleted_sale_ids', []));
   const [, setDeletedCategoryIds] = useState(() => safeParseJSON('rehmat_deleted_category_ids', []));
 
-  // 4. Categories State (Persistent Start with fallback to initialCategories)
+  // 4. Categories State (Persistent Start with fallback to initialCategories only on uninitialized storage)
   const [categories, setCategories] = useState(() => {
+    const rawCats = localStorage.getItem('rehmat_store_categories_v2');
     const saved = safeParseJSON('rehmat_store_categories_v2', null);
     const deletedCatList = safeParseJSON('rehmat_deleted_category_ids', []);
     const deletedCatSet = new Set(deletedCatList.map((x) => String(x).toLowerCase()));
 
-    if (Array.isArray(saved) && saved.length > 0) {
+    if (rawCats !== null && Array.isArray(saved)) {
       const clean = saved.filter((c) => !deletedCatSet.has(String(c.id).toLowerCase()) && !deletedCatSet.has(String(c.name || '').toLowerCase()));
-      if (clean.length > 0) {
-        const normalized = normalizeCategories(clean);
-        safeSetJSON('rehmat_store_categories_v2', JSON.stringify(normalized));
-        return normalized;
-      }
+      if (clean.length === 0) return [];
+      const normalized = normalizeCategories(clean);
+      safeSetJSON('rehmat_store_categories_v2', JSON.stringify(normalized));
+      return normalized;
     }
     if (deletedCatList.length > 0) {
       return [];
@@ -175,7 +175,16 @@ export function StoreInventoryProvider({ children }) {
 
   // 10. Machine BOM Recipes State
   const [machineRecipes, setMachineRecipes] = useState(() => {
-    const parsed = safeParseJSON('store_machine_recipes', null);
+    const rawV2 = localStorage.getItem('rehmat_store_machine_recipes_v2');
+    const parsed = safeParseJSON('rehmat_store_machine_recipes_v2', null) || safeParseJSON('store_machine_recipes', null);
+    if (rawV2 !== null && Array.isArray(parsed)) {
+      return parsed.filter(
+        (r) =>
+          !(r.modelName || '').toLowerCase().includes('emmami') &&
+          r.id !== '__APP_SECURITY__' &&
+          !r.modelName?.startsWith('__APP_')
+      );
+    }
     if (parsed && Array.isArray(parsed) && parsed.length > 0) {
       // Filter out test entries like 'Emmami' and system security control records
       const clean = parsed.filter(
@@ -391,7 +400,7 @@ export function StoreInventoryProvider({ children }) {
           rackLocation: i.location || i.rack_location || i.rackLocation || 'Main Store',
           status: parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= 0 ? 2 : parseFloat(i.remaining_stock !== undefined ? i.remaining_stock : i.remainingStock) <= (parseFloat(i.min_threshold || i.min_level || i.minLevel) || 10) ? 0 : 1
         }));
-        if (mappedItems.length > 0) {
+        if (mappedItems.length > 0 || !itemsSnap.value.metadata?.fromCache) {
           setItems(mappedItems);
           safeSetJSON('rehmat_store_items_v2', JSON.stringify(mappedItems));
         }
@@ -448,7 +457,7 @@ export function StoreInventoryProvider({ children }) {
             notes: l.notes || localItem?.notes || ''
           };
         });
-        if (mappedLogs.length > 0) {
+        if (mappedLogs.length > 0 || !logsSnap.value.metadata?.fromCache) {
           setUsageLogs(mappedLogs);
           safeSetJSON('rehmat_store_usage_logs_v2', JSON.stringify(mappedLogs));
         }
@@ -488,7 +497,7 @@ export function StoreInventoryProvider({ children }) {
             items: s.items || []
           };
         });
-        if (mappedSales.length > 0) {
+        if (mappedSales.length > 0 || !salesSnap.value.metadata?.fromCache) {
           setMachineSales(mappedSales);
           safeSetJSON('rehmat_store_machine_sales_v2', JSON.stringify(mappedSales));
         }
@@ -504,7 +513,7 @@ export function StoreInventoryProvider({ children }) {
           name: c.name,
           description: c.description || ''
         }));
-        if (mappedCats.length > 0) {
+        if (mappedCats.length > 0 || !catSnap.value.metadata?.fromCache) {
           setCategories(mappedCats);
           safeSetJSON('rehmat_store_categories_v2', JSON.stringify(mappedCats));
         }
@@ -564,7 +573,7 @@ export function StoreInventoryProvider({ children }) {
         const unsyncedLocal = localCustPay.filter((p) => pendingSet.has(String(p.id)) && !remoteIdSet.has(String(p.id)));
         const mergedCustPay = [...unsyncedLocal, ...mappedCustPay];
 
-        if (mergedCustPay.length > 0) {
+        if (mergedCustPay.length > 0 || !custPaySnap.value.metadata?.fromCache) {
           setCustomerPayments(mergedCustPay);
           safeSetJSON('rehmat_store_customer_payments_v2', JSON.stringify(mergedCustPay));
         }
@@ -583,7 +592,7 @@ export function StoreInventoryProvider({ children }) {
           notes: c.notes || '',
           createdAt: c.created_at || c.createdAt || ''
         }));
-        if (mappedCustDir.length > 0) {
+        if (mappedCustDir.length > 0 || !machineCustomersSnap.value.metadata?.fromCache) {
           setMachineCustomers(mappedCustDir);
           safeSetJSON('rehmat_store_machine_customers_v1', JSON.stringify(mappedCustDir));
         }
@@ -630,7 +639,7 @@ export function StoreInventoryProvider({ children }) {
             repairItems: r.repair_items || r.repairItems || []
           };
         });
-        if (mappedRepairs.length > 0) {
+        if (mappedRepairs.length > 0 || !repairsSnap.value.metadata?.fromCache) {
           setMachineRepairs(mappedRepairs);
           safeSetJSON('rehmat_store_machine_repairs_v1', JSON.stringify(mappedRepairs));
         }
@@ -646,7 +655,7 @@ export function StoreInventoryProvider({ children }) {
           description: r.description || '',
           ingredients: r.ingredients || []
         }));
-        if (mappedRecipes.length > 0) {
+        if (mappedRecipes.length > 0 || !recipesSnap.value.metadata?.fromCache) {
           setMachineRecipes(mappedRecipes);
           safeSetJSON('rehmat_store_machine_recipes_v2', JSON.stringify(mappedRecipes));
         }
@@ -670,11 +679,11 @@ export function StoreInventoryProvider({ children }) {
 
     fetchFirebaseData();
 
-    // Throttled refetch on window focus for multi-device sync (at most once every 2 minutes)
+    // Refetch on window focus for prompt multi-device sync (throttled to 5s)
     let lastFocusFetch = Date.now();
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastFocusFetch > 120000) {
+      if (now - lastFocusFetch > 5000) {
         lastFocusFetch = now;
         fetchFirebaseData();
       }
@@ -685,8 +694,8 @@ export function StoreInventoryProvider({ children }) {
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
-    // Periodic cloud poll every 90 seconds
-    const interval = setInterval(fetchFirebaseData, 90000);
+    // Periodic cloud poll every 30 seconds
+    const interval = setInterval(fetchFirebaseData, 30000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);

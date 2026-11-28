@@ -436,7 +436,7 @@ export function useExpensesModule({ logActivity }) {
       }
     }
 
-    if (expCatsSnap.status === 'fulfilled' && expCatsSnap.value?.docs && expCatsSnap.value.docs.length > 0) {
+    if (expCatsSnap.status === 'fulfilled' && expCatsSnap.value?.docs && (expCatsSnap.value.docs.length > 0 || !expCatsSnap.value.metadata?.fromCache)) {
       const remoteNames = expCatsSnap.value.docs.map((d) => (d.data()?.name || '').trim()).filter(Boolean);
       const seen = new Set();
       const mergedCats = [...EXPENSE_BASE_CATEGORIES, ...remoteNames].filter((name) => {

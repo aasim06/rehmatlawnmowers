@@ -8,7 +8,9 @@ import {
   setDoc as fsSetDoc,
   deleteDoc as fsDeleteDoc,
   getDocs as fsGetDocs,
+  getDocsFromServer as fsGetDocsFromServer,
   getDoc as fsGetDoc,
+  getDocFromServer as fsGetDocFromServer,
   onSnapshot as fsOnSnapshot
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -45,13 +47,38 @@ if (!CLOUD_SYNC_ENABLED) {
   disableNetwork(db).catch(() => {});
 }
 
-// Guarded Firestore helpers that resolve immediately while Cloud Sync is paused
+// Guarded Firestore helpers: force live server reads when online so remote deletions
+// never get masked by stale IndexedDB persistent cache, and short-circuit when Cloud is paused.
 export const setDoc = (...args) => (CLOUD_SYNC_ENABLED ? fsSetDoc(...args) : Promise.resolve());
 export const deleteDoc = (...args) => (CLOUD_SYNC_ENABLED ? fsDeleteDoc(...args) : Promise.resolve());
-export const getDocs = (...args) =>
-  CLOUD_SYNC_ENABLED ? fsGetDocs(...args) : Promise.resolve({ empty: true, docs: [], size: 0, metadata: { fromCache: true } });
-export const getDoc = (...args) =>
-  CLOUD_SYNC_ENABLED ? fsGetDoc(...args) : Promise.resolve({ exists: () => false, data: () => undefined });
+export const getDocs = async (...args) => {
+  if (!CLOUD_SYNC_ENABLED) {
+    return { empty: true, docs: [], size: 0, metadata: { fromCache: true } };
+  }
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  if (isOnline) {
+    try {
+      return await fsGetDocsFromServer(...args);
+    } catch {
+      // Fall back to persistent cache if offline or unreachable
+    }
+  }
+  return fsGetDocs(...args);
+};
+export const getDoc = async (...args) => {
+  if (!CLOUD_SYNC_ENABLED) {
+    return { exists: () => false, data: () => undefined };
+  }
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  if (isOnline) {
+    try {
+      return await fsGetDocFromServer(...args);
+    } catch {
+      // Fall back to persistent cache if offline or unreachable
+    }
+  }
+  return fsGetDoc(...args);
+};
 export const onSnapshot = (...args) => (CLOUD_SYNC_ENABLED ? fsOnSnapshot(...args) : () => {});
 export const syncWithTimeout = (promise, ms = 1200) =>
   CLOUD_SYNC_ENABLED ? Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]) : Promise.resolve();

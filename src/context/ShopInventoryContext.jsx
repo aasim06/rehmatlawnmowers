@@ -314,7 +314,7 @@ export function ShopInventoryProvider({ children }) {
 
       if (itemsSnap.status === 'fulfilled' && itemsSnap.value?.docs) {
         const fbItems = itemsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })).filter((i) => !deletedItems.has(String(i.id)));
-        if (fbItems.length > 0) {
+        if (fbItems.length > 0 || !itemsSnap.value.metadata?.fromCache) {
           setItems(fbItems);
           persistJSON(STORAGE_KEYS.items, fbItems);
         }
@@ -325,7 +325,7 @@ export function ShopInventoryProvider({ children }) {
           .map((d) => ({ id: d.id, ...d.data() }))
           .filter((l) => !deletedLogs.has(String(l.id)))
           .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-        if (fbLogs.length > 0) {
+        if (fbLogs.length > 0 || !logsSnap.value.metadata?.fromCache) {
           setUsageLogs(fbLogs);
           persistJSON(STORAGE_KEYS.usageLogs, fbLogs);
         }
@@ -333,13 +333,13 @@ export function ShopInventoryProvider({ children }) {
 
       if (vendorsSnap.status === 'fulfilled' && vendorsSnap.value?.docs) {
         const fbVendors = vendorsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() })).filter((v) => !deletedVendors.has(String(v.id)));
-        if (fbVendors.length > 0) {
+        if (fbVendors.length > 0 || !vendorsSnap.value.metadata?.fromCache) {
           setVendors(fbVendors);
           persistJSON(STORAGE_KEYS.vendors, fbVendors);
         }
       }
 
-      if (catsSnap.status === 'fulfilled' && !catsSnap.value.empty) {
+      if (catsSnap.status === 'fulfilled' && catsSnap.value?.docs && (!catsSnap.value.empty || !catsSnap.value.metadata?.fromCache)) {
         const fbCats = catsSnap.value.docs.map((d) => ({ id: d.id, ...d.data() }));
         setCategories(fbCats);
         persistJSON(STORAGE_KEYS.categories, fbCats);
@@ -350,7 +350,7 @@ export function ShopInventoryProvider({ children }) {
         const mergedSales = mergeWithPending(fbSales, deletedSales, STORAGE_KEYS.sales, PENDING_KEYS.sales).sort(
           (a, b) => new Date(b.dateISO || b.createdAt || 0) - new Date(a.dateISO || a.createdAt || 0)
         );
-        if (mergedSales.length > 0) {
+        if (mergedSales.length > 0 || !salesSnap.value.metadata?.fromCache) {
           setShopSales(mergedSales);
           persistJSON(STORAGE_KEYS.sales, mergedSales);
         }
@@ -361,7 +361,7 @@ export function ShopInventoryProvider({ children }) {
         const mergedPayments = mergeWithPending(fbPay, deletedPayments, STORAGE_KEYS.payments, PENDING_KEYS.payments).sort(
           (a, b) => new Date(b.createdAt || b.dateISO || 0) - new Date(a.createdAt || a.dateISO || 0)
         );
-        if (mergedPayments.length > 0) {
+        if (mergedPayments.length > 0 || !paySnap.value.metadata?.fromCache) {
           setShopCustomerPayments(mergedPayments);
           persistJSON(STORAGE_KEYS.payments, mergedPayments);
         }
@@ -372,7 +372,7 @@ export function ShopInventoryProvider({ children }) {
         const mergedCustomers = mergeWithPending(fbCustomers, deletedCustomers, STORAGE_KEYS.customers, PENDING_KEYS.customers).sort((a, b) =>
           (a.name || '').localeCompare(b.name || '')
         );
-        if (mergedCustomers.length > 0) {
+        if (mergedCustomers.length > 0 || !custSnap.value.metadata?.fromCache) {
           setShopCustomers(mergedCustomers);
           persistJSON(STORAGE_KEYS.customers, mergedCustomers);
         }
@@ -388,14 +388,14 @@ export function ShopInventoryProvider({ children }) {
     let lastFocusFetch = Date.now();
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastFocusFetch > 120000) {
+      if (now - lastFocusFetch > 5000) {
         lastFocusFetch = now;
         fetchShopFirebaseData();
       }
     };
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', fetchShopFirebaseData);
-    const interval = setInterval(fetchShopFirebaseData, 90000);
+    const interval = setInterval(fetchShopFirebaseData, 30000);
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', fetchShopFirebaseData);
